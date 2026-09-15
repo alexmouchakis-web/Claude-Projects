@@ -2,81 +2,81 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
 :root {
-  --ground: #ECEAE6;
+  --ground: #FFFFFF;
   --surface: #FFFFFF;
-  --surface-alt: #F5F4F1;
-  --ink: #24272E;
-  --ink-2: #5A5D65;
-  --ink-3: #8E9099;
-  --border: #D8D5CF;
-  --border-light: #E8E6E1;
-  --blue: #3A6BC5;
-  --blue-light: #EBF0FA;
-  --blue-hover: #2F5AAE;
-  --green: #3A8C5C;
-  --green-light: #E8F5ED;
-  --amber: #B8872A;
-  --amber-light: #FDF4E3;
-  --red: #C04B35;
-  --red-light: #FCEAE6;
-  --nav-bg: #24272E;
-  --nav-text: #B0B3BA;
+  --surface-alt: #F7F8FA;
+  --ink: #1A1D24;
+  --ink-2: #4B5060;
+  --ink-3: #8B90A0;
+  --border: #E2E4EA;
+  --border-light: #EDEEF2;
+  --blue: #4F6EF7;
+  --blue-light: #EEF1FE;
+  --blue-hover: #3B57E0;
+  --green: #22A566;
+  --green-light: #E6F9F0;
+  --amber: #E5940A;
+  --amber-light: #FFF7E6;
+  --red: #E5453A;
+  --red-light: #FEF0EF;
+  --nav-bg: #1A1D24;
+  --nav-text: #9DA2B0;
   --nav-active: #FFFFFF;
-  --shadow-sm: 0 1px 2px rgba(0,0,0,.06);
-  --shadow: 0 2px 8px rgba(0,0,0,.08);
-  --shadow-lg: 0 8px 24px rgba(0,0,0,.12);
-  --radius: 8px;
-  --radius-lg: 12px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.05);
+  --shadow: 0 2px 10px rgba(0,0,0,.07);
+  --shadow-lg: 0 8px 28px rgba(0,0,0,.10);
+  --radius: 10px;
+  --radius-lg: 14px;
 }
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --ground: #141518;
-  --surface: #1E2027;
-  --surface-alt: #272930;
-  --ink: #E8E6E1;
-  --ink-2: #A0A3AB;
-  --ink-3: #6B6E76;
-  --border: #35383F;
-  --border-light: #2A2D34;
-  --blue: #6B9AE8;
-  --blue-light: #1E2A3E;
-  --blue-hover: #85AEF0;
-  --green: #5CB87A;
-  --green-light: #1A2E22;
-  --amber: #D4A545;
-  --amber-light: #2E2618;
-  --red: #E06B55;
-  --red-light: #2E1E1A;
-  --nav-bg: #111215;
-  --nav-text: #6B6E76;
-  --nav-active: #E8E6E1;
-  --shadow-sm: 0 1px 2px rgba(0,0,0,.2);
-  --shadow: 0 2px 8px rgba(0,0,0,.3);
-  --shadow-lg: 0 8px 24px rgba(0,0,0,.4);
+  --ground: #111318;
+  --surface: #191C23;
+  --surface-alt: #22252E;
+  --ink: #E4E6EB;
+  --ink-2: #9DA2B0;
+  --ink-3: #636878;
+  --border: #2C303A;
+  --border-light: #23262F;
+  --blue: #7B96FA;
+  --blue-light: #1C2342;
+  --blue-hover: #95ACFF;
+  --green: #4CC88A;
+  --green-light: #142E22;
+  --amber: #F5B034;
+  --amber-light: #2C2414;
+  --red: #F06860;
+  --red-light: #2E1A1A;
+  --nav-bg: #0C0E12;
+  --nav-text: #636878;
+  --nav-active: #E4E6EB;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.25);
+  --shadow: 0 2px 10px rgba(0,0,0,.35);
+  --shadow-lg: 0 8px 28px rgba(0,0,0,.45);
 }}
 :root[data-theme="dark"]{
-  --ground: #141518;
-  --surface: #1E2027;
-  --surface-alt: #272930;
-  --ink: #E8E6E1;
-  --ink-2: #A0A3AB;
-  --ink-3: #6B6E76;
-  --border: #35383F;
-  --border-light: #2A2D34;
-  --blue: #6B9AE8;
-  --blue-light: #1E2A3E;
-  --blue-hover: #85AEF0;
-  --green: #5CB87A;
-  --green-light: #1A2E22;
-  --amber: #D4A545;
-  --amber-light: #2E2618;
-  --red: #E06B55;
-  --red-light: #2E1E1A;
-  --nav-bg: #111215;
-  --nav-text: #6B6E76;
-  --nav-active: #E8E6E1;
-  --shadow-sm: 0 1px 2px rgba(0,0,0,.2);
-  --shadow: 0 2px 8px rgba(0,0,0,.3);
-  --shadow-lg: 0 8px 24px rgba(0,0,0,.4);
+  --ground: #111318;
+  --surface: #191C23;
+  --surface-alt: #22252E;
+  --ink: #E4E6EB;
+  --ink-2: #9DA2B0;
+  --ink-3: #636878;
+  --border: #2C303A;
+  --border-light: #23262F;
+  --blue: #7B96FA;
+  --blue-light: #1C2342;
+  --blue-hover: #95ACFF;
+  --green: #4CC88A;
+  --green-light: #142E22;
+  --amber: #F5B034;
+  --amber-light: #2C2414;
+  --red: #F06860;
+  --red-light: #2E1A1A;
+  --nav-bg: #0C0E12;
+  --nav-text: #636878;
+  --nav-active: #E4E6EB;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.25);
+  --shadow: 0 2px 10px rgba(0,0,0,.35);
+  --shadow-lg: 0 8px 28px rgba(0,0,0,.45);
 }
 *,*::before,*::after{box-sizing:border-box}
 body{
@@ -122,8 +122,8 @@ main{flex:1;margin-left:220px;padding:24px;max-width:1200px}
 .page-header .back-btn{display:flex;align-items:center;gap:6px;color:var(--ink-2);font-size:.85rem;cursor:pointer;background:none;padding:4px 8px;border-radius:6px}
 .page-header .back-btn:hover{background:var(--surface-alt);color:var(--ink)}
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius);font-weight:500;transition:all .15s;white-space:nowrap}
-.btn-primary{background:var(--blue);color:#fff}
-.btn-primary:hover{background:var(--blue-hover)}
+.btn-primary{background:var(--blue);color:#fff;box-shadow:0 1px 3px rgba(79,110,247,.3)}
+.btn-primary:hover{background:var(--blue-hover);box-shadow:0 2px 6px rgba(79,110,247,.35)}
 .btn-secondary{background:var(--surface);color:var(--ink);border:1px solid var(--border)}
 .btn-secondary:hover{background:var(--surface-alt);border-color:var(--ink-3)}
 .btn-danger{background:var(--red-light);color:var(--red)}
@@ -139,7 +139,7 @@ main{flex:1;margin-left:220px;padding:24px;max-width:1200px}
 .kpi.kpi-green .kpi-value{color:var(--green)}
 .kpi.kpi-amber .kpi-value{color:var(--amber)}
 .kpi.kpi-red .kpi-value{color:var(--red)}
-.card{background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);border:1px solid var(--border-light);overflow:hidden}
+.card{background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow);border:1px solid var(--border-light);overflow:hidden}
 .card-header{padding:16px 20px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between;gap:12px}
 .card-header h2{font-size:1rem}
 .card-body{padding:20px}
@@ -234,6 +234,14 @@ tr:hover td{background:var(--surface-alt)}
 .delivery-stat .ds-label{font-size:.75rem;color:var(--ink-2);text-transform:uppercase;letter-spacing:.04em}
 .clickable{cursor:pointer}
 .clickable:hover{background:var(--surface-alt)}
+.kpi.clickable{cursor:pointer;transition:all .15s}
+.kpi.clickable:hover{box-shadow:var(--shadow);transform:translateY(-1px);border-color:var(--border)}
+.inline-edit-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border-light)}
+.inline-edit-row:last-child{border-bottom:none}
+.inline-edit-row input{max-width:100px;padding:4px 8px;font-size:.8rem}
+.inline-edit-row .mat-name{flex:1;font-size:.85rem}
+.catalog-edit-btn{background:none;color:var(--blue);font-size:.8rem;font-weight:500;padding:4px 8px;border-radius:6px}
+.catalog-edit-btn:hover{background:var(--blue-light)}
 .text-right{text-align:right}
 .text-center{text-align:center}
 .text-muted{color:var(--ink-3)}
@@ -668,12 +676,29 @@ function calcUnits(consumption, area, pkg) {
   return { total: Math.round(total * 100) / 100, units: Math.ceil(total / size), size, pkg };
 }
 
+function getEffectiveProducts(sys) {
+  const cat = CATALOG[sys.systemName];
+  if (!cat || !cat.applications[sys.application]) return [];
+  const defaults = cat.applications[sys.application];
+  const overrides = sys.materialOverrides || {};
+  const products = defaults.map((prod, i) => {
+    const ov = overrides[i] || {};
+    return {
+      name: ov.name !== undefined ? ov.name : prod.name,
+      pkg: ov.pkg !== undefined ? ov.pkg : prod.pkg,
+      consumption: ov.consumption !== undefined ? ov.consumption : prod.consumption,
+      unit: ov.unit !== undefined ? ov.unit : prod.unit
+    };
+  });
+  if (sys.extraProducts) sys.extraProducts.forEach(ep => products.push(ep));
+  return products;
+}
+
 function getAllMaterials(systems) {
   const mats = {};
   systems.forEach(sys => {
-    const cat = CATALOG[sys.systemName];
-    if (!cat || !cat.applications[sys.application]) return;
-    cat.applications[sys.application].forEach(prod => {
+    const products = getEffectiveProducts(sys);
+    products.forEach(prod => {
       const calc = calcUnits(prod.consumption, sys.area, prod.pkg);
       const key = prod.name + '|' + prod.pkg;
       if (!mats[key]) mats[key] = { name: prod.name, pkg: prod.pkg, unit: prod.unit, totalQty: 0, totalUnits: 0 };
@@ -796,10 +821,10 @@ function renderDashboard() {
   const lowStock = Object.entries(stockData).filter(([k, v]) => v.quantity <= (v.minStock || 0)).length;
 
   $('dashKpis').innerHTML = `
-    <div class="kpi kpi-blue"><div class="kpi-label">Active Projects</div><div class="kpi-value">${active.length}</div><div class="kpi-sub">${pArr.length} total</div></div>
-    <div class="kpi ${pendingOrders > 0 ? 'kpi-amber' : 'kpi-green'}"><div class="kpi-label">Pending Orders</div><div class="kpi-value">${pendingOrders}</div><div class="kpi-sub">awaiting delivery</div></div>
-    <div class="kpi ${lowStock > 0 ? 'kpi-red' : 'kpi-green'}"><div class="kpi-label">Stock Alerts</div><div class="kpi-value">${lowStock}</div><div class="kpi-sub">below minimum</div></div>
-    <div class="kpi ${alerts.length > 0 ? 'kpi-amber' : 'kpi-green'}"><div class="kpi-label">Active Alerts</div><div class="kpi-value">${alerts.length}</div><div class="kpi-sub">need attention</div></div>`;
+    <div class="kpi kpi-blue clickable" onclick="navigate('projects')"><div class="kpi-label">Active Projects</div><div class="kpi-value">${active.length}</div><div class="kpi-sub">${pArr.length} total</div></div>
+    <div class="kpi ${pendingOrders > 0 ? 'kpi-amber' : 'kpi-green'} clickable" onclick="navigate('orders')"><div class="kpi-label">Pending Orders</div><div class="kpi-value">${pendingOrders}</div><div class="kpi-sub">awaiting delivery</div></div>
+    <div class="kpi ${lowStock > 0 ? 'kpi-red' : 'kpi-green'} clickable" onclick="navigate('stock')"><div class="kpi-label">Stock Alerts</div><div class="kpi-value">${lowStock}</div><div class="kpi-sub">below minimum</div></div>
+    <div class="kpi ${alerts.length > 0 ? 'kpi-amber' : 'kpi-green'} clickable" onclick="showAllAlerts()"><div class="kpi-label">Active Alerts</div><div class="kpi-value">${alerts.length}</div><div class="kpi-sub">need attention</div></div>`;
 
   if (active.length === 0) {
     $('dashProjects').innerHTML = '<div class="empty-state" style="padding:24px"><p>No active projects yet</p></div>';
@@ -1062,10 +1087,13 @@ function renderOverview(p) {
   const deliveredItems = projDeliveries.reduce((s, d) => s + (d.items || []).reduce((ss, i) => ss + (i.quantity || 0), 0), 0);
   const deliveryPct = totalItems > 0 ? Math.min(100, Math.round(deliveredItems / totalItems * 100)) : 0;
 
-  let sysHtml = (p.systems || []).map(s => `<div class="system-card">
-    <div class="system-card-header"><strong>${s.systemName}</strong><span class="chip chip-blue">${s.area} m²</span></div>
+  let sysHtml = (p.systems || []).map((s, idx) => {
+    const hasOverrides = s.materialOverrides || s.extraProducts;
+    return `<div class="system-card">
+    <div class="system-card-header"><strong>${s.systemName}</strong><div class="flex items-center gap-8">${hasOverrides ? '<span class="chip chip-amber" style="font-size:.65rem">CUSTOM</span>' : ''}<span class="chip chip-blue">${s.area} m²</span><button class="catalog-edit-btn" onclick="openEditProjectMaterials(${idx})">Edit Materials</button></div></div>
     <div class="system-card-meta"><span>${s.application}</span>${s.notes ? '<span>' + s.notes + '</span>' : ''}</div>
-  </div>`).join('');
+  </div>`;
+  }).join('');
 
   $('tab-overview').innerHTML = `
     <div class="delivery-summary">
@@ -1722,6 +1750,120 @@ function deleteReminder(id) {
     renderReminders();
     updateBadges();
   }
+}
+
+// ========== ALERTS MODAL (from dashboard KPI tap) ==========
+function showAllAlerts() {
+  const alerts = generateAlerts();
+  if (alerts.length === 0) { toast('All clear — no alerts right now.'); return; }
+  const html = alerts.map(a => `<div class="alert-item alert-${a.level}" style="margin-bottom:6px">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span>${a.message}</span>
+  </div>`).join('');
+  openModal('All Active Alerts (' + alerts.length + ')', `<div class="alert-list">${html}</div>`, '<button class="btn btn-secondary" onclick="closeModal()">Close</button>');
+}
+
+// ========== CATALOG / MATERIAL EDITING ==========
+function openEditProjectMaterials(sysIdx) {
+  const p = projects[currentProject];
+  if (!p || !p.systems[sysIdx]) return;
+  const sys = p.systems[sysIdx];
+  const catDef = CATALOG[sys.systemName];
+  if (!catDef || !catDef.applications[sys.application]) { toast('System or application not found in catalog', 'error'); return; }
+  const defaultProducts = catDef.applications[sys.application];
+  const overrides = sys.materialOverrides || {};
+
+  let rows = defaultProducts.map((prod, i) => {
+    const ov = overrides[i] || {};
+    const name = ov.name !== undefined ? ov.name : prod.name;
+    const pkg = ov.pkg !== undefined ? ov.pkg : prod.pkg;
+    const consumption = ov.consumption !== undefined ? ov.consumption : prod.consumption;
+    const unit = ov.unit !== undefined ? ov.unit : prod.unit;
+    return `<div class="inline-edit-row" data-idx="${i}">
+      <div style="flex:2"><label>Product</label><input type="text" class="ov-name" value="${name}"></div>
+      <div style="flex:1"><label>Pkg</label><input type="text" class="ov-pkg" value="${pkg}"></div>
+      <div style="flex:1"><label>Consumption/${unit}</label><input type="number" class="ov-consumption" value="${consumption}" step="0.01" min="0"></div>
+      <div style="flex:0.5"><label>Unit</label><input type="text" class="ov-unit" value="${unit}" style="max-width:60px"></div>
+      <button class="remove-btn" onclick="this.closest('.inline-edit-row').remove()" title="Remove material">✕</button>
+    </div>`;
+  }).join('');
+
+  openModal('Edit Materials — ' + sys.systemName + ' (' + sys.application + ')', `
+    <div class="form-help mb-16">Override product names, packaging, or consumption rates for this project. Changes only affect this project, not the master catalog.</div>
+    <div id="matOverrideRows">${rows}</div>
+    <button class="btn btn-secondary btn-sm mt-16" onclick="addCustomMaterialRow()">+ Add Custom Material</button>
+  `, `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+     <button class="btn btn-secondary" onclick="resetMaterialOverrides(${sysIdx})">Reset to Defaults</button>
+     <button class="btn btn-primary" onclick="saveMaterialOverrides(${sysIdx})">Save Changes</button>`);
+}
+
+function addCustomMaterialRow() {
+  const container = $('matOverrideRows');
+  const idx = container.querySelectorAll('.inline-edit-row').length;
+  const el = document.createElement('div');
+  el.className = 'inline-edit-row';
+  el.dataset.idx = idx;
+  el.dataset.custom = 'true';
+  el.innerHTML = `
+    <div style="flex:2"><label>Product</label><input type="text" class="ov-name" value="" placeholder="Product name"></div>
+    <div style="flex:1"><label>Pkg</label><input type="text" class="ov-pkg" value="" placeholder="e.g. 20kg"></div>
+    <div style="flex:1"><label>Consumption/m²</label><input type="number" class="ov-consumption" value="0" step="0.01" min="0"></div>
+    <div style="flex:0.5"><label>Unit</label><input type="text" class="ov-unit" value="kg" style="max-width:60px"></div>
+    <button class="remove-btn" onclick="this.closest('.inline-edit-row').remove()" title="Remove material">✕</button>`;
+  container.appendChild(el);
+}
+
+function saveMaterialOverrides(sysIdx) {
+  const p = projects[currentProject];
+  const sys = p.systems[sysIdx];
+  const catDef = CATALOG[sys.systemName];
+  const defaultProducts = catDef ? catDef.applications[sys.application] || [] : [];
+  const rows = $('matOverrideRows').querySelectorAll('.inline-edit-row');
+  const overrides = {};
+  const extraProducts = [];
+
+  rows.forEach(row => {
+    const idx = parseInt(row.dataset.idx);
+    const isCustom = row.dataset.custom === 'true';
+    const name = row.querySelector('.ov-name').value.trim();
+    const pkg = row.querySelector('.ov-pkg').value.trim();
+    const consumption = parseFloat(row.querySelector('.ov-consumption').value) || 0;
+    const unit = row.querySelector('.ov-unit').value.trim() || 'kg';
+    if (!name) return;
+
+    if (isCustom || idx >= defaultProducts.length) {
+      extraProducts.push({ name, pkg, consumption, unit });
+    } else {
+      const def = defaultProducts[idx];
+      const ov = {};
+      if (name !== def.name) ov.name = name;
+      if (pkg !== def.pkg) ov.pkg = pkg;
+      if (consumption !== def.consumption) ov.consumption = consumption;
+      if (unit !== def.unit) ov.unit = unit;
+      if (Object.keys(ov).length > 0) overrides[idx] = ov;
+    }
+  });
+
+  sys.materialOverrides = Object.keys(overrides).length > 0 ? overrides : undefined;
+  sys.extraProducts = extraProducts.length > 0 ? extraProducts : undefined;
+  p.updatedAt = new Date().toISOString();
+  if (db) db.doc('projects/' + p.id).set(p);
+  logActivity(`edited materials for ${sys.systemName} in "${p.name}"`);
+  closeModal();
+  toast('Material overrides saved');
+  renderProjectDetail();
+}
+
+function resetMaterialOverrides(sysIdx) {
+  const p = projects[currentProject];
+  const sys = p.systems[sysIdx];
+  delete sys.materialOverrides;
+  delete sys.extraProducts;
+  p.updatedAt = new Date().toISOString();
+  if (db) db.doc('projects/' + p.id).set(p);
+  closeModal();
+  toast('Reset to catalog defaults');
+  renderProjectDetail();
 }
 
 // ========== RESPONSIVE DASHBOARD GRID ==========
