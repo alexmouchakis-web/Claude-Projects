@@ -698,14 +698,15 @@ function getEffectiveProducts(sys) {
 
 function getAllMaterials(systems) {
   const mats = {};
-  systems.forEach(sys => {
+  systems.forEach((sys, sysIdx) => {
     const products = getEffectiveProducts(sys);
     products.forEach(prod => {
       const calc = calcUnits(prod.consumption, sys.area, prod.pkg);
       const key = prod.name + '|' + prod.pkg;
-      if (!mats[key]) mats[key] = { name: prod.name, pkg: prod.pkg, unit: prod.unit, totalQty: 0, totalUnits: 0 };
+      if (!mats[key]) mats[key] = { name: prod.name, pkg: prod.pkg, unit: prod.unit, totalQty: 0, totalUnits: 0, sysIndices: [] };
       mats[key].totalQty += calc.total;
       mats[key].totalUnits += calc.units;
+      if (!mats[key].sysIndices.includes(sysIdx)) mats[key].sysIndices.push(sysIdx);
     });
   });
   return Object.values(mats);
@@ -1242,7 +1243,8 @@ function renderMaterials(p) {
     const diff = stock - remaining;
     const statusCls = remaining <= 0 ? 'chip-green' : diff >= 0 ? 'chip-blue' : 'chip-red';
     const statusText = remaining <= 0 ? 'Fully delivered' : diff >= 0 ? 'Stock OK' : 'Need ' + Math.abs(diff);
-    return `<tr><td><strong>${m.name}</strong></td><td>${m.pkg}</td><td>${m.totalQty} ${m.unit}</td><td>${m.totalUnits}</td><td>${stock}</td><td>${delivered}</td><td>${Math.max(0, remaining)}</td><td><span class="chip ${statusCls}">${statusText}</span></td></tr>`;
+    const editIdx = m.sysIndices[0];
+    return `<tr><td><div class="flex items-center gap-8"><button class="catalog-edit-btn" onclick="openEditProjectMaterials(${editIdx})" title="Edit this material"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button><strong>${m.name}</strong></div></td><td>${m.pkg}</td><td>${m.totalQty} ${m.unit}</td><td>${m.totalUnits}</td><td>${stock}</td><td>${delivered}</td><td>${Math.max(0, remaining)}</td><td><span class="chip ${statusCls}">${statusText}</span></td></tr>`;
   }).join('');
   $('tab-materials').innerHTML = `
     <div class="flex justify-between items-center mb-16"><h3>Material Requirements</h3>
