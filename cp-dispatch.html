@@ -2,9 +2,9 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
 :root {
-  --ground: #FFFFFF;
+  --ground: #F5F6FA;
   --surface: #FFFFFF;
-  --surface-alt: #F7F8FA;
+  --surface-alt: #F0F1F5;
   --ink: #1A1D24;
   --ink-2: #4B5060;
   --ink-3: #8B90A0;
@@ -115,7 +115,7 @@ nav .nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:.7rem
 nav .nav-footer{padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);font-size:.75rem}
 nav .nav-footer .online{display:flex;align-items:center;gap:6px;margin-bottom:4px}
 nav .nav-footer .online .dot{width:7px;height:7px;background:var(--green);border-radius:50%}
-main{flex:1;margin-left:220px;padding:24px;max-width:1200px}
+main{flex:1;margin-left:220px;padding:24px;max-width:1200px;background:#FFFFFF;min-height:100vh;min-height:100dvh}
 .page{display:none}
 .page.active{display:block}
 .page-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px;flex-wrap:wrap}
@@ -269,6 +269,8 @@ tr:hover td{background:var(--surface-alt)}
   .kpi-grid{grid-template-columns:1fr 1fr}
   .modal{max-width:100%}
 }
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) main{background:var(--ground)}}
+:root[data-theme="dark"] main{background:var(--ground)}
 </style>
 
 <div class="app">
