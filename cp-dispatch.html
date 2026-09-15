@@ -1,0 +1,1811 @@
+<title>CP Dispatch</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root {
+  --ground: #ECEAE6;
+  --surface: #FFFFFF;
+  --surface-alt: #F5F4F1;
+  --ink: #24272E;
+  --ink-2: #5A5D65;
+  --ink-3: #8E9099;
+  --border: #D8D5CF;
+  --border-light: #E8E6E1;
+  --blue: #3A6BC5;
+  --blue-light: #EBF0FA;
+  --blue-hover: #2F5AAE;
+  --green: #3A8C5C;
+  --green-light: #E8F5ED;
+  --amber: #B8872A;
+  --amber-light: #FDF4E3;
+  --red: #C04B35;
+  --red-light: #FCEAE6;
+  --nav-bg: #24272E;
+  --nav-text: #B0B3BA;
+  --nav-active: #FFFFFF;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.06);
+  --shadow: 0 2px 8px rgba(0,0,0,.08);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,.12);
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ground: #141518;
+  --surface: #1E2027;
+  --surface-alt: #272930;
+  --ink: #E8E6E1;
+  --ink-2: #A0A3AB;
+  --ink-3: #6B6E76;
+  --border: #35383F;
+  --border-light: #2A2D34;
+  --blue: #6B9AE8;
+  --blue-light: #1E2A3E;
+  --blue-hover: #85AEF0;
+  --green: #5CB87A;
+  --green-light: #1A2E22;
+  --amber: #D4A545;
+  --amber-light: #2E2618;
+  --red: #E06B55;
+  --red-light: #2E1E1A;
+  --nav-bg: #111215;
+  --nav-text: #6B6E76;
+  --nav-active: #E8E6E1;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.2);
+  --shadow: 0 2px 8px rgba(0,0,0,.3);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,.4);
+}}
+:root[data-theme="dark"]{
+  --ground: #141518;
+  --surface: #1E2027;
+  --surface-alt: #272930;
+  --ink: #E8E6E1;
+  --ink-2: #A0A3AB;
+  --ink-3: #6B6E76;
+  --border: #35383F;
+  --border-light: #2A2D34;
+  --blue: #6B9AE8;
+  --blue-light: #1E2A3E;
+  --blue-hover: #85AEF0;
+  --green: #5CB87A;
+  --green-light: #1A2E22;
+  --amber: #D4A545;
+  --amber-light: #2E2618;
+  --red: #E06B55;
+  --red-light: #2E1E1A;
+  --nav-bg: #111215;
+  --nav-text: #6B6E76;
+  --nav-active: #E8E6E1;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.2);
+  --shadow: 0 2px 8px rgba(0,0,0,.3);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,.4);
+}
+*,*::before,*::after{box-sizing:border-box}
+body{
+  margin:0;font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--ink);
+  background:var(--ground);font-size:14px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{font-family:'Archivo','IBM Plex Sans',system-ui,sans-serif;margin:0;font-weight:600}
+h1{font-size:1.5rem;letter-spacing:-.01em}
+h2{font-size:1.2rem}
+h3{font-size:1rem}
+p{margin:0}
+a{color:var(--blue);text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none;font-size:.875rem}
+input,select,textarea{font-family:inherit;font-size:.875rem;color:var(--ink);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;outline:none;width:100%}
+input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-light)}
+select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235A5D65' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+textarea{resize:vertical;min-height:60px}
+label{display:block;font-size:.8rem;font-weight:500;color:var(--ink-2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+[hidden]{display:none!important}
+img{max-width:100%}
+.app{display:flex;min-height:100vh;min-height:100dvh}
+nav{width:220px;background:var(--nav-bg);color:var(--nav-text);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;transition:width .2s}
+nav .logo{padding:20px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.08)}
+nav .logo-mark{width:36px;height:36px;background:var(--blue);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Archivo',sans-serif;font-weight:700;font-size:14px;color:#fff;flex-shrink:0}
+nav .logo-text{font-family:'Archivo',sans-serif;font-weight:600;font-size:.95rem;color:var(--nav-active);white-space:nowrap}
+nav .logo-text span{display:block;font-size:.65rem;font-weight:400;color:var(--nav-text);text-transform:uppercase;letter-spacing:.08em;margin-top:1px}
+nav ul{list-style:none;padding:12px 8px;margin:0;flex:1}
+nav li{margin-bottom:2px}
+nav li a{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--radius);color:var(--nav-text);font-size:.875rem;font-weight:500;transition:all .15s}
+nav li a:hover{background:rgba(255,255,255,.06);color:var(--nav-active)}
+nav li a.active{background:rgba(58,107,197,.2);color:var(--blue)}
+nav li a svg{width:20px;height:20px;flex-shrink:0;opacity:.7}
+nav li a.active svg{opacity:1}
+nav .nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:.7rem;font-weight:600;padding:2px 7px;border-radius:10px;min-width:18px;text-align:center}
+nav .nav-footer{padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);font-size:.75rem}
+nav .nav-footer .online{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+nav .nav-footer .online .dot{width:7px;height:7px;background:var(--green);border-radius:50%}
+main{flex:1;margin-left:220px;padding:24px;max-width:1200px}
+.page{display:none}
+.page.active{display:block}
+.page-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px;flex-wrap:wrap}
+.page-header .back-btn{display:flex;align-items:center;gap:6px;color:var(--ink-2);font-size:.85rem;cursor:pointer;background:none;padding:4px 8px;border-radius:6px}
+.page-header .back-btn:hover{background:var(--surface-alt);color:var(--ink)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius);font-weight:500;transition:all .15s;white-space:nowrap}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-primary:hover{background:var(--blue-hover)}
+.btn-secondary{background:var(--surface);color:var(--ink);border:1px solid var(--border)}
+.btn-secondary:hover{background:var(--surface-alt);border-color:var(--ink-3)}
+.btn-danger{background:var(--red-light);color:var(--red)}
+.btn-danger:hover{background:var(--red);color:#fff}
+.btn-sm{padding:5px 10px;font-size:.8rem}
+.btn svg{width:16px;height:16px}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+.kpi{background:var(--surface);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow-sm);border:1px solid var(--border-light)}
+.kpi .kpi-label{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);font-weight:500;margin-bottom:8px}
+.kpi .kpi-value{font-family:'Archivo',sans-serif;font-size:2rem;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+.kpi .kpi-sub{font-size:.8rem;color:var(--ink-2);margin-top:4px}
+.kpi.kpi-blue .kpi-value{color:var(--blue)}
+.kpi.kpi-green .kpi-value{color:var(--green)}
+.kpi.kpi-amber .kpi-value{color:var(--amber)}
+.kpi.kpi-red .kpi-value{color:var(--red)}
+.card{background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);border:1px solid var(--border-light);overflow:hidden}
+.card-header{padding:16px 20px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.card-header h2{font-size:1rem}
+.card-body{padding:20px}
+.card-body.no-pad{padding:0}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{text-align:left;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);font-weight:500;padding:10px 16px;border-bottom:1px solid var(--border-light);white-space:nowrap}
+td{padding:10px 16px;border-bottom:1px solid var(--border-light);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surface-alt)}
+.chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:.75rem;font-weight:600;letter-spacing:.02em}
+.chip-blue{background:var(--blue-light);color:var(--blue)}
+.chip-green{background:var(--green-light);color:var(--green)}
+.chip-amber{background:var(--amber-light);color:var(--amber)}
+.chip-red{background:var(--red-light);color:var(--red)}
+.chip-gray{background:var(--surface-alt);color:var(--ink-3)}
+.progress-bar{height:6px;background:var(--border-light);border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;border-radius:3px;transition:width .3s}
+.progress-fill.blue{background:var(--blue)}
+.progress-fill.green{background:var(--green)}
+.progress-fill.amber{background:var(--amber)}
+.progress-fill.red{background:var(--red)}
+.alert-list{display:flex;flex-direction:column;gap:8px}
+.alert-item{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-radius:var(--radius);font-size:.85rem;line-height:1.4}
+.alert-item.alert-red{background:var(--red-light);color:var(--red)}
+.alert-item.alert-amber{background:var(--amber-light);color:var(--amber)}
+.alert-item.alert-blue{background:var(--blue-light);color:var(--blue)}
+.alert-item svg{width:18px;height:18px;flex-shrink:0;margin-top:1px}
+.tabs{display:flex;gap:0;border-bottom:2px solid var(--border-light);margin-bottom:20px;overflow-x:auto}
+.tab{padding:10px 20px;font-size:.875rem;font-weight:500;color:var(--ink-3);cursor:pointer;background:none;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:all .15s}
+.tab:hover{color:var(--ink)}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-overlay.open{opacity:1;pointer-events:auto}
+.modal{background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);width:100%;max-width:640px;max-height:90vh;display:flex;flex-direction:column}
+.modal-header{padding:20px 24px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between}
+.modal-header h2{font-size:1.1rem}
+.modal-close{background:none;padding:4px;color:var(--ink-3);border-radius:6px}
+.modal-close:hover{background:var(--surface-alt);color:var(--ink)}
+.modal-body{padding:24px;overflow-y:auto;flex:1}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--border-light);display:flex;justify-content:flex-end;gap:8px}
+.form-row{margin-bottom:16px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-help{font-size:.75rem;color:var(--ink-3);margin-top:4px}
+.inline-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:.7rem;font-weight:600;color:#fff;flex-shrink:0}
+.stock-ok{color:var(--green)}
+.stock-low{color:var(--amber)}
+.stock-out{color:var(--red)}
+.stock-indicator{width:8px;height:8px;border-radius:50%;flex-shrink:0;display:inline-block}
+.stock-indicator.ok{background:var(--green)}
+.stock-indicator.low{background:var(--amber)}
+.stock-indicator.out{background:var(--red)}
+.empty-state{text-align:center;padding:48px 24px;color:var(--ink-3)}
+.empty-state svg{width:48px;height:48px;margin-bottom:12px;opacity:.4}
+.empty-state p{font-size:.9rem;margin-bottom:16px}
+.toast{position:fixed;bottom:24px;right:24px;z-index:300;display:flex;flex-direction:column;gap:8px}
+.toast-item{background:var(--ink);color:var(--ground);padding:12px 20px;border-radius:var(--radius);font-size:.875rem;box-shadow:var(--shadow-lg);animation:toastIn .3s;display:flex;align-items:center;gap:8px;max-width:400px}
+.toast-item.warn{background:var(--amber);color:#fff}
+.toast-item.error{background:var(--red);color:#fff}
+@keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.systems-list{display:flex;flex-direction:column;gap:12px}
+.system-card{border:1px solid var(--border);border-radius:var(--radius);padding:16px;background:var(--surface-alt)}
+.system-card-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.system-card-header strong{font-size:.9rem}
+.system-card-meta{display:flex;gap:16px;font-size:.8rem;color:var(--ink-2)}
+.remove-btn{background:none;color:var(--red);padding:4px;border-radius:4px;font-size:.8rem}
+.remove-btn:hover{background:var(--red-light)}
+.phase-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border-light)}
+.phase-row:last-child{border-bottom:none}
+.phase-num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:.8rem;flex-shrink:0}
+.phase-num.pending{background:var(--surface-alt);color:var(--ink-3)}
+.phase-num.active{background:var(--blue-light);color:var(--blue)}
+.phase-num.done{background:var(--green-light);color:var(--green)}
+.file-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--border-light);border-radius:var(--radius);margin-bottom:8px}
+.file-item .file-icon{width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:600;text-transform:uppercase;flex-shrink:0}
+.file-item .file-info{flex:1;min-width:0}
+.file-item .file-name{font-weight:500;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file-item .file-meta{font-size:.75rem;color:var(--ink-3)}
+.warning-popup{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:250;background:var(--surface);border:2px solid var(--amber);border-radius:var(--radius-lg);padding:24px;box-shadow:var(--shadow-lg);max-width:440px;width:calc(100% - 32px);text-align:center}
+.warning-popup h3{color:var(--amber);margin-bottom:8px}
+.warning-popup p{color:var(--ink-2);font-size:.9rem;margin-bottom:16px}
+.warning-popup .popup-actions{display:flex;justify-content:center;gap:8px}
+.warning-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:249}
+.reminder-item{display:flex;gap:12px;padding:12px 16px;border:1px solid var(--border-light);border-radius:var(--radius);margin-bottom:8px;align-items:flex-start}
+.reminder-item .rem-date{font-size:.75rem;color:var(--ink-3);white-space:nowrap}
+.reminder-item .rem-msg{flex:1;font-size:.875rem}
+.reminder-item .rem-actions{display:flex;gap:4px}
+.delivery-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+.delivery-stat{padding:12px 16px;border-radius:var(--radius);text-align:center}
+.delivery-stat .ds-val{font-family:'Archivo',sans-serif;font-size:1.3rem;font-weight:700}
+.delivery-stat .ds-label{font-size:.75rem;color:var(--ink-2);text-transform:uppercase;letter-spacing:.04em}
+.clickable{cursor:pointer}
+.clickable:hover{background:var(--surface-alt)}
+.text-right{text-align:right}
+.text-center{text-align:center}
+.text-muted{color:var(--ink-3)}
+.text-sm{font-size:.8rem}
+.mt-8{margin-top:8px}
+.mt-16{margin-top:16px}
+.mb-8{margin-bottom:8px}
+.mb-16{margin-bottom:16px}
+.gap-8{gap:8px}
+.flex{display:flex}
+.items-center{align-items:center}
+.justify-between{justify-content:space-between}
+.flex-1{flex:1}
+.flex-wrap{flex-wrap:wrap}
+.overflow-x{overflow-x:auto}
+@media(max-width:768px){
+  nav{width:64px}
+  nav .logo-text,nav li a span,nav .nav-footer{display:none}
+  nav .logo{padding:16px 14px;justify-content:center}
+  nav li a{justify-content:center;padding:10px}
+  nav .nav-badge{position:absolute;top:4px;right:4px;margin:0}
+  nav li{position:relative}
+  main{margin-left:64px;padding:16px}
+  .form-grid{grid-template-columns:1fr}
+  .kpi-grid{grid-template-columns:1fr 1fr}
+  .modal{max-width:100%}
+}
+</style>
+
+<div class="app">
+<nav>
+  <div class="logo">
+    <div class="logo-mark">CP</div>
+    <div class="logo-text">Dispatch<span>Cement Plus</span></div>
+  </div>
+  <ul>
+    <li><a href="#dashboard" class="nav-link active" data-page="dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span>Dashboard</span>
+    </a></li>
+    <li><a href="#projects" class="nav-link" data-page="projects">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+      <span>Projects</span>
+    </a></li>
+    <li><a href="#stock" class="nav-link" data-page="stock">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0022 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+      <span>Stock</span>
+      <span class="nav-badge" id="stockBadge" hidden>0</span>
+    </a></li>
+    <li><a href="#orders" class="nav-link" data-page="orders">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="15" y2="16"/></svg>
+      <span>Orders</span>
+    </a></li>
+    <li><a href="#reminders" class="nav-link" data-page="reminders">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+      <span>Reminders</span>
+      <span class="nav-badge" id="reminderBadge" hidden>0</span>
+    </a></li>
+  </ul>
+  <div class="nav-footer">
+    <div class="online" id="onlineUsers"><span class="dot"></span> <span id="onlineCount">1 online</span></div>
+  </div>
+</nav>
+
+<main>
+  <!-- DASHBOARD -->
+  <div class="page active" id="page-dashboard">
+    <div class="page-header"><h1>Dashboard</h1><div class="text-sm text-muted" id="todayDate"></div></div>
+    <div class="kpi-grid" id="dashKpis"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="dash-grid">
+      <div class="card">
+        <div class="card-header"><h2>Active Projects</h2></div>
+        <div class="card-body no-pad"><div id="dashProjects" class="overflow-x"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Alerts</h2></div>
+        <div class="card-body"><div class="alert-list" id="dashAlerts"></div></div>
+      </div>
+    </div>
+    <div class="card mt-16">
+      <div class="card-header"><h2>Recent Activity</h2></div>
+      <div class="card-body"><div id="dashActivity"></div></div>
+    </div>
+  </div>
+
+  <!-- PROJECTS LIST -->
+  <div class="page" id="page-projects">
+    <div class="page-header"><h1>Projects</h1><button class="btn btn-primary" onclick="openNewProject()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> New Project</button></div>
+    <div class="card"><div class="card-body no-pad overflow-x" id="projectsList"></div></div>
+  </div>
+
+  <!-- PROJECT DETAIL -->
+  <div class="page" id="page-project-detail">
+    <div class="page-header">
+      <div class="flex items-center gap-8">
+        <button class="back-btn" onclick="navigate('projects')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="15 18 9 12 15 6"/></svg> Projects</button>
+        <h1 id="projDetailName"></h1>
+        <span class="chip" id="projDetailStatus"></span>
+      </div>
+      <div class="flex gap-8">
+        <button class="btn btn-secondary btn-sm" onclick="editCurrentProject()">Edit</button>
+        <button class="btn btn-secondary btn-sm" onclick="duplicateProject()">Duplicate</button>
+      </div>
+    </div>
+    <div id="projDetailMeta" class="text-sm text-muted mb-16"></div>
+    <div class="tabs" id="projTabs">
+      <button class="tab active" data-tab="overview">Overview</button>
+      <button class="tab" data-tab="phases">Phases</button>
+      <button class="tab" data-tab="materials">Materials</button>
+      <button class="tab" data-tab="deliveries">Deliveries</button>
+      <button class="tab" data-tab="files">Files</button>
+      <button class="tab" data-tab="notes">Notes</button>
+    </div>
+    <div class="tab-panel active" id="tab-overview"></div>
+    <div class="tab-panel" id="tab-phases"></div>
+    <div class="tab-panel" id="tab-materials"></div>
+    <div class="tab-panel" id="tab-deliveries"></div>
+    <div class="tab-panel" id="tab-files"></div>
+    <div class="tab-panel" id="tab-notes"></div>
+  </div>
+
+  <!-- STOCK -->
+  <div class="page" id="page-stock">
+    <div class="page-header"><h1>Warehouse Stock</h1><button class="btn btn-secondary btn-sm" onclick="openStockEdit()">Update Stock</button></div>
+    <div class="card"><div class="card-body no-pad overflow-x" id="stockTable"></div></div>
+  </div>
+
+  <!-- ORDERS -->
+  <div class="page" id="page-orders">
+    <div class="page-header"><h1>Orders</h1><button class="btn btn-primary" onclick="openNewOrder()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> New Order</button></div>
+    <div class="card"><div class="card-body no-pad overflow-x" id="ordersList"></div></div>
+  </div>
+
+  <!-- REMINDERS -->
+  <div class="page" id="page-reminders">
+    <div class="page-header"><h1>Reminders</h1><button class="btn btn-primary" onclick="openNewReminder()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> New Reminder</button></div>
+    <div id="remindersList"></div>
+  </div>
+</main>
+</div>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header"><h2 id="modalTitle">Modal</h2><button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer" id="modalFooter"></div>
+  </div>
+</div>
+
+<div class="toast" id="toastContainer"></div>
+<div id="warningContainer"></div>
+
+<script>
+// ========== PRODUCT CATALOG ==========
+const CATALOG = {
+  "NANOSTUCCO 500": {
+    category: "microcement",
+    applications: {
+      "Wall & furniture (smooth)": [
+        { name: "NANOSTUCCO 500 (POWDER)", pkg: "20kg", consumption: 0.80, unit: "kg" },
+        { name: "COLORFRESH", pkg: "10lt", consumption: 0.10, unit: "lt" }
+      ],
+      "Floor & bathroom (smooth)": [
+        { name: "NANOSTUCCO 500 (POWDER)", pkg: "20kg", consumption: 0.80, unit: "kg" },
+        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
+        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
+      ],
+      "Ceramic tiles + fibermesh": [
+        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
+        { name: "D-BASE 60", pkg: "25kg", consumption: 4.00, unit: "kg" },
+        { name: "GLASSTEX 150", pkg: "50m²", consumption: 1.00, unit: "m²" },
+        { name: "NANOSTUCCO 500 (POWDER)", pkg: "20kg", consumption: 1.00, unit: "kg" },
+        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
+        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
+      ],
+      "Ceramic tiles + membrane": [
+        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
+        { name: "D-BASE 60", pkg: "25kg", consumption: 4.00, unit: "kg" },
+        { name: "UW MEMBRANE PLUS", pkg: "30m²", consumption: 1.00, unit: "m²" },
+        { name: "NANOSTUCCO JOINT", pkg: "10kg", consumption: 0.20, unit: "kg" },
+        { name: "NANOSTUCCO 500 (POWDER)", pkg: "20kg", consumption: 1.00, unit: "kg" },
+        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
+        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
+      ]
+    }
+  },
+  "NANOFIN 50 VELVET": {
+    category: "microcement",
+    applications: {
+      "Wall & furniture (smooth)": [
+        { name: "NANOFIN 50 VELVET (POWDER)", pkg: "20kg", consumption: 0.90, unit: "kg" },
+        { name: "COLORFRESH", pkg: "10lt", consumption: 0.10, unit: "lt" }
+      ],
+      "Floor & bathroom (smooth)": [
+        { name: "NANOFIN 50 VELVET (POWDER)", pkg: "20kg", consumption: 0.90, unit: "kg" },
+        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
+        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
+      ],
+      "Ceramic tiles + fibermesh": [
+        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
+        { name: "D-BASE 60", pkg: "25kg", consumption: 4.00, unit: "kg" },
+        { name: "GLASSTEX 150", pkg: "50m²", consumption: 1.00, unit: "m²" },
+        { name: "NANOFIN 50 VELVET (POWDER)", pkg: "20kg", consumption: 1.10, unit: "kg" },
+        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
+        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
+      ],
+      "Ceramic tiles + membrane": [
+        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
+        { name: "D-BASE 60", pkg: "25kg", consumption: 4.00, unit: "kg" },
+        { name: "UW MEMBRANE PLUS", pkg: "30m²", consumption: 1.00, unit: "m²" },
+        { name: "NANOSTUCCO JOINT", pkg: "10kg", consumption: 0.20, unit: "kg" },
+        { name: "NANOFIN 50 VELVET (POWDER)", pkg: "20kg", consumption: 1.10, unit: "kg" },
+        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
+        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
+      ]
+    }
+  },
+  "NATURA 50 VELVET": {
+    category: "micro-coating",
+    applications: {
+      "Wall & furniture (smooth)": [
+        { name: "NATURA 50 VELVET (POWDER)", pkg: "20kg", consumption: 0.90, unit: "kg" },
+        { name: "NATURA SEAL", pkg: "10lt", consumption: 0.10, unit: "lt" }
+      ],
+      "Floor & bathroom (smooth)": [
+        { name: "NATURA 50 VELVET (POWDER)", pkg: "20kg", consumption: 0.90, unit: "kg" },
+        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
+        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
+      ],
+      "Ceramic tiles + fibermesh": [
+        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
+        { name: "D-BASE 60", pkg: "25kg", consumption: 4.00, unit: "kg" },
+        { name: "GLASSTEX 150", pkg: "50m²", consumption: 1.00, unit: "m²" },
+        { name: "NATURA 50 VELVET (POWDER)", pkg: "20kg", consumption: 1.10, unit: "kg" },
+        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
+        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
+      ],
+      "Ceramic tiles + membrane": [
+        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
+        { name: "D-BASE 60", pkg: "25kg", consumption: 4.00, unit: "kg" },
+        { name: "UW MEMBRANE PLUS", pkg: "30m²", consumption: 1.00, unit: "m²" },
+        { name: "NANOSTUCCO JOINT", pkg: "10kg", consumption: 0.20, unit: "kg" },
+        { name: "NATURA 50 VELVET (POWDER)", pkg: "20kg", consumption: 1.10, unit: "kg" },
+        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
+        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
+      ]
+    }
+  },
+  "MARMOFIN 50": {
+    category: "marble microcement",
+    applications: {
+      "Smooth surfaces": [
+        { name: "MARMOFIN 50 BASE (POWDER)", pkg: "20kg", consumption: 0.80, unit: "kg" },
+        { name: "MARMOFIN 50 FINISH (POWDER)", pkg: "20kg", consumption: 0.30, unit: "kg" },
+        { name: "MARMOFIN 50 VEINS", pkg: "1kg", consumption: 0.10, unit: "kg" },
+        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
+        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
+      ],
+      "Ceramic tiles + fibermesh": [
+        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
+        { name: "D-BASE 60", pkg: "25kg", consumption: 4.00, unit: "kg" },
+        { name: "GLASSTEX 150", pkg: "50m²", consumption: 1.00, unit: "m²" },
+        { name: "MARMOFIN 50 BASE (POWDER)", pkg: "20kg", consumption: 0.80, unit: "kg" },
+        { name: "MARMOFIN 50 FINISH (POWDER)", pkg: "20kg", consumption: 0.30, unit: "kg" },
+        { name: "MARMOFIN 50 VEINS", pkg: "1kg", consumption: 0.10, unit: "kg" },
+        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
+        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
+      ],
+      "Ceramic tiles + membrane": [
+        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
+        { name: "D-BASE 60", pkg: "25kg", consumption: 4.00, unit: "kg" },
+        { name: "UW MEMBRANE PLUS", pkg: "30m²", consumption: 1.00, unit: "m²" },
+        { name: "NANOSTUCCO JOINT", pkg: "10kg", consumption: 0.20, unit: "kg" },
+        { name: "MARMOFIN 50 BASE (POWDER)", pkg: "20kg", consumption: 0.80, unit: "kg" },
+        { name: "MARMOFIN 50 FINISH (POWDER)", pkg: "20kg", consumption: 0.30, unit: "kg" },
+        { name: "MARMOFIN 50 VEINS", pkg: "1kg", consumption: 0.10, unit: "kg" },
+        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
+        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
+      ]
+    }
+  },
+  "PAINT NATURA": {
+    category: "natural paint",
+    applications: {
+      "Wall application": [
+        { name: "RES PRIMER PLUS", pkg: "4lt", consumption: 0.10, unit: "lt" },
+        { name: "PAINT NATURA (POWDER)", pkg: "20kg", consumption: 0.30, unit: "kg" },
+        { name: "NATURA SEAL", pkg: "10lt", consumption: 0.10, unit: "lt" }
+      ]
+    }
+  },
+  "CREATIVO NATURA": {
+    category: "pure textured surfaces",
+    applications: {
+      "Wall application": [
+        { name: "C PRIMER PLUS", pkg: "4lt", consumption: 0.15, unit: "lt" },
+        { name: "CREATIVO NATURA (POWDER)", pkg: "20kg", consumption: 4.00, unit: "kg" },
+        { name: "NATURA SEAL", pkg: "10lt", consumption: 0.10, unit: "lt" }
+      ]
+    }
+  },
+  "NANOFIN METAL": {
+    category: "microcement metal",
+    applications: {
+      "Wall & furniture": [
+        { name: "NANOSTUCCO 500 (POWDER)", pkg: "20kg", consumption: 0.80, unit: "kg" },
+        { name: "NANOFIN METAL (POWDER)", pkg: "3kg", consumption: 0.50, unit: "kg" },
+        { name: "NANOFIN WAX", pkg: "1lt", consumption: 0.04, unit: "lt" },
+        { name: "NANOFIN METAL SEALER", pkg: "1lt", consumption: 0.10, unit: "lt" }
+      ]
+    }
+  },
+  "ELEMENT:20 (concrete/travertino)": {
+    category: "fair-faced concrete",
+    applications: {
+      "Wall application": [
+        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
+        { name: "ELEMENT:20 (POWDER)", pkg: "20kg", consumption: 3.00, unit: "kg" },
+        { name: "COLORTEC", pkg: "10lt", consumption: 0.13, unit: "lt" }
+      ]
+    }
+  },
+  "ELEMENT:20 (bamboo/linea)": {
+    category: "fair-faced concrete",
+    applications: {
+      "Wall application": [
+        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
+        { name: "ELEMENT:20 (POWDER)", pkg: "20kg", consumption: 4.00, unit: "kg" },
+        { name: "COLORFRESH", pkg: "10lt", consumption: 0.10, unit: "lt" }
+      ]
+    }
+  },
+  "TX RASO": {
+    category: "exposed concrete",
+    applications: {
+      "Wall application": [
+        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
+        { name: "TX RASO (POWDER)", pkg: "25kg", consumption: 4.00, unit: "kg" },
+        { name: "COLORTEC", pkg: "10lt", consumption: 0.13, unit: "lt" }
+      ]
+    }
+  },
+  "ELEMENT:10": {
+    category: "retro walls",
+    applications: {
+      "Wall application": [
+        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
+        { name: "ELEMENT:10 (POWDER)", pkg: "20kg", consumption: 2.20, unit: "kg" },
+        { name: "COLORTEC", pkg: "10lt", consumption: 0.13, unit: "lt" }
+      ]
+    }
+  },
+  "RESAIC": {
+    category: "liquid mosaic",
+    applications: {
+      "Application": [
+        { name: "EP PRIMER PLUS S", pkg: "7+3kg", consumption: 0.15, unit: "kg" },
+        { name: "EP COLOR S", pkg: "7.5+2.5kg", consumption: 0.35, unit: "kg" },
+        { name: "DECO TOP", pkg: "3.35+0.65kg", consumption: 0.18, unit: "kg" },
+        { name: "FLAKES", pkg: "1kg", consumption: 0.05, unit: "kg" }
+      ]
+    }
+  },
+  "EP COLOR PLUS S": {
+    category: "epoxy paint",
+    applications: {
+      "Application": [
+        { name: "EP PRIMER PLUS S", pkg: "7+3kg", consumption: 0.15, unit: "kg" },
+        { name: "EP COLOR S", pkg: "7.5+2.5kg", consumption: 0.35, unit: "kg" }
+      ]
+    }
+  },
+  "EP COLOR PLUS W": {
+    category: "epoxy paint",
+    applications: {
+      "Application": [
+        { name: "EP PRIMER PLUS W", pkg: "14kg", consumption: 0.15, unit: "kg" },
+        { name: "EP COLOR W", pkg: "4+1kg", consumption: 0.35, unit: "kg" }
+      ]
+    }
+  },
+  "PAVITECT RESIN PU 2K UV": {
+    category: "quartz floors",
+    applications: {
+      "Floor application": [
+        { name: "EP PRIMER PLUS", pkg: "15kg", consumption: 0.15, unit: "kg" },
+        { name: "PAVITECT RESIN PU 2K UV", pkg: "6.5kg", consumption: 0.90, unit: "kg" },
+        { name: "AGGREGATES (graphite 2.5-3.5mm)", pkg: "25kg", consumption: 14.00, unit: "kg" },
+        { name: "DECO FLOOR", pkg: "4kg", consumption: 0.15, unit: "kg" }
+      ]
+    }
+  },
+  "PAVITECT RESIN EPOXY UV": {
+    category: "quartz floors",
+    applications: {
+      "Floor application": [
+        { name: "EP PRIMER PLUS", pkg: "15kg", consumption: 0.15, unit: "kg" },
+        { name: "PAVITECT EPOXY UV", pkg: "5kg", consumption: 1.12, unit: "kg" },
+        { name: "AGGREGATES (graphite 2.5-3.5mm)", pkg: "25kg", consumption: 14.00, unit: "kg" },
+        { name: "DECO FLOOR", pkg: "4kg", consumption: 0.15, unit: "kg" }
+      ]
+    }
+  },
+  "INTOTECT RESIN": {
+    category: "granite walls",
+    applications: {
+      "Wall application": [
+        { name: "C PRIMER PLUS", pkg: "5lt", consumption: 0.15, unit: "lt" },
+        { name: "INTOTECT RESIN", pkg: "25kg", consumption: 4.50, unit: "kg" }
+      ]
+    }
+  }
+};
+
+const TEAM = [
+  { name: "Alex", role: "Managing Director", email: "alex@cementplus.gr" },
+  { name: "Kostas", role: "Technical Sales", email: "kostas@cementplus.gr" },
+  { name: "Matina", role: "Operations", email: "matina@cementplus.gr" }
+];
+
+function pkgSize(pkg) {
+  const m = pkg.match(/([\d.+]+)\s*(kg|lt|m²)/i);
+  if (!m) return 1;
+  const parts = m[1].split('+');
+  return parts.reduce((a, b) => a + parseFloat(b), 0);
+}
+
+function calcUnits(consumption, area, pkg) {
+  const total = consumption * area;
+  const size = pkgSize(pkg);
+  return { total: Math.round(total * 100) / 100, units: Math.ceil(total / size), size, pkg };
+}
+
+function getAllMaterials(systems) {
+  const mats = {};
+  systems.forEach(sys => {
+    const cat = CATALOG[sys.systemName];
+    if (!cat || !cat.applications[sys.application]) return;
+    cat.applications[sys.application].forEach(prod => {
+      const calc = calcUnits(prod.consumption, sys.area, prod.pkg);
+      const key = prod.name + '|' + prod.pkg;
+      if (!mats[key]) mats[key] = { name: prod.name, pkg: prod.pkg, unit: prod.unit, totalQty: 0, totalUnits: 0 };
+      mats[key].totalQty += calc.total;
+      mats[key].totalUnits += calc.units;
+    });
+  });
+  return Object.values(mats);
+}
+
+function getPhaseMaterials(systems, phase) {
+  if (!phase.allocations) return [];
+  const phaseSystems = systems.map(sys => {
+    const alloc = phase.allocations[sys.id];
+    if (!alloc || alloc <= 0) return null;
+    return { ...sys, area: alloc };
+  }).filter(Boolean);
+  return getAllMaterials(phaseSystems);
+}
+
+// ========== STATE ==========
+let db = null;
+let downloads = null;
+let assets = null;
+let room = null;
+let projects = {};
+let stockData = {};
+let orders = {};
+let deliveries = {};
+let reminders = {};
+let activities = [];
+let currentProject = null;
+let currentUser = TEAM[0].name;
+
+// ========== HELPERS ==========
+const $ = id => document.getElementById(id);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
+const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+const daysDiff = (a, b) => Math.ceil((new Date(a) - new Date(b)) / 86400000);
+const today = () => new Date().toISOString().split('T')[0];
+
+function toast(msg, type) {
+  const el = document.createElement('div');
+  el.className = 'toast-item' + (type ? ' ' + type : '');
+  el.textContent = msg;
+  $('toastContainer').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+function showWarning(title, message, onConfirm, onCancel) {
+  const c = $('warningContainer');
+  c.innerHTML = `<div class="warning-backdrop" onclick="dismissWarning()"></div>
+    <div class="warning-popup">
+      <h3>⚠ ${title}</h3>
+      <p>${message}</p>
+      <div class="popup-actions">
+        <button class="btn btn-secondary" onclick="dismissWarning()">Cancel</button>
+        <button class="btn btn-primary" id="warnConfirm">Proceed Anyway</button>
+      </div>
+    </div>`;
+  $('warnConfirm').onclick = () => { dismissWarning(); if (onConfirm) onConfirm(); };
+}
+function dismissWarning() { $('warningContainer').innerHTML = ''; }
+
+function logActivity(text) {
+  activities.unshift({ text, time: new Date().toISOString(), user: currentUser });
+  if (activities.length > 50) activities.length = 50;
+  if (db) db.doc('activity/recent').set({ items: activities });
+}
+
+// ========== NAVIGATION ==========
+function navigate(page, projectId) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(a => a.classList.remove('active'));
+  const pg = $('page-' + page);
+  if (pg) pg.classList.add('active');
+  const link = document.querySelector(`[data-page="${page}"]`);
+  if (link) link.classList.add('active');
+  if (page === 'dashboard') renderDashboard();
+  else if (page === 'projects') renderProjects();
+  else if (page === 'project-detail' && projectId) { currentProject = projectId; renderProjectDetail(); }
+  else if (page === 'stock') renderStock();
+  else if (page === 'orders') renderOrders();
+  else if (page === 'reminders') renderReminders();
+}
+
+document.querySelectorAll('.nav-link').forEach(a => {
+  a.addEventListener('click', e => { e.preventDefault(); navigate(a.dataset.page); });
+});
+
+// ========== MODALS ==========
+function openModal(title, bodyHtml, footerHtml) {
+  $('modalTitle').textContent = title;
+  $('modalBody').innerHTML = bodyHtml;
+  $('modalFooter').innerHTML = footerHtml;
+  $('modalOverlay').classList.add('open');
+}
+function closeModal() { $('modalOverlay').classList.remove('open'); }
+$('modalOverlay').addEventListener('click', e => { if (e.target === $('modalOverlay')) closeModal(); });
+
+// ========== TABS ==========
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    const parent = t.closest('.page');
+    parent.querySelectorAll('.tab').forEach(tb => tb.classList.remove('active'));
+    parent.querySelectorAll('.tab-panel').forEach(tp => tp.classList.remove('active'));
+    t.classList.add('active');
+    const panel = $('tab-' + t.dataset.tab);
+    if (panel) panel.classList.add('active');
+  });
+});
+
+// ========== DASHBOARD ==========
+function renderDashboard() {
+  $('todayDate').textContent = fmtDate(today());
+  const pArr = Object.values(projects);
+  const active = pArr.filter(p => p.status === 'active');
+  const alerts = generateAlerts();
+  const pendingOrders = Object.values(orders).filter(o => o.status === 'pending').length;
+  const lowStock = Object.entries(stockData).filter(([k, v]) => v.quantity <= (v.minStock || 0)).length;
+
+  $('dashKpis').innerHTML = `
+    <div class="kpi kpi-blue"><div class="kpi-label">Active Projects</div><div class="kpi-value">${active.length}</div><div class="kpi-sub">${pArr.length} total</div></div>
+    <div class="kpi ${pendingOrders > 0 ? 'kpi-amber' : 'kpi-green'}"><div class="kpi-label">Pending Orders</div><div class="kpi-value">${pendingOrders}</div><div class="kpi-sub">awaiting delivery</div></div>
+    <div class="kpi ${lowStock > 0 ? 'kpi-red' : 'kpi-green'}"><div class="kpi-label">Stock Alerts</div><div class="kpi-value">${lowStock}</div><div class="kpi-sub">below minimum</div></div>
+    <div class="kpi ${alerts.length > 0 ? 'kpi-amber' : 'kpi-green'}"><div class="kpi-label">Active Alerts</div><div class="kpi-value">${alerts.length}</div><div class="kpi-sub">need attention</div></div>`;
+
+  if (active.length === 0) {
+    $('dashProjects').innerHTML = '<div class="empty-state" style="padding:24px"><p>No active projects yet</p></div>';
+  } else {
+    let rows = active.map(p => {
+      const totalPhases = (p.phases || []).length;
+      const donePhases = (p.phases || []).filter(ph => ph.status === 'completed').length;
+      const pct = totalPhases > 0 ? Math.round(donePhases / totalPhases * 100) : 0;
+      const barColor = pct >= 100 ? 'green' : pct > 50 ? 'blue' : 'amber';
+      return `<tr class="clickable" onclick="navigate('project-detail','${p.id}')">
+        <td><strong>${p.name}</strong><div class="text-sm text-muted">${p.client || ''}</div></td>
+        <td>${p.location || '—'}</td>
+        <td>${totalPhases > 0 ? donePhases + '/' + totalPhases : '—'}</td>
+        <td style="min-width:120px"><div class="progress-bar"><div class="progress-fill ${barColor}" style="width:${pct}%"></div></div><div class="text-sm text-muted mt-8">${pct}%</div></td>
+        <td>${p.deadline ? fmtDate(p.deadline) : '—'}</td>
+      </tr>`;
+    }).join('');
+    $('dashProjects').innerHTML = `<table><thead><tr><th>Project</th><th>Location</th><th>Phases</th><th>Progress</th><th>Deadline</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+
+  if (alerts.length === 0) {
+    $('dashAlerts').innerHTML = '<div class="text-muted text-sm">All clear — no alerts right now.</div>';
+  } else {
+    $('dashAlerts').innerHTML = alerts.slice(0, 8).map(a => `<div class="alert-item alert-${a.level}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span>${a.message}</span>
+    </div>`).join('');
+  }
+
+  $('dashActivity').innerHTML = activities.length === 0
+    ? '<div class="text-muted text-sm">No activity recorded yet.</div>'
+    : activities.slice(0, 10).map(a => `<div style="padding:6px 0;border-bottom:1px solid var(--border-light);font-size:.85rem"><strong>${a.user}</strong> ${a.text} <span class="text-muted">— ${fmtDate(a.time)}</span></div>`).join('');
+
+  updateBadges();
+}
+
+// ========== ALERTS ENGINE ==========
+function generateAlerts() {
+  const alerts = [];
+  const now = new Date();
+  Object.entries(stockData).forEach(([key, val]) => {
+    if (val.quantity <= 0) alerts.push({ level: 'red', message: `Out of stock: ${key.replace(/\|/g, ' ')}` });
+    else if (val.minStock && val.quantity <= val.minStock) alerts.push({ level: 'amber', message: `Low stock: ${key.replace(/\|/g, ' ')} (${val.quantity} remaining, min: ${val.minStock})` });
+  });
+  Object.values(projects).filter(p => p.status === 'active').forEach(p => {
+    if (p.deadline) {
+      const days = daysDiff(p.deadline, now);
+      if (days < 0) alerts.push({ level: 'red', message: `Project "${p.name}" is ${Math.abs(days)} days past deadline` });
+      else if (days <= 7) alerts.push({ level: 'amber', message: `Project "${p.name}" deadline in ${days} days` });
+    }
+    (p.phases || []).filter(ph => ph.status !== 'completed').forEach(ph => {
+      if (ph.targetDate) {
+        const days = daysDiff(ph.targetDate, now);
+        if (days < 0) alerts.push({ level: 'red', message: `"${p.name}" — ${ph.name} is overdue by ${Math.abs(days)} days` });
+        else if (days <= 5) alerts.push({ level: 'amber', message: `"${p.name}" — ${ph.name} due in ${days} days` });
+      }
+    });
+    const mats = getAllMaterials(p.systems || []);
+    mats.forEach(m => {
+      const sKey = m.name + '|' + m.pkg;
+      const inStock = (stockData[sKey] || {}).quantity || 0;
+      if (inStock < m.totalUnits) {
+        const hasPending = Object.values(orders).some(o => o.status === 'pending' && (o.items || []).some(i => i.material === sKey));
+        if (!hasPending) alerts.push({ level: 'amber', message: `"${p.name}" needs ${m.totalUnits} ${m.name} (${m.pkg}) but only ${inStock} in stock and no pending orders` });
+      }
+    });
+  });
+  Object.values(orders).filter(o => o.status === 'pending' && o.expectedDate).forEach(o => {
+    const days = daysDiff(o.expectedDate, now);
+    if (days < 0) alerts.push({ level: 'red', message: `Order "${o.ref || o.id}" is ${Math.abs(days)} days overdue` });
+  });
+  Object.values(reminders).filter(r => !r.done).forEach(r => {
+    if (r.date) {
+      const days = daysDiff(r.date, now);
+      if (days <= 0) alerts.push({ level: 'blue', message: `Reminder: ${r.message}` });
+      else if (days <= 1) alerts.push({ level: 'blue', message: `Reminder tomorrow: ${r.message}` });
+    }
+  });
+  return alerts;
+}
+
+function updateBadges() {
+  const lowStock = Object.entries(stockData).filter(([k, v]) => v.quantity <= (v.minStock || 0)).length;
+  const stockBadge = $('stockBadge');
+  if (lowStock > 0) { stockBadge.textContent = lowStock; stockBadge.hidden = false; }
+  else stockBadge.hidden = true;
+  const dueReminders = Object.values(reminders).filter(r => !r.done && r.date && daysDiff(r.date, new Date()) <= 1).length;
+  const remBadge = $('reminderBadge');
+  if (dueReminders > 0) { remBadge.textContent = dueReminders; remBadge.hidden = false; }
+  else remBadge.hidden = true;
+}
+
+// ========== PROJECTS ==========
+function renderProjects() {
+  const pArr = Object.values(projects).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  if (pArr.length === 0) {
+    $('projectsList').innerHTML = '<div class="empty-state" style="padding:48px"><p>No projects yet. Create your first project to get started.</p><button class="btn btn-primary" onclick="openNewProject()">New Project</button></div>';
+    return;
+  }
+  const statusChip = s => ({ planning: 'chip-blue', active: 'chip-green', completed: 'chip-gray', archived: 'chip-gray' }[s] || 'chip-gray');
+  $('projectsList').innerHTML = `<table><thead><tr><th>Project</th><th>Client</th><th>Location</th><th>Status</th><th>Systems</th><th>Deadline</th></tr></thead><tbody>${pArr.map(p => `<tr class="clickable" onclick="navigate('project-detail','${p.id}')">
+    <td><strong>${p.name}</strong></td><td>${p.client || '—'}</td><td>${p.location || '—'}</td>
+    <td><span class="chip ${statusChip(p.status)}">${p.status}</span></td>
+    <td>${(p.systems || []).length}</td><td>${fmtDate(p.deadline)}</td>
+  </tr>`).join('')}</tbody></table>`;
+}
+
+function openNewProject(editId) {
+  const p = editId ? projects[editId] : null;
+  const systemOptions = Object.keys(CATALOG).map(s => `<option value="${s}">${s} (${CATALOG[s].category})</option>`).join('');
+  let systemsHtml = '';
+  if (p && p.systems) {
+    p.systems.forEach((sys, i) => {
+      const apps = CATALOG[sys.systemName] ? Object.keys(CATALOG[sys.systemName].applications).map(a => `<option value="${a}" ${a === sys.application ? 'selected' : ''}>${a}</option>`).join('') : '';
+      systemsHtml += `<div class="system-card" data-idx="${i}">
+        <div class="system-card-header"><strong>${sys.systemName}</strong><button class="remove-btn" onclick="this.closest('.system-card').remove()">✕ Remove</button></div>
+        <div class="form-grid">
+          <div><label>Application</label><select class="sys-app">${apps}</select></div>
+          <div><label>Area (m²)</label><input type="number" class="sys-area" value="${sys.area}" min="1"></div>
+        </div>
+        <div class="form-row mt-8"><label>Notes</label><input type="text" class="sys-notes" value="${sys.notes || ''}" placeholder="e.g., Main hall floors"></div>
+        <input type="hidden" class="sys-name" value="${sys.systemName}">
+      </div>`;
+    });
+  }
+  openModal(p ? 'Edit Project' : 'New Project', `
+    <div class="form-grid">
+      <div class="form-row"><label>Project Name</label><input type="text" id="projName" value="${p ? p.name : ''}" placeholder="e.g., Hotel Samos"></div>
+      <div class="form-row"><label>Client</label><input type="text" id="projClient" value="${p ? p.client || '' : ''}" placeholder="e.g., Samos Hotels SA"></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-row"><label>Location</label><input type="text" id="projLocation" value="${p ? p.location || '' : ''}" placeholder="e.g., Samos, Greece"></div>
+      <div class="form-row"><label>Deadline</label><input type="date" id="projDeadline" value="${p ? p.deadline || '' : ''}"></div>
+    </div>
+    <div class="form-row"><label>Status</label><select id="projStatus">
+      <option value="planning" ${p && p.status === 'planning' ? 'selected' : ''}>Planning</option>
+      <option value="active" ${!p || p.status === 'active' ? 'selected' : ''}>Active</option>
+      <option value="completed" ${p && p.status === 'completed' ? 'selected' : ''}>Completed</option>
+      <option value="archived" ${p && p.status === 'archived' ? 'selected' : ''}>Archived</option>
+    </select></div>
+    <div class="form-row"><label>Notes</label><textarea id="projNotes" rows="2">${p ? p.notes || '' : ''}</textarea></div>
+    <hr style="border:none;border-top:1px solid var(--border-light);margin:16px 0">
+    <div class="flex justify-between items-center mb-8"><h3>Product Systems</h3>
+      <div class="flex gap-8 items-center"><select id="addSysSelect" style="width:auto"><option value="">Select system...</option>${systemOptions}</select>
+      <button class="btn btn-secondary btn-sm" onclick="addSystemRow()">Add</button></div>
+    </div>
+    <div class="systems-list" id="systemsList">${systemsHtml}</div>
+    <div class="form-help mt-8">Add the product systems needed for this project. The app will auto-calculate all materials.</div>
+  `, `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+     <button class="btn btn-primary" onclick="saveProject('${editId || ''}')">${p ? 'Save Changes' : 'Create Project'}</button>`);
+}
+
+function addSystemRow() {
+  const sel = $('addSysSelect');
+  const sysName = sel.value;
+  if (!sysName) return;
+  const cat = CATALOG[sysName];
+  const apps = Object.keys(cat.applications).map(a => `<option value="${a}">${a}</option>`).join('');
+  const el = document.createElement('div');
+  el.className = 'system-card';
+  el.innerHTML = `<div class="system-card-header"><strong>${sysName}</strong><button class="remove-btn" onclick="this.closest('.system-card').remove()">✕ Remove</button></div>
+    <div class="form-grid">
+      <div><label>Application</label><select class="sys-app">${apps}</select></div>
+      <div><label>Area (m²)</label><input type="number" class="sys-area" value="" min="1" placeholder="0"></div>
+    </div>
+    <div class="form-row mt-8"><label>Notes</label><input type="text" class="sys-notes" placeholder="e.g., Main hall floors"></div>
+    <input type="hidden" class="sys-name" value="${sysName}">`;
+  $('systemsList').appendChild(el);
+  sel.value = '';
+}
+
+function saveProject(editId) {
+  const name = $('projName').value.trim();
+  if (!name) { toast('Project name is required', 'error'); return; }
+  const systemCards = $('systemsList').querySelectorAll('.system-card');
+  const systems = [];
+  let valid = true;
+  systemCards.forEach(card => {
+    const sysName = card.querySelector('.sys-name').value;
+    const app = card.querySelector('.sys-app').value;
+    const area = parseFloat(card.querySelector('.sys-area').value) || 0;
+    const notes = card.querySelector('.sys-notes').value;
+    if (area <= 0) { toast(`Set area for ${sysName}`, 'warn'); valid = false; }
+    systems.push({ id: uid(), systemName: sysName, application: app, area, notes });
+  });
+  if (!valid) return;
+  if (systems.length === 0) {
+    showWarning('No Systems Added', 'You are saving a project without any product systems. You can add them later, but the app cannot calculate materials without them.', () => doSaveProject(editId, name, systems));
+    return;
+  }
+  doSaveProject(editId, name, systems);
+}
+
+function doSaveProject(editId, name, systems) {
+  const id = editId || 'proj_' + uid();
+  const existing = editId ? projects[editId] : {};
+  const proj = {
+    ...existing,
+    id,
+    name,
+    client: $('projClient').value.trim(),
+    location: $('projLocation').value.trim(),
+    deadline: $('projDeadline').value,
+    status: $('projStatus').value,
+    notes: $('projNotes').value.trim(),
+    systems,
+    phases: existing.phases || [],
+    createdAt: existing.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  projects[id] = proj;
+  if (db) db.doc('projects/' + id).set(proj);
+  logActivity(`${editId ? 'updated' : 'created'} project "${name}"`);
+  closeModal();
+  toast(editId ? 'Project updated' : 'Project created');
+  if (currentProject === id) renderProjectDetail();
+  else navigate('projects');
+}
+
+function editCurrentProject() { if (currentProject) openNewProject(currentProject); }
+
+function duplicateProject() {
+  const p = projects[currentProject];
+  if (!p) return;
+  const newId = 'proj_' + uid();
+  const dup = { ...JSON.parse(JSON.stringify(p)), id: newId, name: p.name + ' (Copy)', status: 'planning', phases: [], createdAt: new Date().toISOString() };
+  dup.systems.forEach(s => s.id = uid());
+  projects[newId] = dup;
+  if (db) db.doc('projects/' + newId).set(dup);
+  logActivity(`duplicated project "${p.name}"`);
+  toast('Project duplicated');
+  navigate('project-detail', newId);
+}
+
+// ========== PROJECT DETAIL ==========
+function renderProjectDetail() {
+  const p = projects[currentProject];
+  if (!p) { navigate('projects'); return; }
+  $('projDetailName').textContent = p.name;
+  const statusColors = { planning: 'chip-blue', active: 'chip-green', completed: 'chip-gray', archived: 'chip-gray' };
+  $('projDetailStatus').className = 'chip ' + (statusColors[p.status] || 'chip-gray');
+  $('projDetailStatus').textContent = p.status;
+  $('projDetailMeta').innerHTML = `${p.client ? p.client + ' • ' : ''}${p.location || ''} ${p.deadline ? ' • Deadline: ' + fmtDate(p.deadline) : ''}`;
+  renderOverview(p);
+  renderPhases(p);
+  renderMaterials(p);
+  renderDeliveries(p);
+  renderFiles(p);
+  renderNotes(p);
+}
+
+function renderOverview(p) {
+  const mats = getAllMaterials(p.systems || []);
+  const totalPhases = (p.phases || []).length;
+  const donePhases = (p.phases || []).filter(ph => ph.status === 'completed').length;
+  const pct = totalPhases > 0 ? Math.round(donePhases / totalPhases * 100) : 0;
+
+  const projDeliveries = Object.values(deliveries).filter(d => d.projectId === p.id);
+  const totalItems = mats.reduce((s, m) => s + m.totalUnits, 0);
+  const deliveredItems = projDeliveries.reduce((s, d) => s + (d.items || []).reduce((ss, i) => ss + (i.quantity || 0), 0), 0);
+  const deliveryPct = totalItems > 0 ? Math.min(100, Math.round(deliveredItems / totalItems * 100)) : 0;
+
+  let sysHtml = (p.systems || []).map(s => `<div class="system-card">
+    <div class="system-card-header"><strong>${s.systemName}</strong><span class="chip chip-blue">${s.area} m²</span></div>
+    <div class="system-card-meta"><span>${s.application}</span>${s.notes ? '<span>' + s.notes + '</span>' : ''}</div>
+  </div>`).join('');
+
+  $('tab-overview').innerHTML = `
+    <div class="delivery-summary">
+      <div class="delivery-stat" style="background:var(--blue-light)"><div class="ds-val" style="color:var(--blue)">${(p.systems || []).length}</div><div class="ds-label">Systems</div></div>
+      <div class="delivery-stat" style="background:var(--surface-alt)"><div class="ds-val">${mats.length}</div><div class="ds-label">Materials</div></div>
+      <div class="delivery-stat" style="background:var(--green-light)"><div class="ds-val" style="color:var(--green)">${pct}%</div><div class="ds-label">Phases Done</div></div>
+      <div class="delivery-stat" style="background:var(--amber-light)"><div class="ds-val" style="color:var(--amber)">${deliveryPct}%</div><div class="ds-label">Delivered</div></div>
+    </div>
+    <div class="card mb-16"><div class="card-header"><h2>Product Systems</h2></div><div class="card-body"><div class="systems-list">${sysHtml || '<div class="text-muted">No systems added yet.</div>'}</div></div></div>
+    ${p.notes ? `<div class="card"><div class="card-header"><h2>Project Notes</h2></div><div class="card-body"><p>${p.notes}</p></div></div>` : ''}`;
+}
+
+function renderPhases(p) {
+  const phases = p.phases || [];
+  let html = `<div class="flex justify-between items-center mb-16"><h3>${phases.length} Phase${phases.length !== 1 ? 's' : ''}</h3><button class="btn btn-primary btn-sm" onclick="openAddPhase()">Add Phase</button></div>`;
+  if (phases.length === 0) {
+    html += '<div class="empty-state"><p>No phases defined. Add phases to split your project into manageable batches.</p></div>';
+  } else {
+    phases.forEach((ph, i) => {
+      const statusClass = ph.status === 'completed' ? 'done' : ph.status === 'in_progress' ? 'active' : 'pending';
+      const mats = getPhaseMaterials(p.systems || [], ph);
+      const totalMats = mats.reduce((s, m) => s + m.totalUnits, 0);
+      html += `<div class="card mb-8"><div class="card-body">
+        <div class="flex justify-between items-center mb-8">
+          <div class="flex items-center gap-8"><div class="phase-num ${statusClass}">${i + 1}</div><strong>${ph.name}</strong><span class="chip ${statusClass === 'done' ? 'chip-green' : statusClass === 'active' ? 'chip-blue' : 'chip-gray'}">${ph.status.replace('_', ' ')}</span></div>
+          <div class="flex gap-8">
+            <select class="btn btn-secondary btn-sm" onchange="updatePhaseStatus('${ph.id}',this.value)" style="padding:4px 8px">
+              <option value="pending" ${ph.status === 'pending' ? 'selected' : ''}>Pending</option>
+              <option value="in_progress" ${ph.status === 'in_progress' ? 'selected' : ''}>In Progress</option>
+              <option value="completed" ${ph.status === 'completed' ? 'selected' : ''}>Completed</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" onclick="openEditPhase('${ph.id}')">Edit</button>
+            <button class="remove-btn" onclick="deletePhase('${ph.id}')">✕</button>
+          </div>
+        </div>
+        <div class="text-sm text-muted mb-8">${ph.targetDate ? 'Target: ' + fmtDate(ph.targetDate) : 'No target date'} • ${totalMats} material units • ${Object.keys(ph.allocations || {}).length} systems allocated</div>
+        ${mats.length > 0 ? `<div class="overflow-x"><table><thead><tr><th>Material</th><th>Pkg</th><th>Qty Needed</th><th>Units</th><th>In Stock</th><th>Status</th></tr></thead><tbody>${mats.map(m => {
+          const sKey = m.name + '|' + m.pkg;
+          const stock = (stockData[sKey] || {}).quantity || 0;
+          const diff = stock - m.totalUnits;
+          const cls = diff >= 0 ? 'stock-ok' : 'stock-out';
+          return `<tr><td>${m.name}</td><td>${m.pkg}</td><td>${m.totalQty} ${m.unit}</td><td>${m.totalUnits}</td><td>${stock}</td><td class="${cls}">${diff >= 0 ? 'OK' : 'Need ' + Math.abs(diff)}</td></tr>`;
+        }).join('')}</tbody></table></div>` : '<div class="text-sm text-muted">No area allocated to this phase yet.</div>'}
+      </div></div>`;
+    });
+  }
+  $('tab-phases').innerHTML = html;
+}
+
+function openAddPhase(editId) {
+  const p = projects[currentProject];
+  const ph = editId ? (p.phases || []).find(x => x.id === editId) : null;
+  const sysRows = (p.systems || []).map(s => {
+    const alloc = ph ? (ph.allocations || {})[s.id] || '' : '';
+    return `<div class="form-grid"><div><label>${s.systemName} (${s.application})</label><div class="text-sm text-muted">Total: ${s.area} m²</div></div><div><label>m² for this phase</label><input type="number" class="phase-alloc" data-sysid="${s.id}" value="${alloc}" min="0" max="${s.area}" placeholder="0"></div></div>`;
+  }).join('');
+  openModal(ph ? 'Edit Phase' : 'Add Phase', `
+    <div class="form-grid"><div class="form-row"><label>Phase Name</label><input type="text" id="phaseName" value="${ph ? ph.name : 'Phase ' + ((p.phases || []).length + 1)}" placeholder="e.g., Phase 1"></div>
+    <div class="form-row"><label>Target Date</label><input type="date" id="phaseDate" value="${ph ? ph.targetDate || '' : ''}"></div></div>
+    <hr style="border:none;border-top:1px solid var(--border-light);margin:16px 0">
+    <h3 class="mb-8">Area Allocation</h3>
+    <div class="form-help mb-16">Set how many m² of each system will be produced/delivered in this phase.</div>
+    ${sysRows}
+  `, `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+     <button class="btn btn-primary" onclick="savePhase('${editId || ''}')">${ph ? 'Save' : 'Add Phase'}</button>`);
+}
+
+function openEditPhase(phId) { openAddPhase(phId); }
+
+function savePhase(editId) {
+  const p = projects[currentProject];
+  const name = $('phaseName').value.trim();
+  if (!name) { toast('Phase name is required', 'error'); return; }
+  const allocations = {};
+  let totalAlloc = 0;
+  document.querySelectorAll('.phase-alloc').forEach(inp => {
+    const v = parseFloat(inp.value) || 0;
+    if (v > 0) { allocations[inp.dataset.sysid] = v; totalAlloc += v; }
+  });
+  // Smart check: warn if allocation exceeds remaining
+  const warnings = [];
+  (p.systems || []).forEach(s => {
+    const alloc = allocations[s.id] || 0;
+    const otherPhases = (p.phases || []).filter(ph => ph.id !== editId).reduce((sum, ph) => sum + ((ph.allocations || {})[s.id] || 0), 0);
+    if (alloc + otherPhases > s.area) warnings.push(`${s.systemName}: allocated ${alloc + otherPhases} m² across phases but project total is only ${s.area} m²`);
+  });
+  if (warnings.length > 0) {
+    showWarning('Over-Allocation Detected', warnings.join('<br>') + '<br><br>This means you are planning more than the project total. Are you sure?', () => doSavePhase(p, editId, name, allocations));
+    return;
+  }
+  doSavePhase(p, editId, name, allocations);
+}
+
+function doSavePhase(p, editId, name, allocations) {
+  if (!p.phases) p.phases = [];
+  if (editId) {
+    const idx = p.phases.findIndex(x => x.id === editId);
+    if (idx >= 0) Object.assign(p.phases[idx], { name, targetDate: $('phaseDate').value, allocations });
+  } else {
+    p.phases.push({ id: 'ph_' + uid(), name, targetDate: $('phaseDate').value, status: 'pending', allocations });
+  }
+  p.updatedAt = new Date().toISOString();
+  if (db) db.doc('projects/' + p.id).set(p);
+  logActivity(`${editId ? 'updated' : 'added'} phase "${name}" in "${p.name}"`);
+  closeModal();
+  toast(editId ? 'Phase updated' : 'Phase added');
+  renderProjectDetail();
+}
+
+function updatePhaseStatus(phId, status) {
+  const p = projects[currentProject];
+  const ph = (p.phases || []).find(x => x.id === phId);
+  if (ph) {
+    ph.status = status;
+    p.updatedAt = new Date().toISOString();
+    if (db) db.doc('projects/' + p.id).set(p);
+    logActivity(`set ${ph.name} to "${status}" in "${p.name}"`);
+    renderProjectDetail();
+  }
+}
+
+function deletePhase(phId) {
+  const p = projects[currentProject];
+  p.phases = (p.phases || []).filter(x => x.id !== phId);
+  p.updatedAt = new Date().toISOString();
+  if (db) db.doc('projects/' + p.id).set(p);
+  toast('Phase deleted');
+  renderProjectDetail();
+}
+
+// ========== MATERIALS ==========
+function renderMaterials(p) {
+  const mats = getAllMaterials(p.systems || []);
+  if (mats.length === 0) {
+    $('tab-materials').innerHTML = '<div class="empty-state"><p>Add product systems to see calculated materials.</p></div>';
+    return;
+  }
+  const projDels = Object.values(deliveries).filter(d => d.projectId === p.id);
+  let rows = mats.map(m => {
+    const sKey = m.name + '|' + m.pkg;
+    const stock = (stockData[sKey] || {}).quantity || 0;
+    const delivered = projDels.reduce((s, d) => s + (d.items || []).filter(i => i.material === sKey).reduce((ss, i) => ss + (i.quantity || 0), 0), 0);
+    const remaining = m.totalUnits - delivered;
+    const diff = stock - remaining;
+    const statusCls = remaining <= 0 ? 'chip-green' : diff >= 0 ? 'chip-blue' : 'chip-red';
+    const statusText = remaining <= 0 ? 'Fully delivered' : diff >= 0 ? 'Stock OK' : 'Need ' + Math.abs(diff);
+    return `<tr><td><strong>${m.name}</strong></td><td>${m.pkg}</td><td>${m.totalQty} ${m.unit}</td><td>${m.totalUnits}</td><td>${stock}</td><td>${delivered}</td><td>${Math.max(0, remaining)}</td><td><span class="chip ${statusCls}">${statusText}</span></td></tr>`;
+  }).join('');
+  $('tab-materials').innerHTML = `
+    <div class="flex justify-between items-center mb-16"><h3>Material Requirements</h3>
+      <button class="btn btn-secondary btn-sm" onclick="generateOrderFromProject()">Generate Order for Missing</button></div>
+    <div class="overflow-x"><table><thead><tr><th>Material</th><th>Pkg</th><th>Total Qty</th><th>Units Needed</th><th>In Stock</th><th>Delivered</th><th>Remaining</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function generateOrderFromProject() {
+  const p = projects[currentProject];
+  const mats = getAllMaterials(p.systems || []);
+  const projDels = Object.values(deliveries).filter(d => d.projectId === p.id);
+  const missing = [];
+  mats.forEach(m => {
+    const sKey = m.name + '|' + m.pkg;
+    const stock = (stockData[sKey] || {}).quantity || 0;
+    const delivered = projDels.reduce((s, d) => s + (d.items || []).filter(i => i.material === sKey).reduce((ss, i) => ss + (i.quantity || 0), 0), 0);
+    const remaining = m.totalUnits - delivered;
+    const toOrder = remaining - stock;
+    if (toOrder > 0) missing.push({ material: sKey, name: m.name, pkg: m.pkg, quantity: toOrder });
+  });
+  if (missing.length === 0) { toast('All materials are in stock!'); return; }
+  const orderId = 'ord_' + uid();
+  const order = {
+    id: orderId,
+    ref: 'ORD-' + new Date().getFullYear() + '-' + String(Object.keys(orders).length + 1).padStart(3, '0'),
+    projectId: p.id,
+    projectName: p.name,
+    status: 'pending',
+    items: missing,
+    createdAt: new Date().toISOString(),
+    createdBy: currentUser,
+    expectedDate: '',
+    notes: 'Auto-generated from project "' + p.name + '"'
+  };
+  orders[orderId] = order;
+  if (db) db.doc('orders/' + orderId).set(order);
+  logActivity(`generated order ${order.ref} for "${p.name}" (${missing.length} items)`);
+  toast(`Order ${order.ref} created with ${missing.length} items`);
+  renderProjectDetail();
+}
+
+// ========== DELIVERIES ==========
+function renderDeliveries(p) {
+  const projDels = Object.values(deliveries).filter(d => d.projectId === p.id).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  let html = `<div class="flex justify-between items-center mb-16"><h3>Deliveries</h3><button class="btn btn-primary btn-sm" onclick="openNewDelivery()">Record Delivery</button></div>`;
+  if (projDels.length === 0) {
+    html += '<div class="empty-state"><p>No deliveries recorded yet.</p></div>';
+  } else {
+    html += '<div class="overflow-x"><table><thead><tr><th>Date</th><th>Ref</th><th>Phase</th><th>Items</th><th>By</th><th>Actions</th></tr></thead><tbody>';
+    projDels.forEach(d => {
+      const ph = d.phaseId ? (p.phases || []).find(x => x.id === d.phaseId) : null;
+      const itemCount = (d.items || []).reduce((s, i) => s + (i.quantity || 0), 0);
+      html += `<tr><td>${fmtDate(d.date)}</td><td>${d.ref || '—'}</td><td>${ph ? ph.name : '—'}</td><td>${itemCount} units (${(d.items || []).length} types)</td><td>${d.deliveredBy || '—'}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="viewDelivery('${d.id}')">View</button> <button class="btn btn-secondary btn-sm" onclick="downloadDeliveryNote('${d.id}')">Download</button></td></tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
+  $('tab-deliveries').innerHTML = html;
+}
+
+function openNewDelivery() {
+  const p = projects[currentProject];
+  const mats = getAllMaterials(p.systems || []);
+  const phaseOptions = (p.phases || []).map(ph => `<option value="${ph.id}">${ph.name}</option>`).join('');
+  const matRows = mats.map(m => {
+    const sKey = m.name + '|' + m.pkg;
+    const stock = (stockData[sKey] || {}).quantity || 0;
+    return `<div class="form-grid" style="grid-template-columns:2fr 1fr 1fr;align-items:end;margin-bottom:8px">
+      <div><label>${m.name} (${m.pkg})</label><div class="text-sm text-muted">In stock: ${stock}</div></div>
+      <div><label>Deliver</label><input type="number" class="del-qty" data-mat="${sKey}" value="0" min="0" max="${stock}"></div>
+      <div class="text-sm text-muted" style="padding-bottom:10px">of ${m.totalUnits} needed</div>
+    </div>`;
+  }).join('');
+
+  openModal('Record Delivery', `
+    <div class="form-grid">
+      <div class="form-row"><label>Delivery Date</label><input type="date" id="delDate" value="${today()}"></div>
+      <div class="form-row"><label>Delivery Ref</label><input type="text" id="delRef" value="DN-${new Date().getFullYear()}-${String(Object.keys(deliveries).length + 1).padStart(3, '0')}" placeholder="e.g., DN-2026-001"></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-row"><label>Phase</label><select id="delPhase"><option value="">No specific phase</option>${phaseOptions}</select></div>
+      <div class="form-row"><label>Delivered By</label><select id="delBy">${TEAM.map(t => `<option value="${t.name}">${t.name}</option>`).join('')}</select></div>
+    </div>
+    <hr style="border:none;border-top:1px solid var(--border-light);margin:16px 0">
+    <h3 class="mb-8">Materials</h3>${matRows}
+    <div class="form-row mt-16"><label>Notes</label><textarea id="delNotes" rows="2"></textarea></div>
+  `, `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+     <button class="btn btn-primary" onclick="saveDelivery()">Save Delivery</button>`);
+}
+
+function saveDelivery() {
+  const items = [];
+  let hasWarning = false;
+  document.querySelectorAll('.del-qty').forEach(inp => {
+    const qty = parseInt(inp.value) || 0;
+    if (qty > 0) {
+      const sKey = inp.dataset.mat;
+      const stock = (stockData[sKey] || {}).quantity || 0;
+      if (qty > stock) hasWarning = true;
+      items.push({ material: sKey, quantity: qty, name: sKey.split('|')[0], pkg: sKey.split('|')[1] });
+    }
+  });
+  if (items.length === 0) { toast('No materials selected for delivery', 'warn'); return; }
+  if (hasWarning) {
+    showWarning('Delivering More Than Available', 'Some delivery quantities exceed current stock. This will result in negative stock. Double-check the numbers.', doSaveDelivery.bind(null, items));
+    return;
+  }
+  doSaveDelivery(items);
+}
+
+function doSaveDelivery(items) {
+  const id = 'del_' + uid();
+  const del = {
+    id,
+    projectId: currentProject,
+    ref: $('delRef').value.trim(),
+    date: $('delDate').value,
+    phaseId: $('delPhase').value,
+    deliveredBy: $('delBy').value,
+    items,
+    notes: $('delNotes').value.trim(),
+    createdAt: new Date().toISOString()
+  };
+  deliveries[id] = del;
+  if (db) db.doc('deliveries/' + id).set(del);
+  // Deduct from stock
+  items.forEach(item => {
+    const sKey = item.material;
+    if (!stockData[sKey]) stockData[sKey] = { quantity: 0, minStock: 0 };
+    stockData[sKey].quantity = Math.max(0, (stockData[sKey].quantity || 0) - item.quantity);
+  });
+  if (db) db.doc('stock/materials').set(stockData);
+  logActivity(`recorded delivery ${del.ref} for "${projects[currentProject]?.name}" (${items.length} items)`);
+  closeModal();
+  toast('Delivery recorded and stock updated');
+  renderProjectDetail();
+}
+
+function viewDelivery(delId) {
+  const d = deliveries[delId];
+  if (!d) return;
+  const p = projects[d.projectId];
+  const ph = d.phaseId ? (p?.phases || []).find(x => x.id === d.phaseId) : null;
+  openModal('Delivery ' + (d.ref || delId), `
+    <div class="form-grid mb-16"><div><label>Date</label><p>${fmtDate(d.date)}</p></div><div><label>Reference</label><p>${d.ref || '—'}</p></div></div>
+    <div class="form-grid mb-16"><div><label>Project</label><p>${p?.name || '—'}</p></div><div><label>Phase</label><p>${ph?.name || '—'}</p></div></div>
+    <div class="form-grid mb-16"><div><label>Delivered By</label><p>${d.deliveredBy || '—'}</p></div><div><label>Notes</label><p>${d.notes || '—'}</p></div></div>
+    <table><thead><tr><th>Material</th><th>Pkg</th><th>Quantity</th></tr></thead><tbody>${(d.items || []).map(i => `<tr><td>${i.name}</td><td>${i.pkg}</td><td>${i.quantity}</td></tr>`).join('')}</tbody></table>
+  `, `<button class="btn btn-secondary" onclick="closeModal()">Close</button><button class="btn btn-primary" onclick="downloadDeliveryNote('${delId}');closeModal()">Download Note</button>`);
+}
+
+async function downloadDeliveryNote(delId) {
+  const d = deliveries[delId];
+  if (!d) return;
+  const p = projects[d.projectId];
+  const ph = d.phaseId ? (p?.phases || []).find(x => x.id === d.phaseId) : null;
+  let csv = 'CEMENT PLUS - DELIVERY NOTE\n';
+  csv += `Reference,${d.ref || ''}\nDate,${d.date}\nProject,${p?.name || ''}\nPhase,${ph?.name || ''}\nDelivered By,${d.deliveredBy || ''}\n\n`;
+  csv += 'Material,Packaging,Quantity\n';
+  (d.items || []).forEach(i => { csv += `"${i.name}","${i.pkg}",${i.quantity}\n`; });
+  csv += `\nNotes,"${d.notes || ''}"`;
+  if (downloads) {
+    try { await downloads.save({ filename: `${d.ref || 'delivery'}.csv`, data: csv }); }
+    catch (e) { if (e.code !== 'declined') toast('Download failed: ' + e.message, 'error'); }
+  } else {
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = (d.ref || 'delivery') + '.csv';
+    toast('Download not available in this view. Copy the data instead.', 'warn');
+  }
+}
+
+// ========== FILES ==========
+function renderFiles(p) {
+  const fileList = p.files || [];
+  let html = `<div class="flex justify-between items-center mb-16"><h3>Attached Files</h3>
+    <button class="btn btn-primary btn-sm" onclick="uploadFile()">Upload File</button></div>`;
+  if (fileList.length === 0) {
+    html += '<div class="empty-state"><p>No files attached. Upload delivery notes, invoices, or offers here.</p></div>';
+  } else {
+    fileList.forEach(f => {
+      const ext = (f.name || '').split('.').pop().toUpperCase();
+      const colors = { PDF: 'var(--red)', DOC: 'var(--blue)', XLS: 'var(--green)', JPG: 'var(--amber)', PNG: 'var(--amber)' };
+      const bg = { PDF: 'var(--red-light)', DOC: 'var(--blue-light)', XLS: 'var(--green-light)', JPG: 'var(--amber-light)', PNG: 'var(--amber-light)' };
+      html += `<div class="file-item">
+        <div class="file-icon" style="background:${bg[ext] || 'var(--surface-alt)'};color:${colors[ext] || 'var(--ink-3)'}">${ext || '?'}</div>
+        <div class="file-info"><div class="file-name">${f.name}</div><div class="file-meta">${f.category || 'Document'} • ${fmtDate(f.uploadedAt)} • ${f.uploadedBy || ''}</div></div>
+        ${f.url ? `<a href="${f.url}" target="_blank" class="btn btn-secondary btn-sm">View</a>` : ''}
+        <button class="remove-btn" onclick="removeFile('${f.id}')">✕</button>
+      </div>`;
+    });
+  }
+  $('tab-files').innerHTML = html;
+}
+
+async function uploadFile() {
+  if (!assets) { toast('File uploads not available in this view', 'warn'); return; }
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.csv';
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    try {
+      const result = await assets.upload(file);
+      const p = projects[currentProject];
+      if (!p.files) p.files = [];
+      const cat = prompt('File category (e.g., Delivery Note, Invoice, Offer, Photo):') || 'Document';
+      p.files.push({ id: result.id, name: file.name, url: result.url, category: cat, uploadedAt: new Date().toISOString(), uploadedBy: currentUser });
+      if (db) db.doc('projects/' + p.id).set(p);
+      logActivity(`uploaded file "${file.name}" to "${p.name}"`);
+      toast('File uploaded');
+      renderFiles(p);
+    } catch (e) { toast('Upload failed: ' + e.message, 'error'); }
+  };
+  input.click();
+}
+
+function removeFile(fileId) {
+  const p = projects[currentProject];
+  p.files = (p.files || []).filter(f => f.id !== fileId);
+  if (db) db.doc('projects/' + p.id).set(p);
+  renderFiles(p);
+}
+
+// ========== NOTES ==========
+function renderNotes(p) {
+  const notes = p.projectNotes || [];
+  $('tab-notes').innerHTML = `
+    <div class="flex justify-between items-center mb-16"><h3>Team Notes</h3></div>
+    <div class="form-row"><textarea id="newNote" rows="2" placeholder="Add a note for the team..."></textarea></div>
+    <button class="btn btn-primary btn-sm mb-16" onclick="addNote()">Add Note</button>
+    ${notes.length === 0 ? '<div class="text-muted">No notes yet.</div>' : notes.slice().reverse().map(n => `<div style="padding:12px 0;border-bottom:1px solid var(--border-light)"><div class="flex justify-between"><strong>${n.author}</strong><span class="text-sm text-muted">${fmtDate(n.time)}</span></div><p style="margin-top:4px">${n.text}</p></div>`).join('')}`;
+}
+
+function addNote() {
+  const text = $('newNote')?.value?.trim();
+  if (!text) return;
+  const p = projects[currentProject];
+  if (!p.projectNotes) p.projectNotes = [];
+  p.projectNotes.push({ text, author: currentUser, time: new Date().toISOString() });
+  if (db) db.doc('projects/' + p.id).set(p);
+  toast('Note added');
+  renderNotes(p);
+}
+
+// ========== STOCK ==========
+function renderStock() {
+  const entries = Object.entries(stockData).sort((a, b) => a[0].localeCompare(b[0]));
+  if (entries.length === 0) {
+    $('stockTable').innerHTML = '<div class="empty-state" style="padding:48px"><p>No stock data yet. Update your warehouse inventory to get started.</p><button class="btn btn-primary" onclick="openStockEdit()">Update Stock</button></div>';
+    return;
+  }
+  // Calculate total demand across active projects
+  const demand = {};
+  Object.values(projects).filter(p => p.status === 'active').forEach(p => {
+    getAllMaterials(p.systems || []).forEach(m => {
+      const key = m.name + '|' + m.pkg;
+      demand[key] = (demand[key] || 0) + m.totalUnits;
+    });
+  });
+
+  let rows = entries.map(([key, val]) => {
+    const [name, pkg] = key.split('|');
+    const dem = demand[key] || 0;
+    const cls = val.quantity <= 0 ? 'out' : val.quantity <= (val.minStock || 0) ? 'low' : 'ok';
+    return `<tr><td><span class="stock-indicator ${cls}"></span></td><td><strong>${name}</strong></td><td>${pkg}</td><td>${val.quantity}</td><td>${val.minStock || 0}</td><td>${dem}</td><td>${val.quantity - dem}</td></tr>`;
+  }).join('');
+  $('stockTable').innerHTML = `<table><thead><tr><th></th><th>Material</th><th>Pkg</th><th>In Stock</th><th>Min Stock</th><th>Total Demand</th><th>Surplus/Deficit</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function openStockEdit() {
+  // Collect all known materials
+  const allMats = new Set();
+  Object.keys(stockData).forEach(k => allMats.add(k));
+  Object.values(CATALOG).forEach(sys => {
+    Object.values(sys.applications).forEach(app => {
+      app.forEach(prod => allMats.add(prod.name + '|' + prod.pkg));
+    });
+  });
+  const sorted = [...allMats].sort();
+  const rows = sorted.map(key => {
+    const [name, pkg] = key.split('|');
+    const val = stockData[key] || { quantity: 0, minStock: 0 };
+    return `<div class="form-grid" style="grid-template-columns:2fr 1fr 1fr;align-items:end;margin-bottom:6px;padding:4px 0;border-bottom:1px solid var(--border-light)">
+      <div class="text-sm"><strong>${name}</strong> <span class="text-muted">(${pkg})</span></div>
+      <div><label>Qty</label><input type="number" class="stock-qty" data-key="${key}" value="${val.quantity}" min="0"></div>
+      <div><label>Min</label><input type="number" class="stock-min" data-key="${key}" value="${val.minStock || 0}" min="0"></div>
+    </div>`;
+  }).join('');
+
+  openModal('Update Stock', `<div class="form-help mb-16">Update current warehouse quantities and minimum stock levels.</div>${rows}`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveStock()">Save Stock</button>`);
+}
+
+function saveStock() {
+  const warnings = [];
+  document.querySelectorAll('.stock-qty').forEach(inp => {
+    const key = inp.dataset.key;
+    const qty = parseInt(inp.value) || 0;
+    const minEl = document.querySelector(`.stock-min[data-key="${key}"]`);
+    const min = parseInt(minEl?.value) || 0;
+    const oldQty = (stockData[key] || {}).quantity || 0;
+    if (qty < 0) warnings.push(`${key.split('|')[0]}: negative stock`);
+    if (oldQty > 0 && qty === 0) warnings.push(`${key.split('|')[0]}: zeroing out stock from ${oldQty}`);
+    stockData[key] = { quantity: qty, minStock: min };
+  });
+  if (warnings.length > 0) {
+    showWarning('Stock Update Check', warnings.join('<br>') + '<br><br>Are these values correct?', () => { if (db) db.doc('stock/materials').set(stockData); closeModal(); toast('Stock updated'); logActivity('updated warehouse stock'); renderStock(); });
+    return;
+  }
+  if (db) db.doc('stock/materials').set(stockData);
+  closeModal();
+  toast('Stock updated');
+  logActivity('updated warehouse stock');
+  renderStock();
+}
+
+// ========== ORDERS ==========
+function renderOrders() {
+  const ordArr = Object.values(orders).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  if (ordArr.length === 0) {
+    $('ordersList').innerHTML = '<div class="empty-state" style="padding:48px"><p>No orders yet. Orders are generated automatically from project material needs.</p></div>';
+    return;
+  }
+  const statusChip = s => ({ pending: 'chip-amber', ordered: 'chip-blue', received: 'chip-green', cancelled: 'chip-gray' }[s] || 'chip-gray');
+  let rows = ordArr.map(o => {
+    const itemCount = (o.items || []).reduce((s, i) => s + (i.quantity || 0), 0);
+    return `<tr>
+      <td><strong>${o.ref || o.id}</strong></td>
+      <td>${o.projectName || '—'}</td>
+      <td><span class="chip ${statusChip(o.status)}">${o.status}</span></td>
+      <td>${itemCount} units</td>
+      <td>${fmtDate(o.createdAt)}</td>
+      <td>${fmtDate(o.expectedDate)}</td>
+      <td>
+        ${o.status === 'pending' ? `<button class="btn btn-secondary btn-sm" onclick="markOrdered('${o.id}')">Mark Ordered</button>` : ''}
+        ${o.status === 'ordered' ? `<button class="btn btn-primary btn-sm" onclick="receiveOrder('${o.id}')">Receive</button>` : ''}
+        <button class="btn btn-secondary btn-sm" onclick="viewOrder('${o.id}')">View</button>
+      </td>
+    </tr>`;
+  }).join('');
+  $('ordersList').innerHTML = `<table><thead><tr><th>Reference</th><th>Project</th><th>Status</th><th>Items</th><th>Created</th><th>Expected</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function openNewOrder() {
+  const allMats = new Set();
+  Object.values(CATALOG).forEach(sys => Object.values(sys.applications).forEach(app => app.forEach(prod => allMats.add(prod.name + '|' + prod.pkg))));
+  Object.keys(stockData).forEach(k => allMats.add(k));
+  const sorted = [...allMats].sort();
+  const rows = sorted.map(key => {
+    const [name, pkg] = key.split('|');
+    return `<div class="form-grid" style="grid-template-columns:2fr 1fr;align-items:end;margin-bottom:6px"><div class="text-sm"><strong>${name}</strong> (${pkg})</div><div><input type="number" class="order-qty" data-mat="${key}" value="0" min="0"></div></div>`;
+  }).join('');
+  const projOpts = Object.values(projects).map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  openModal('New Order', `
+    <div class="form-grid"><div class="form-row"><label>Order Reference</label><input type="text" id="ordRef" value="ORD-${new Date().getFullYear()}-${String(Object.keys(orders).length + 1).padStart(3, '0')}"></div>
+    <div class="form-row"><label>Related Project</label><select id="ordProject"><option value="">None</option>${projOpts}</select></div></div>
+    <div class="form-row"><label>Expected Delivery Date</label><input type="date" id="ordExpected"></div>
+    <div class="form-row"><label>Notes</label><textarea id="ordNotes" rows="2"></textarea></div>
+    <hr style="border:none;border-top:1px solid var(--border-light);margin:16px 0"><h3 class="mb-8">Materials to Order</h3>${rows}
+  `, `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveNewOrder()">Create Order</button>`);
+}
+
+function saveNewOrder() {
+  const items = [];
+  document.querySelectorAll('.order-qty').forEach(inp => {
+    const qty = parseInt(inp.value) || 0;
+    if (qty > 0) {
+      const sKey = inp.dataset.mat;
+      items.push({ material: sKey, name: sKey.split('|')[0], pkg: sKey.split('|')[1], quantity: qty });
+    }
+  });
+  if (items.length === 0) { toast('No materials selected', 'warn'); return; }
+  const id = 'ord_' + uid();
+  const projId = $('ordProject').value;
+  orders[id] = {
+    id, ref: $('ordRef').value.trim(), projectId: projId,
+    projectName: projId ? projects[projId]?.name : '', status: 'pending',
+    items, createdAt: new Date().toISOString(), createdBy: currentUser,
+    expectedDate: $('ordExpected').value, notes: $('ordNotes').value.trim()
+  };
+  if (db) db.doc('orders/' + id).set(orders[id]);
+  logActivity(`created order ${orders[id].ref}`);
+  closeModal();
+  toast('Order created');
+  renderOrders();
+}
+
+function markOrdered(ordId) {
+  const o = orders[ordId];
+  if (!o) return;
+  const expDate = prompt('Expected delivery date (YYYY-MM-DD):', o.expectedDate || '');
+  o.status = 'ordered';
+  if (expDate) o.expectedDate = expDate;
+  o.orderedAt = new Date().toISOString();
+  if (db) db.doc('orders/' + ordId).set(o);
+  logActivity(`marked order ${o.ref} as ordered`);
+  toast('Order marked as ordered');
+  renderOrders();
+}
+
+function receiveOrder(ordId) {
+  const o = orders[ordId];
+  if (!o) return;
+  o.status = 'received';
+  o.receivedAt = new Date().toISOString();
+  // Add to stock
+  (o.items || []).forEach(item => {
+    if (!stockData[item.material]) stockData[item.material] = { quantity: 0, minStock: 0 };
+    stockData[item.material].quantity += item.quantity;
+  });
+  if (db) {
+    db.doc('orders/' + ordId).set(o);
+    db.doc('stock/materials').set(stockData);
+  }
+  logActivity(`received order ${o.ref} (${(o.items || []).length} items added to stock)`);
+  toast('Order received and stock updated');
+  renderOrders();
+}
+
+function viewOrder(ordId) {
+  const o = orders[ordId];
+  if (!o) return;
+  openModal('Order ' + (o.ref || ordId), `
+    <div class="form-grid mb-16"><div><label>Reference</label><p>${o.ref}</p></div><div><label>Status</label><p>${o.status}</p></div></div>
+    <div class="form-grid mb-16"><div><label>Project</label><p>${o.projectName || '—'}</p></div><div><label>Expected</label><p>${fmtDate(o.expectedDate)}</p></div></div>
+    <table><thead><tr><th>Material</th><th>Pkg</th><th>Quantity</th></tr></thead><tbody>${(o.items || []).map(i => `<tr><td>${i.name}</td><td>${i.pkg}</td><td>${i.quantity}</td></tr>`).join('')}</tbody></table>
+    ${o.notes ? `<div class="mt-16"><label>Notes</label><p>${o.notes}</p></div>` : ''}
+  `, `<button class="btn btn-secondary" onclick="closeModal()">Close</button>`);
+}
+
+// ========== REMINDERS ==========
+function renderReminders() {
+  const remArr = Object.values(reminders).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const active = remArr.filter(r => !r.done);
+  const done = remArr.filter(r => r.done);
+  let html = '';
+  if (active.length === 0 && done.length === 0) {
+    html = '<div class="empty-state"><p>No reminders set. Create a reminder to keep your team on track.</p></div>';
+  } else {
+    if (active.length > 0) {
+      html += '<h3 class="mb-8">Active</h3>';
+      active.forEach(r => {
+        const days = r.date ? daysDiff(r.date, new Date()) : null;
+        const urgent = days !== null && days <= 0;
+        html += `<div class="reminder-item" style="${urgent ? 'border-color:var(--red)' : ''}">
+          <div style="flex:1"><div class="rem-msg">${r.message}</div><div class="rem-date">${r.date ? fmtDate(r.date) + (r.time ? ' at ' + r.time : '') : 'No date'} • For: ${(r.assignees || []).join(', ') || 'All'} ${urgent ? ' • <strong style="color:var(--red)">DUE</strong>' : ''}</div></div>
+          <div class="rem-actions"><button class="btn btn-secondary btn-sm" onclick="completeReminder('${r.id}')">Done</button><button class="remove-btn" onclick="deleteReminder('${r.id}')">✕</button></div>
+        </div>`;
+      });
+    }
+    if (done.length > 0) {
+      html += '<h3 class="mb-8 mt-16" style="color:var(--ink-3)">Completed</h3>';
+      done.slice(0, 10).forEach(r => {
+        html += `<div class="reminder-item" style="opacity:.6"><div style="flex:1"><div class="rem-msg" style="text-decoration:line-through">${r.message}</div><div class="rem-date">${fmtDate(r.date)}</div></div></div>`;
+      });
+    }
+  }
+  $('remindersList').innerHTML = html;
+}
+
+function openNewReminder() {
+  const teamChecks = TEAM.map(t => `<label style="display:flex;align-items:center;gap:6px;font-size:.875rem;text-transform:none;letter-spacing:0"><input type="checkbox" class="rem-assignee" value="${t.name}" checked> ${t.name}</label>`).join('');
+  openModal('New Reminder', `
+    <div class="form-row"><label>Message</label><textarea id="remMsg" rows="2" placeholder="e.g., Check if order has shipped"></textarea></div>
+    <div class="form-grid"><div class="form-row"><label>Date</label><input type="date" id="remDate" value="${today()}"></div>
+    <div class="form-row"><label>Time</label><input type="time" id="remTime" value="09:00"></div></div>
+    <div class="form-row"><label>Assign To</label><div class="flex gap-8 flex-wrap">${teamChecks}</div></div>
+    <div class="form-row"><label>Related Project</label><select id="remProject"><option value="">None</option>${Object.values(projects).map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</select></div>
+  `, `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveReminder()">Create Reminder</button>`);
+}
+
+function saveReminder() {
+  const msg = $('remMsg').value.trim();
+  if (!msg) { toast('Reminder message is required', 'error'); return; }
+  const assignees = [];
+  document.querySelectorAll('.rem-assignee:checked').forEach(cb => assignees.push(cb.value));
+  const id = 'rem_' + uid();
+  reminders[id] = {
+    id, message: msg, date: $('remDate').value, time: $('remTime').value,
+    assignees, projectId: $('remProject').value, done: false,
+    createdAt: new Date().toISOString(), createdBy: currentUser
+  };
+  if (db) db.doc('reminders/' + id).set(reminders[id]);
+  logActivity(`set reminder: "${msg}"`);
+  closeModal();
+  toast('Reminder created');
+  renderReminders();
+}
+
+function completeReminder(id) {
+  if (reminders[id]) {
+    reminders[id].done = true;
+    reminders[id].completedAt = new Date().toISOString();
+    if (db) db.doc('reminders/' + id).set(reminders[id]);
+    renderReminders();
+    updateBadges();
+  }
+}
+
+function deleteReminder(id) {
+  if (reminders[id]) {
+    delete reminders[id];
+    if (db) db.doc('reminders/' + id).delete();
+    renderReminders();
+    updateBadges();
+  }
+}
+
+// ========== RESPONSIVE DASHBOARD GRID ==========
+const style = document.createElement('style');
+style.textContent = '@media(max-width:900px){.dash-grid{grid-template-columns:1fr!important}}';
+document.head.appendChild(style);
+
+// ========== INIT ==========
+async function init() {
+  $('todayDate').textContent = fmtDate(today());
+
+  // Try to connect capabilities
+  if (window.claude) {
+    try {
+      db = await window.claude.use('db');
+      downloads = await window.claude.use('downloads');
+      assets = await window.claude.use('assets');
+      room = await window.claude.use('room');
+    } catch (e) {}
+  }
+
+  if (db) {
+    // Subscribe to projects
+    db.collection('projects').onSnapshot(snap => {
+      snap.docs.forEach(doc => { if (doc.exists) projects[doc.id] = doc.data(); });
+      snap.docChanges().forEach(ch => { if (ch.type === 'removed') delete projects[ch.doc.id]; });
+      renderCurrentPage();
+    });
+    // Subscribe to stock
+    db.doc('stock/materials').onSnapshot(snap => {
+      if (snap.exists) stockData = snap.data();
+      renderCurrentPage();
+    });
+    // Subscribe to orders
+    db.collection('orders').onSnapshot(snap => {
+      snap.docs.forEach(doc => { if (doc.exists) orders[doc.id] = doc.data(); });
+      snap.docChanges().forEach(ch => { if (ch.type === 'removed') delete orders[ch.doc.id]; });
+      renderCurrentPage();
+    });
+    // Subscribe to deliveries
+    db.collection('deliveries').onSnapshot(snap => {
+      snap.docs.forEach(doc => { if (doc.exists) deliveries[doc.id] = doc.data(); });
+      snap.docChanges().forEach(ch => { if (ch.type === 'removed') delete deliveries[ch.doc.id]; });
+      renderCurrentPage();
+    });
+    // Subscribe to reminders
+    db.collection('reminders').onSnapshot(snap => {
+      snap.docs.forEach(doc => { if (doc.exists) reminders[doc.id] = doc.data(); });
+      snap.docChanges().forEach(ch => { if (ch.type === 'removed') delete reminders[ch.doc.id]; });
+      renderCurrentPage();
+    });
+    // Subscribe to activity
+    db.doc('activity/recent').onSnapshot(snap => {
+      if (snap.exists) activities = snap.data().items || [];
+      renderCurrentPage();
+    });
+  } else {
+    // No DB - show with empty state
+    renderDashboard();
+  }
+
+  // Room presence
+  if (room) {
+    room.presence({ name: currentUser, status: 'online' });
+    room.onPeers(peers => {
+      const online = Object.values(peers).filter(p => p.name);
+      $('onlineCount').textContent = online.length + ' online';
+    });
+  }
+
+  renderDashboard();
+}
+
+function renderCurrentPage() {
+  const activePage = document.querySelector('.page.active');
+  if (!activePage) return;
+  const pageId = activePage.id.replace('page-', '');
+  if (pageId === 'dashboard') renderDashboard();
+  else if (pageId === 'projects') renderProjects();
+  else if (pageId === 'project-detail') renderProjectDetail();
+  else if (pageId === 'stock') renderStock();
+  else if (pageId === 'orders') renderOrders();
+  else if (pageId === 'reminders') renderReminders();
+}
+
+init();
+</script>
