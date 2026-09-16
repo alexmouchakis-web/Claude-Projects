@@ -2,81 +2,81 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
 :root {
-  --ground: #F5F6FA;
-  --surface: #FFFFFF;
-  --surface-alt: #F0F1F5;
-  --ink: #1A1D24;
-  --ink-2: #4B5060;
-  --ink-3: #8B90A0;
-  --border: #E2E4EA;
-  --border-light: #EDEEF2;
-  --blue: #4F6EF7;
-  --blue-light: #EEF1FE;
-  --blue-hover: #3B57E0;
-  --green: #22A566;
-  --green-light: #E6F9F0;
-  --amber: #E5940A;
-  --amber-light: #FFF7E6;
-  --red: #E5453A;
-  --red-light: #FEF0EF;
-  --nav-bg: #1A1D24;
-  --nav-text: #9DA2B0;
+  --ground: #EBE7DD;
+  --surface: #F8F5EC;
+  --surface-alt: #E3DFCF;
+  --ink: #2A1215;
+  --ink-2: #6A3840;
+  --ink-3: #9A757B;
+  --border: #D6D0C2;
+  --border-light: #E2DDD2;
+  --blue: #F05A1E;
+  --blue-light: #FDE8DE;
+  --blue-hover: #D84E16;
+  --green: #2D8C55;
+  --green-light: #E4F5EC;
+  --amber: #C98A1A;
+  --amber-light: #FDF3DD;
+  --red: #C43830;
+  --red-light: #FCE8E6;
+  --nav-bg: #5E2129;
+  --nav-text: #C09298;
   --nav-active: #FFFFFF;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,.05);
-  --shadow: 0 2px 10px rgba(0,0,0,.07);
-  --shadow-lg: 0 8px 28px rgba(0,0,0,.10);
+  --shadow-sm: 0 1px 3px rgba(94,33,41,.06);
+  --shadow: 0 2px 10px rgba(94,33,41,.08);
+  --shadow-lg: 0 8px 28px rgba(94,33,41,.12);
   --radius: 10px;
   --radius-lg: 14px;
 }
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --ground: #111318;
-  --surface: #191C23;
-  --surface-alt: #22252E;
-  --ink: #E4E6EB;
-  --ink-2: #9DA2B0;
-  --ink-3: #636878;
-  --border: #2C303A;
-  --border-light: #23262F;
-  --blue: #7B96FA;
-  --blue-light: #1C2342;
-  --blue-hover: #95ACFF;
+  --ground: #1A1214;
+  --surface: #241A1C;
+  --surface-alt: #2E2224;
+  --ink: #EDDEDF;
+  --ink-2: #B09498;
+  --ink-3: #7A5C62;
+  --border: #3A2A2E;
+  --border-light: #302428;
+  --blue: #F47A48;
+  --blue-light: #3A201A;
+  --blue-hover: #FF9060;
   --green: #4CC88A;
-  --green-light: #142E22;
-  --amber: #F5B034;
-  --amber-light: #2C2414;
+  --green-light: #182E22;
+  --amber: #E8A830;
+  --amber-light: #2E2414;
   --red: #F06860;
   --red-light: #2E1A1A;
-  --nav-bg: #0C0E12;
-  --nav-text: #636878;
-  --nav-active: #E4E6EB;
-  --shadow-sm: 0 1px 2px rgba(0,0,0,.25);
-  --shadow: 0 2px 10px rgba(0,0,0,.35);
-  --shadow-lg: 0 8px 28px rgba(0,0,0,.45);
+  --nav-bg: #3D1520;
+  --nav-text: #8A6068;
+  --nav-active: #EDDEDF;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.3);
+  --shadow: 0 2px 10px rgba(0,0,0,.4);
+  --shadow-lg: 0 8px 28px rgba(0,0,0,.5);
 }}
 :root[data-theme="dark"]{
-  --ground: #111318;
-  --surface: #191C23;
-  --surface-alt: #22252E;
-  --ink: #E4E6EB;
-  --ink-2: #9DA2B0;
-  --ink-3: #636878;
-  --border: #2C303A;
-  --border-light: #23262F;
-  --blue: #7B96FA;
-  --blue-light: #1C2342;
-  --blue-hover: #95ACFF;
+  --ground: #1A1214;
+  --surface: #241A1C;
+  --surface-alt: #2E2224;
+  --ink: #EDDEDF;
+  --ink-2: #B09498;
+  --ink-3: #7A5C62;
+  --border: #3A2A2E;
+  --border-light: #302428;
+  --blue: #F47A48;
+  --blue-light: #3A201A;
+  --blue-hover: #FF9060;
   --green: #4CC88A;
-  --green-light: #142E22;
-  --amber: #F5B034;
-  --amber-light: #2C2414;
+  --green-light: #182E22;
+  --amber: #E8A830;
+  --amber-light: #2E2414;
   --red: #F06860;
   --red-light: #2E1A1A;
-  --nav-bg: #0C0E12;
-  --nav-text: #636878;
-  --nav-active: #E4E6EB;
-  --shadow-sm: 0 1px 2px rgba(0,0,0,.25);
-  --shadow: 0 2px 10px rgba(0,0,0,.35);
-  --shadow-lg: 0 8px 28px rgba(0,0,0,.45);
+  --nav-bg: #3D1520;
+  --nav-text: #8A6068;
+  --nav-active: #EDDEDF;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.3);
+  --shadow: 0 2px 10px rgba(0,0,0,.4);
+  --shadow-lg: 0 8px 28px rgba(0,0,0,.5);
 }
 *,*::before,*::after{box-sizing:border-box}
 body{
@@ -101,29 +101,29 @@ img{max-width:100%}
 .app{display:flex;min-height:100vh;min-height:100dvh}
 nav{width:220px;background:var(--nav-bg);color:var(--nav-text);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;transition:width .2s}
 nav .logo{padding:20px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.08)}
-nav .logo-mark{width:36px;height:36px;background:var(--blue);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Archivo',sans-serif;font-weight:700;font-size:14px;color:#fff;flex-shrink:0}
+nav .logo-mark{width:36px;height:36px;background:var(--blue);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Archivo',sans-serif;font-weight:700;font-size:14px;color:#fff;flex-shrink:0;box-shadow:0 2px 6px rgba(240,90,30,.35)}
 nav .logo-text{font-family:'Archivo',sans-serif;font-weight:600;font-size:.95rem;color:var(--nav-active);white-space:nowrap}
 nav .logo-text span{display:block;font-size:.65rem;font-weight:400;color:var(--nav-text);text-transform:uppercase;letter-spacing:.08em;margin-top:1px}
 nav ul{list-style:none;padding:12px 8px;margin:0;flex:1}
 nav li{margin-bottom:2px}
 nav li a{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--radius);color:var(--nav-text);font-size:.875rem;font-weight:500;transition:all .15s}
 nav li a:hover{background:rgba(255,255,255,.06);color:var(--nav-active)}
-nav li a.active{background:rgba(58,107,197,.2);color:var(--blue)}
+nav li a.active{background:rgba(240,90,30,.15);color:var(--blue)}
 nav li a svg{width:20px;height:20px;flex-shrink:0;opacity:.7}
 nav li a.active svg{opacity:1}
 nav .nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:.7rem;font-weight:600;padding:2px 7px;border-radius:10px;min-width:18px;text-align:center}
 nav .nav-footer{padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);font-size:.75rem}
 nav .nav-footer .online{display:flex;align-items:center;gap:6px;margin-bottom:4px}
 nav .nav-footer .online .dot{width:7px;height:7px;background:var(--green);border-radius:50%}
-main{flex:1;margin-left:220px;padding:24px;max-width:1200px;background:#FFFFFF;min-height:100vh;min-height:100dvh}
+main{flex:1;margin-left:220px;padding:24px;max-width:1200px;background:var(--surface);min-height:100vh;min-height:100dvh}
 .page{display:none}
 .page.active{display:block}
 .page-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px;flex-wrap:wrap}
 .page-header .back-btn{display:flex;align-items:center;gap:6px;color:var(--ink-2);font-size:.85rem;cursor:pointer;background:none;padding:4px 8px;border-radius:6px}
 .page-header .back-btn:hover{background:var(--surface-alt);color:var(--ink)}
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius);font-weight:500;transition:all .15s;white-space:nowrap}
-.btn-primary{background:var(--blue);color:#fff;box-shadow:0 1px 3px rgba(79,110,247,.3)}
-.btn-primary:hover{background:var(--blue-hover);box-shadow:0 2px 6px rgba(79,110,247,.35)}
+.btn-primary{background:var(--blue);color:#fff;box-shadow:0 1px 3px rgba(240,90,30,.3)}
+.btn-primary:hover{background:var(--blue-hover);box-shadow:0 2px 6px rgba(240,90,30,.4)}
 .btn-secondary{background:var(--surface);color:var(--ink);border:1px solid var(--border)}
 .btn-secondary:hover{background:var(--surface-alt);border-color:var(--ink-3)}
 .btn-danger{background:var(--red-light);color:var(--red)}
@@ -269,8 +269,6 @@ tr:hover td{background:var(--surface-alt)}
   .kpi-grid{grid-template-columns:1fr 1fr}
   .modal{max-width:100%}
 }
-@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) main{background:var(--ground)}}
-:root[data-theme="dark"] main{background:var(--ground)}
 </style>
 
 <div class="app">
