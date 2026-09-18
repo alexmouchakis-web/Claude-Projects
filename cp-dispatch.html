@@ -269,6 +269,33 @@ tr:hover td{background:var(--surface-alt)}
   .kpi-grid{grid-template-columns:1fr 1fr}
   .modal{max-width:100%}
 }
+.gantt-wrap{overflow-x:auto;padding:8px 0}
+.gantt-row{display:flex;align-items:center;min-height:32px;border-bottom:1px solid var(--border-light)}
+.gantt-label{width:180px;flex-shrink:0;font-size:.8rem;padding:4px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gantt-bars{flex:1;position:relative;height:28px;min-width:0}
+.gantt-bar{position:absolute;height:20px;top:4px;border-radius:4px;font-size:.68rem;color:#fff;display:flex;align-items:center;padding:0 6px;white-space:nowrap;overflow:hidden}
+.gantt-bar.pending{background:var(--ink-3)}
+.gantt-bar.in_progress{background:var(--blue)}
+.gantt-bar.completed{background:var(--green)}
+.gantt-head{display:flex;border-bottom:2px solid var(--border);margin-bottom:2px}
+.gantt-head .gantt-label{font-weight:600;font-size:.7rem;text-transform:uppercase;color:var(--ink-3);letter-spacing:.04em}
+.gantt-months{display:flex;flex:1;min-width:0}
+.gantt-mlabel{font-size:.7rem;color:var(--ink-3);text-align:center;border-left:1px solid var(--border-light);flex-shrink:0}
+.prod-card{border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:8px;background:var(--surface)}
+.prod-steps{display:flex;gap:4px;flex-wrap:wrap}
+.prod-steps button{padding:3px 10px;border-radius:14px;font-size:.7rem;font-weight:600;background:var(--surface-alt);color:var(--ink-3);border:1px solid var(--border)}
+.prod-steps button.on{border-color:var(--blue);background:var(--blue-light);color:var(--blue)}
+.prod-steps button:hover:not(.on){background:var(--surface);border-color:var(--ink-3)}
+.an-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.an-card{background:var(--surface);border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:16px;box-shadow:var(--shadow-sm)}
+.an-card h3{font-size:.85rem;margin-bottom:12px;color:var(--ink-2);font-family:'Archivo',sans-serif}
+.an-card canvas{width:100%;height:180px;display:block}
+.photo-grid{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.photo-thumb{width:64px;height:64px;border-radius:6px;object-fit:cover;border:1px solid var(--border)}
+.email-btn{background:none;color:var(--blue);font-size:.8rem;font-weight:500;padding:4px 10px;border-radius:6px;display:inline-flex;align-items:center;gap:4px}
+.email-btn:hover{background:var(--blue-light)}
+.email-btn svg{width:14px;height:14px}
+@media(max-width:768px){.an-grid{grid-template-columns:1fr}.gantt-label{width:100px}}
 </style>
 
 <div class="app">
@@ -300,6 +327,10 @@ tr:hover td{background:var(--surface-alt)}
       <span>Reminders</span>
       <span class="nav-badge" id="reminderBadge" hidden>0</span>
     </a></li>
+    <li><a href="#timeline" class="nav-link" data-page="timeline">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="16" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="12" y2="18"/><circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="4" cy="12" r="1.5" fill="currentColor"/><circle cx="4" cy="18" r="1.5" fill="currentColor"/></svg>
+      <span>Timeline</span>
+    </a></li>
   </ul>
   <div class="nav-footer">
     <div class="online" id="onlineUsers"><span class="dot"></span> <span id="onlineCount">1 online</span></div>
@@ -324,6 +355,10 @@ tr:hover td{background:var(--surface-alt)}
     <div class="card mt-16">
       <div class="card-header"><h2>Recent Activity</h2></div>
       <div class="card-body"><div id="dashActivity"></div></div>
+    </div>
+    <div class="card mt-16">
+      <div class="card-header"><h2>Monthly Analytics</h2><button class="email-btn" onclick="notifyLowStock()" title="Email stock alerts to team"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> Email Stock Alerts</button></div>
+      <div class="card-body"><div class="an-grid" id="dashAnalytics"></div></div>
     </div>
   </div>
 
@@ -353,6 +388,7 @@ tr:hover td{background:var(--surface-alt)}
       <button class="tab" data-tab="materials">Materials</button>
       <button class="tab" data-tab="deliveries">Deliveries</button>
       <button class="tab" data-tab="files">Files</button>
+      <button class="tab" data-tab="production">Production</button>
       <button class="tab" data-tab="notes">Notes</button>
     </div>
     <div class="tab-panel active" id="tab-overview"></div>
@@ -360,6 +396,7 @@ tr:hover td{background:var(--surface-alt)}
     <div class="tab-panel" id="tab-materials"></div>
     <div class="tab-panel" id="tab-deliveries"></div>
     <div class="tab-panel" id="tab-files"></div>
+    <div class="tab-panel" id="tab-production"></div>
     <div class="tab-panel" id="tab-notes"></div>
   </div>
 
@@ -379,6 +416,12 @@ tr:hover td{background:var(--surface-alt)}
   <div class="page" id="page-reminders">
     <div class="page-header"><h1>Reminders</h1><button class="btn btn-primary" onclick="openNewReminder()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> New Reminder</button></div>
     <div id="remindersList"></div>
+  </div>
+
+  <!-- TIMELINE -->
+  <div class="page" id="page-timeline">
+    <div class="page-header"><h1>Project Timeline</h1></div>
+    <div class="card"><div class="card-body" id="timelineContent"></div></div>
   </div>
 </main>
 </div>
@@ -725,6 +768,7 @@ let db = null;
 let downloads = null;
 let assets = null;
 let room = null;
+let mcp = null;
 let projects = {};
 let stockData = {};
 let orders = {};
@@ -784,6 +828,7 @@ function navigate(page, projectId) {
   else if (page === 'stock') renderStock();
   else if (page === 'orders') renderOrders();
   else if (page === 'reminders') renderReminders();
+  else if (page === 'timeline') renderTimeline();
 }
 
 document.querySelectorAll('.nav-link').forEach(a => {
@@ -859,6 +904,8 @@ function renderDashboard() {
     ? '<div class="text-muted text-sm">No activity recorded yet.</div>'
     : activities.slice(0, 10).map(a => `<div style="padding:6px 0;border-bottom:1px solid var(--border-light);font-size:.85rem"><strong>${a.user}</strong> ${a.text} <span class="text-muted">— ${fmtDate(a.time)}</span></div>`).join('');
 
+  renderAnalytics();
+  checkAutoReorder();
   updateBadges();
 }
 
@@ -1074,6 +1121,7 @@ function renderProjectDetail() {
   renderMaterials(p);
   renderDeliveries(p);
   renderFiles(p);
+  renderProduction(p);
   renderNotes(p);
 }
 
@@ -1213,6 +1261,7 @@ function updatePhaseStatus(phId, status) {
     if (db) db.doc('projects/' + p.id).set(p);
     logActivity(`set ${ph.name} to "${status}" in "${p.name}"`);
     renderProjectDetail();
+    if (mcp && (status === 'in_progress' || status === 'completed')) notifyPhaseChange(p, ph, status);
   }
 }
 
@@ -1329,6 +1378,11 @@ function openNewDelivery() {
     <hr style="border:none;border-top:1px solid var(--border-light);margin:16px 0">
     <h3 class="mb-8">Materials</h3>${matRows}
     <div class="form-row mt-16"><label>Notes</label><textarea id="delNotes" rows="2"></textarea></div>
+    <div class="form-row mt-8"><label>Delivery Photos</label>
+      <input type="file" id="delPhotos" accept="image/*" capture="environment" multiple onchange="previewDeliveryPhotos()">
+      <div class="form-help">Tap to take photos of delivered materials</div>
+      <div class="photo-grid" id="photoPreview"></div>
+    </div>
   `, `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
      <button class="btn btn-primary" onclick="saveDelivery()">Save Delivery</button>`);
 }
@@ -1353,8 +1407,18 @@ function saveDelivery() {
   doSaveDelivery(items);
 }
 
-function doSaveDelivery(items) {
+async function doSaveDelivery(items) {
   const id = 'del_' + uid();
+  const photos = [];
+  const fileInput = $('delPhotos');
+  if (fileInput && fileInput.files.length > 0 && assets) {
+    for (const file of fileInput.files) {
+      try {
+        const r = await assets.upload(file);
+        photos.push({ id: r.id, url: r.url, name: file.name, timestamp: new Date().toISOString() });
+      } catch (e) {}
+    }
+  }
   const del = {
     id,
     projectId: currentProject,
@@ -1363,6 +1427,7 @@ function doSaveDelivery(items) {
     phaseId: $('delPhase').value,
     deliveredBy: $('delBy').value,
     items,
+    photos,
     notes: $('delNotes').value.trim(),
     createdAt: new Date().toISOString()
   };
@@ -1376,6 +1441,7 @@ function doSaveDelivery(items) {
   });
   if (db) db.doc('stock/materials').set(stockData);
   logActivity(`recorded delivery ${del.ref} for "${projects[currentProject]?.name}" (${items.length} items)`);
+  if (mcp) notifyDelivery(del);
   closeModal();
   toast('Delivery recorded and stock updated');
   renderProjectDetail();
@@ -1386,11 +1452,13 @@ function viewDelivery(delId) {
   if (!d) return;
   const p = projects[d.projectId];
   const ph = d.phaseId ? (p?.phases || []).find(x => x.id === d.phaseId) : null;
+  const photoHtml = (d.photos && d.photos.length > 0) ? '<div class="mt-16"><label>Photos</label><div class="photo-grid">' + d.photos.map(ph => '<img src="' + ph.url + '" class="photo-thumb" title="' + (ph.name || 'Photo') + '">').join('') + '</div></div>' : '';
   openModal('Delivery ' + (d.ref || delId), `
     <div class="form-grid mb-16"><div><label>Date</label><p>${fmtDate(d.date)}</p></div><div><label>Reference</label><p>${d.ref || '—'}</p></div></div>
     <div class="form-grid mb-16"><div><label>Project</label><p>${p?.name || '—'}</p></div><div><label>Phase</label><p>${ph?.name || '—'}</p></div></div>
     <div class="form-grid mb-16"><div><label>Delivered By</label><p>${d.deliveredBy || '—'}</p></div><div><label>Notes</label><p>${d.notes || '—'}</p></div></div>
     <table><thead><tr><th>Material</th><th>Pkg</th><th>Quantity</th></tr></thead><tbody>${(d.items || []).map(i => `<tr><td>${i.name}</td><td>${i.pkg}</td><td>${i.quantity}</td></tr>`).join('')}</tbody></table>
+    ${photoHtml}
   `, `<button class="btn btn-secondary" onclick="closeModal()">Close</button><button class="btn btn-primary" onclick="downloadDeliveryNote('${delId}');closeModal()">Download Note</button>`);
 }
 
@@ -1873,6 +1941,342 @@ const style = document.createElement('style');
 style.textContent = '@media(max-width:900px){.dash-grid{grid-template-columns:1fr!important}}';
 document.head.appendChild(style);
 
+// ========== PRODUCTION TRACKER ==========
+function renderProduction(p) {
+  const batches = p.production || [];
+  const statusLabels = {planned:'Planned',mixing:'Mixing',cured:'Curing',ready:'Ready'};
+  const statusChips = {planned:'chip-gray',mixing:'chip-blue',cured:'chip-amber',ready:'chip-green'};
+  const statusOrder = ['planned','mixing','cured','ready'];
+  let html = `<div class="flex justify-between items-center mb-16"><h3>Production Batches</h3><button class="btn btn-primary btn-sm" onclick="openAddBatch()">New Batch</button></div>`;
+  if (batches.length === 0) {
+    html += '<div class="empty-state"><p>No production batches yet. Create a batch when materials are being mixed.</p></div>';
+  } else {
+    batches.slice().reverse().forEach(b => {
+      const bph = b.phaseId ? (p.phases||[]).find(x=>x.id===b.phaseId) : null;
+      html += `<div class="prod-card">
+        <div class="flex justify-between items-center">
+          <div class="flex items-center gap-8"><strong>${b.systemName||'Batch'}</strong>${bph?` <span class="text-sm text-muted">— ${bph.name}</span>`:''} <span class="chip ${statusChips[b.status]||'chip-gray'}">${statusLabels[b.status]||b.status}</span></div>
+          <div class="text-sm text-muted">${fmtDate(b.startedAt||b.createdAt)}</div>
+        </div>
+        ${b.materials&&b.materials.length?`<div class="overflow-x mt-8"><table><thead><tr><th>Material</th><th>Planned</th><th>Actual</th><th>Unit</th></tr></thead><tbody>${b.materials.map(m=>`<tr><td>${m.name}</td><td>${m.planned}</td><td>${m.actual!=null?m.actual:'—'}</td><td>${m.unit||'kg'}</td></tr>`).join('')}</tbody></table></div>`:''}
+        <div class="flex justify-between items-center mt-8">
+          <div class="prod-steps">${statusOrder.map(s=>`<button class="${b.status===s?'on':''}" onclick="updateBatchStatus('${b.id}','${s}')">${statusLabels[s]}</button>`).join('')}</div>
+          <div class="flex items-center gap-8"><span class="text-sm text-muted">By: ${b.mixedBy||'—'}</span><button class="remove-btn" onclick="deleteBatch('${b.id}')">✕</button></div>
+        </div>
+        ${b.notes?`<div class="text-sm text-muted mt-8">${b.notes}</div>`:''}
+      </div>`;
+    });
+  }
+  $('tab-production').innerHTML = html;
+}
+
+function openAddBatch() {
+  const p = projects[currentProject];
+  if (!p) return;
+  const phaseOpts = (p.phases||[]).map(ph=>`<option value="${ph.id}">${ph.name}</option>`).join('');
+  const sysOpts = (p.systems||[]).map((s,i)=>`<option value="${i}">${s.systemName} (${s.application})</option>`).join('');
+  openModal('New Production Batch', `
+    <div class="form-grid">
+      <div class="form-row"><label>System</label><select id="batchSys" onchange="updateBatchMaterials()">${sysOpts}</select></div>
+      <div class="form-row"><label>Phase</label><select id="batchPhase"><option value="">No specific phase</option>${phaseOpts}</select></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-row"><label>Mixed By</label><select id="batchBy">${TEAM.map(t=>`<option value="${t.name}">${t.name}</option>`).join('')}</select></div>
+      <div class="form-row"><label>Date</label><input type="date" id="batchDate" value="${today()}"></div>
+    </div>
+    <hr style="border:none;border-top:1px solid var(--border-light);margin:16px 0">
+    <h3 class="mb-8">Materials in Batch</h3>
+    <div id="batchMaterials"></div>
+    <div class="form-row mt-16"><label>Notes</label><textarea id="batchNotes" rows="2"></textarea></div>
+  `, `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+     <button class="btn btn-primary" onclick="saveBatch()">Create Batch</button>`);
+  updateBatchMaterials();
+}
+
+function updateBatchMaterials() {
+  const p = projects[currentProject];
+  const sysIdx = parseInt($('batchSys').value);
+  const sys = p.systems[sysIdx];
+  if (!sys) return;
+  const products = getEffectiveProducts(sys);
+  $('batchMaterials').innerHTML = products.map((prod, idx) => {
+    const calc = calcUnits(prod.consumption, sys.area, prod.pkg);
+    return `<div class="form-grid" style="grid-template-columns:2fr 1fr 1fr;align-items:end;margin-bottom:6px">
+      <div class="text-sm"><strong>${prod.name}</strong> <span class="text-muted">(${prod.pkg})</span></div>
+      <div><label>Planned</label><input type="number" class="batch-planned" data-idx="${idx}" data-name="${prod.name}" data-unit="${prod.unit}" value="${calc.total}" step="0.01" min="0"></div>
+      <div><label>Actual</label><input type="number" class="batch-actual" data-idx="${idx}" value="" step="0.01" min="0" placeholder="After mixing"></div>
+    </div>`;
+  }).join('');
+}
+
+function saveBatch() {
+  const p = projects[currentProject];
+  const sysIdx = parseInt($('batchSys').value);
+  const sys = p.systems[sysIdx];
+  const materials = [];
+  document.querySelectorAll('#batchMaterials .batch-planned').forEach(inp => {
+    const planned = parseFloat(inp.value) || 0;
+    const idx = inp.dataset.idx;
+    const actEl = document.querySelector('#batchMaterials .batch-actual[data-idx="' + idx + '"]');
+    const actual = actEl ? (parseFloat(actEl.value) || null) : null;
+    if (planned > 0) materials.push({ name: inp.dataset.name, unit: inp.dataset.unit, planned, actual });
+  });
+  if (materials.length === 0) { toast('No materials in batch', 'warn'); return; }
+  if (!p.production) p.production = [];
+  p.production.push({
+    id: 'bat_' + uid(), systemName: sys.systemName, systemIdx: sysIdx,
+    phaseId: $('batchPhase').value, mixedBy: $('batchBy').value,
+    startedAt: $('batchDate').value, status: 'planned', materials,
+    notes: $('batchNotes').value.trim(), createdAt: new Date().toISOString()
+  });
+  p.updatedAt = new Date().toISOString();
+  if (db) db.doc('projects/' + p.id).set(p);
+  logActivity(`created production batch for ${sys.systemName} in "${p.name}"`);
+  closeModal();
+  toast('Production batch created');
+  renderProjectDetail();
+}
+
+function updateBatchStatus(batchId, newStatus) {
+  const p = projects[currentProject];
+  const batch = (p.production||[]).find(b=>b.id===batchId);
+  if (!batch) return;
+  batch.status = newStatus;
+  if (newStatus === 'ready') batch.completedAt = new Date().toISOString();
+  if (newStatus === 'mixing') batch.startedAt = batch.startedAt || new Date().toISOString();
+  p.updatedAt = new Date().toISOString();
+  if (db) db.doc('projects/' + p.id).set(p);
+  logActivity(`batch ${batch.systemName} → "${newStatus}" in "${p.name}"`);
+  renderProjectDetail();
+}
+
+function deleteBatch(batchId) {
+  const p = projects[currentProject];
+  p.production = (p.production||[]).filter(b=>b.id!==batchId);
+  p.updatedAt = new Date().toISOString();
+  if (db) db.doc('projects/' + p.id).set(p);
+  toast('Batch removed');
+  renderProjectDetail();
+}
+
+// ========== GANTT TIMELINE ==========
+function renderTimeline() {
+  const prjs = Object.values(projects).filter(p => (p.status==='active'||p.status==='planning') && (p.phases||[]).length > 0);
+  if (prjs.length === 0) {
+    $('timelineContent').innerHTML = '<div class="empty-state"><p>No active projects with phases to show on the timeline.</p></div>';
+    return;
+  }
+  let earliest = new Date(), latest = new Date();
+  latest.setMonth(latest.getMonth() + 2);
+  prjs.forEach(p => {
+    const created = new Date(p.createdAt || Date.now());
+    if (created < earliest) earliest = created;
+    (p.phases||[]).forEach(ph => { if (ph.targetDate) { const d = new Date(ph.targetDate); if (d > latest) latest = new Date(d.getTime()+7*864e5); }});
+    if (p.deadline) { const d = new Date(p.deadline); if (d > latest) latest = new Date(d.getTime()+7*864e5); }
+  });
+  earliest = new Date(earliest.getTime() - 7*864e5);
+  const totalDays = Math.max(30, daysDiff(latest, earliest));
+  const dayW = Math.max(3, Math.min(16, 700 / totalDays));
+  const chartW = totalDays * dayW;
+  let months = '';
+  const cur = new Date(earliest); cur.setDate(1);
+  while (cur <= latest) {
+    const ms = Math.max(0, daysDiff(cur, earliest));
+    const next = new Date(cur); next.setMonth(next.getMonth()+1);
+    const me = Math.min(daysDiff(next, earliest), totalDays);
+    const w = (me - ms) * dayW;
+    if (w > 0) months += `<div class="gantt-mlabel" style="width:${w}px">${cur.toLocaleDateString('en-GB',{month:'short',year:'2-digit'})}</div>`;
+    cur.setTime(next.getTime());
+  }
+  const todayX = daysDiff(new Date(), earliest) * dayW;
+  let rows = '';
+  prjs.forEach(p => {
+    const created = new Date(p.createdAt || Date.now());
+    rows += `<div class="gantt-row" style="background:var(--surface-alt)"><div class="gantt-label"><strong style="cursor:pointer" onclick="navigate('project-detail','${p.id}')">${p.name}</strong></div><div class="gantt-bars" style="width:${chartW}px">${p.deadline?`<div style="position:absolute;left:${daysDiff(new Date(p.deadline),earliest)*dayW}px;top:0;bottom:0;width:2px;background:var(--red);opacity:.4" title="Deadline ${fmtDate(p.deadline)}"></div>`:''}</div></div>`;
+    const phases = p.phases || [];
+    const phCount = phases.length;
+    const projSpan = p.deadline ? daysDiff(new Date(p.deadline), created) : totalDays * 0.6;
+    phases.forEach((ph, i) => {
+      let startDay, endDay;
+      if (ph.targetDate) {
+        endDay = daysDiff(new Date(ph.targetDate), earliest);
+        const dur = Math.max(7, projSpan / phCount);
+        startDay = endDay - dur;
+      } else {
+        const dur = projSpan / phCount;
+        startDay = daysDiff(created, earliest) + dur * i;
+        endDay = startDay + dur;
+      }
+      startDay = Math.max(0, startDay);
+      const barL = startDay * dayW;
+      const barW = Math.max(30, (endDay - startDay) * dayW);
+      rows += `<div class="gantt-row"><div class="gantt-label" style="padding-left:20px;font-size:.78rem;color:var(--ink-2)">${ph.name}</div><div class="gantt-bars" style="width:${chartW}px"><div class="gantt-bar ${ph.status}" style="left:${barL}px;width:${barW}px" title="${ph.name} — ${(ph.status||'pending').replace('_',' ')}">${ph.name}</div></div></div>`;
+    });
+  });
+  $('timelineContent').innerHTML = `<div class="gantt-wrap"><div class="gantt-head"><div class="gantt-label">Project / Phase</div><div class="gantt-months" style="width:${chartW}px">${months}</div></div><div style="position:relative">${rows}<div style="position:absolute;top:0;bottom:0;left:${180+todayX}px;width:2px;background:var(--blue);opacity:.4;z-index:1;pointer-events:none" title="Today"></div></div></div><div class="flex items-center gap-8 mt-8 text-sm text-muted"><span style="display:inline-block;width:12px;height:3px;background:var(--blue);border-radius:2px"></span> Today <span style="display:inline-block;width:12px;height:3px;background:var(--red);border-radius:2px;margin-left:12px"></span> Deadline</div>`;
+}
+
+// ========== AUTO-REORDER ENGINE ==========
+function checkAutoReorder() {
+  const active = Object.values(projects).filter(p => p.status === 'active');
+  if (active.length === 0) return;
+  const needs = {};
+  active.forEach(p => {
+    getAllMaterials(p.systems || []).forEach(m => {
+      const key = m.name + '|' + m.pkg;
+      if (!needs[key]) needs[key] = { name: m.name, pkg: m.pkg, total: 0 };
+      needs[key].total += m.totalUnits;
+    });
+  });
+  const toReorder = [];
+  Object.entries(needs).forEach(([key, need]) => {
+    const stock = (stockData[key] || {}).quantity || 0;
+    const minStock = (stockData[key] || {}).minStock || 0;
+    if (stock > minStock || stock >= need.total) return;
+    const hasPending = Object.values(orders).some(o => (o.status==='pending'||o.status==='ordered') && (o.items||[]).some(i => i.material===key));
+    if (!hasPending) toReorder.push({ material: key, name: need.name, pkg: need.pkg, quantity: Math.max(1, need.total - stock) });
+  });
+  if (toReorder.length === 0) return;
+  const todayStr = today();
+  const alreadyToday = Object.values(orders).some(o => o.autoGenerated && o.createdAt && o.createdAt.startsWith(todayStr));
+  if (alreadyToday) return;
+  const orderId = 'ord_' + uid();
+  const order = {
+    id: orderId,
+    ref: 'AUTO-' + new Date().getFullYear() + '-' + String(Object.keys(orders).length + 1).padStart(3, '0'),
+    projectId: '', projectName: 'Auto-reorder', status: 'pending',
+    items: toReorder, createdAt: new Date().toISOString(), createdBy: 'System',
+    autoGenerated: true, expectedDate: '',
+    notes: 'Auto-generated: stock below minimum for active project needs (' + toReorder.length + ' items)'
+  };
+  orders[orderId] = order;
+  if (db) db.doc('orders/' + orderId).set(order);
+  logActivity(`auto-reorder ${order.ref} created (${toReorder.length} items)`);
+  toast(`Auto-reorder ${order.ref}: ${toReorder.length} items below minimum`, 'warn');
+}
+
+// ========== DELIVERY PHOTOS ==========
+function previewDeliveryPhotos() {
+  const input = $('delPhotos');
+  const grid = $('photoPreview');
+  if (!input || !grid) return;
+  grid.innerHTML = '';
+  for (const file of input.files) {
+    const url = URL.createObjectURL(file);
+    const img = document.createElement('img');
+    img.src = url; img.className = 'photo-thumb'; img.alt = file.name;
+    grid.appendChild(img);
+  }
+}
+
+// ========== EMAIL NOTIFICATIONS ==========
+async function sendTeamEmail(subject, body) {
+  if (!mcp) { toast('Email not available — connect Gmail in claude.ai Settings', 'warn'); return false; }
+  try {
+    await mcp.callTool('Gmail', 'send_message', {
+      to: TEAM.map(t => t.email),
+      subject: '[CP Dispatch] ' + subject,
+      body: body + '\n\n—\nCement Plus Dispatch'
+    });
+    toast('Email sent to team');
+    return true;
+  } catch (e) {
+    if (e.code === 'not_granted' || e.code === 'server_not_connected' || e.code === 'not_in_manifest') {
+      toast('Gmail not connected — add Gmail in claude.ai Settings → Connectors', 'warn');
+    } else {
+      toast('Email failed: ' + (e.message || 'Unknown error'), 'error');
+    }
+    return false;
+  }
+}
+
+function notifyDelivery(del) {
+  const p = projects[del.projectId];
+  const items = (del.items||[]).map(i => '  - ' + i.name + ' (' + i.pkg + '): ' + i.quantity + ' units').join('\n');
+  sendTeamEmail(
+    'Delivery ' + (del.ref||'') + ' — ' + (p?.name||'Project'),
+    'New delivery recorded.\n\nProject: ' + (p?.name||'—') + '\nReference: ' + (del.ref||'—') + '\nDate: ' + del.date + '\nDelivered by: ' + (del.deliveredBy||'—') + '\n\nItems:\n' + items
+  );
+}
+
+function notifyPhaseChange(project, phase, status) {
+  sendTeamEmail(
+    phase.name + ' -> ' + status.replace('_', ' ') + ' — ' + project.name,
+    'Phase status updated.\n\nProject: ' + project.name + '\nPhase: ' + phase.name + '\nNew status: ' + status.replace('_', ' ')
+  );
+}
+
+function notifyLowStock() {
+  const low = Object.entries(stockData).filter(([k,v]) => v.quantity > 0 && v.quantity <= (v.minStock||0));
+  const out = Object.entries(stockData).filter(([k,v]) => v.quantity <= 0);
+  if (low.length === 0 && out.length === 0) { toast('No stock alerts to send'); return; }
+  let body = 'Stock Alert\n';
+  if (out.length) body += '\nOUT OF STOCK:\n' + out.map(([k]) => '  - ' + k.replace('|', ' ')).join('\n');
+  if (low.length) body += '\nLOW STOCK:\n' + low.map(([k,v]) => '  - ' + k.replace('|', ' ') + ': ' + v.quantity + ' remaining (min: ' + v.minStock + ')').join('\n');
+  sendTeamEmail('Stock Alert — ' + (out.length + low.length) + ' items need attention', body);
+}
+
+// ========== DASHBOARD ANALYTICS ==========
+function renderAnalytics() {
+  const months = [];
+  const now = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({ label: d.toLocaleDateString('en-GB',{month:'short'}), year: d.getFullYear(), month: d.getMonth() });
+  }
+  const delCounts = months.map(m => Object.values(deliveries).filter(d => { if (!d.date) return false; const dd = new Date(d.date); return dd.getFullYear()===m.year&&dd.getMonth()===m.month; }).length);
+  const matCounts = months.map(m => Object.values(deliveries).filter(d => { if (!d.date) return false; const dd = new Date(d.date); return dd.getFullYear()===m.year&&dd.getMonth()===m.month; }).reduce((s,d) => s+(d.items||[]).reduce((ss,i) => ss+(i.quantity||0),0),0));
+  const ordCounts = months.map(m => Object.values(orders).filter(o => { if (!o.createdAt) return false; const dd = new Date(o.createdAt); return dd.getFullYear()===m.year&&dd.getMonth()===m.month; }).length);
+  const projCounts = months.map(() => Object.values(projects).filter(p => p.status==='active'||p.status==='planning').length);
+  const labels = months.map(m => m.label);
+  $('dashAnalytics').innerHTML = `
+    <div class="an-card"><h3>Deliveries / Month</h3><canvas id="chartDel"></canvas></div>
+    <div class="an-card"><h3>Materials Consumed (units)</h3><canvas id="chartMat"></canvas></div>
+    <div class="an-card"><h3>Orders Placed</h3><canvas id="chartOrd"></canvas></div>
+    <div class="an-card"><h3>Active Projects</h3><canvas id="chartProj"></canvas></div>`;
+  requestAnimationFrame(() => {
+    drawBarChart('chartDel', labels, delCounts, '--blue');
+    drawBarChart('chartMat', labels, matCounts, '--green');
+    drawBarChart('chartOrd', labels, ordCounts, '--amber');
+    drawBarChart('chartProj', labels, projCounts, '--blue');
+  });
+}
+
+function drawBarChart(id, labels, data, token) {
+  const canvas = $(id);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr; canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+  const w = rect.width, h = rect.height;
+  const pad = {t:12,r:10,b:26,l:36};
+  const cw = w-pad.l-pad.r, ch = h-pad.t-pad.b;
+  const s = getComputedStyle(document.documentElement);
+  const color = s.getPropertyValue(token).trim()||'#F05A1E';
+  const ink = s.getPropertyValue('--ink').trim()||'#333';
+  const brd = s.getPropertyValue('--border-light').trim()||'#eee';
+  const maxVal = Math.max(...data, 1);
+  const bw = cw/labels.length*0.55;
+  ctx.textBaseline = 'middle';
+  for (let i=0;i<=3;i++){
+    const y=pad.t+ch-ch*i/3;
+    ctx.strokeStyle=brd;ctx.lineWidth=.5;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+cw,y);ctx.stroke();
+    ctx.fillStyle=ink;ctx.font='10px IBM Plex Sans,sans-serif';ctx.textAlign='right';ctx.fillText(Math.round(maxVal*i/3),pad.l-4,y);
+  }
+  labels.forEach((lbl,i)=>{
+    const x=pad.l+cw/labels.length*i+(cw/labels.length-bw)/2;
+    const bh=Math.max(2,data[i]/maxVal*ch); const y=pad.t+ch-bh;
+    ctx.fillStyle=color;ctx.beginPath();
+    const r=Math.min(3,bw/4);
+    ctx.moveTo(x+r,y);ctx.lineTo(x+bw-r,y);ctx.quadraticCurveTo(x+bw,y,x+bw,y+r);
+    ctx.lineTo(x+bw,pad.t+ch);ctx.lineTo(x,pad.t+ch);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.fill();
+    if(data[i]>0){ctx.fillStyle=ink;ctx.font='bold 10px Archivo,sans-serif';ctx.textAlign='center';ctx.fillText(data[i],x+bw/2,y-7);}
+    ctx.fillStyle=ink;ctx.font='10px IBM Plex Sans,sans-serif';ctx.textAlign='center';ctx.fillText(lbl,x+bw/2,pad.t+ch+14);
+  });
+}
+
 // ========== INIT ==========
 async function init() {
   $('todayDate').textContent = fmtDate(today());
@@ -1884,6 +2288,7 @@ async function init() {
       downloads = await window.claude.use('downloads');
       assets = await window.claude.use('assets');
       room = await window.claude.use('room');
+      mcp = await window.claude.use('mcp');
     } catch (e) {}
   }
 
