@@ -19,8 +19,8 @@
   --amber-light: #FDF3DD;
   --red: #C43830;
   --red-light: #FCE8E6;
-  --nav-bg: #5E2129;
-  --nav-text: #C09298;
+  --nav-bg: #6E2530;
+  --nav-text: #DBBFC3;
   --nav-active: #FFFFFF;
   --shadow-sm: 0 1px 3px rgba(94,33,41,.06);
   --shadow: 0 2px 10px rgba(94,33,41,.08);
@@ -46,8 +46,8 @@
   --amber-light: #2E2414;
   --red: #F06860;
   --red-light: #2E1A1A;
-  --nav-bg: #3D1520;
-  --nav-text: #8A6068;
+  --nav-bg: #4A1826;
+  --nav-text: #A88890;
   --nav-active: #EDDEDF;
   --shadow-sm: 0 1px 2px rgba(0,0,0,.3);
   --shadow: 0 2px 10px rgba(0,0,0,.4);
@@ -71,8 +71,8 @@
   --amber-light: #2E2414;
   --red: #F06860;
   --red-light: #2E1A1A;
-  --nav-bg: #3D1520;
-  --nav-text: #8A6068;
+  --nav-bg: #4A1826;
+  --nav-text: #A88890;
   --nav-active: #EDDEDF;
   --shadow-sm: 0 1px 2px rgba(0,0,0,.3);
   --shadow: 0 2px 10px rgba(0,0,0,.4);
@@ -98,6 +98,10 @@ textarea{resize:vertical;min-height:60px}
 label{display:block;font-size:.8rem;font-weight:500;color:var(--ink-2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
 [hidden]{display:none!important}
 img{max-width:100%}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{width:20px;height:20px;border:2.5px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+.import-row input[type="text"],.import-row input[type="number"]{padding:4px 8px;font-size:.8rem}
+.import-row td{vertical-align:middle;padding:4px 6px}
 .app{display:flex;min-height:100vh;min-height:100dvh}
 nav{width:220px;background:var(--nav-bg);color:var(--nav-text);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;transition:width .2s}
 nav .logo{padding:20px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.08)}
@@ -769,6 +773,7 @@ let downloads = null;
 let assets = null;
 let room = null;
 let mcp = null;
+let sampleAI = null;
 let projects = {};
 let stockData = {};
 let orders = {};
@@ -782,6 +787,7 @@ let currentUser = TEAM[0].name;
 const $ = id => document.getElementById(id);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+const escAttr = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const daysDiff = (a, b) => Math.ceil((new Date(a) - new Date(b)) / 86400000);
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -993,18 +999,19 @@ function openNewProject(editId) {
           <div><label>Application</label><select class="sys-app">${apps}</select></div>
           <div><label>Area (m²)</label><input type="number" class="sys-area" value="${sys.area}" min="1"></div>
         </div>
-        <div class="form-row mt-8"><label>Notes</label><input type="text" class="sys-notes" value="${sys.notes || ''}" placeholder="e.g., Main hall floors"></div>
-        <input type="hidden" class="sys-name" value="${sys.systemName}">
+        <div class="form-row mt-8"><label>Notes</label><input type="text" class="sys-notes" value="${escAttr(sys.notes)}" placeholder="e.g., Main hall floors"></div>
+        <input type="hidden" class="sys-name" value="${escAttr(sys.systemName)}">
+        <input type="hidden" class="sys-id" value="${sys.id || ''}">
       </div>`;
     });
   }
   openModal(p ? 'Edit Project' : 'New Project', `
     <div class="form-grid">
-      <div class="form-row"><label>Project Name</label><input type="text" id="projName" value="${p ? p.name : ''}" placeholder="e.g., Hotel Samos"></div>
-      <div class="form-row"><label>Client</label><input type="text" id="projClient" value="${p ? p.client || '' : ''}" placeholder="e.g., Samos Hotels SA"></div>
+      <div class="form-row"><label>Project Name</label><input type="text" id="projName" value="${escAttr(p ? p.name : '')}" placeholder="e.g., Hotel Samos"></div>
+      <div class="form-row"><label>Client</label><input type="text" id="projClient" value="${escAttr(p ? p.client : '')}" placeholder="e.g., Samos Hotels SA"></div>
     </div>
     <div class="form-grid">
-      <div class="form-row"><label>Location</label><input type="text" id="projLocation" value="${p ? p.location || '' : ''}" placeholder="e.g., Samos, Greece"></div>
+      <div class="form-row"><label>Location</label><input type="text" id="projLocation" value="${escAttr(p ? p.location : '')}" placeholder="e.g., Samos, Greece"></div>
       <div class="form-row"><label>Deadline</label><input type="date" id="projDeadline" value="${p ? p.deadline || '' : ''}"></div>
     </div>
     <div class="form-row"><label>Status</label><select id="projStatus">
@@ -1013,7 +1020,7 @@ function openNewProject(editId) {
       <option value="completed" ${p && p.status === 'completed' ? 'selected' : ''}>Completed</option>
       <option value="archived" ${p && p.status === 'archived' ? 'selected' : ''}>Archived</option>
     </select></div>
-    <div class="form-row"><label>Notes</label><textarea id="projNotes" rows="2">${p ? p.notes || '' : ''}</textarea></div>
+    <div class="form-row"><label>Notes</label><textarea id="projNotes" rows="2">${escAttr(p ? p.notes : '')}</textarea></div>
     <hr style="border:none;border-top:1px solid var(--border-light);margin:16px 0">
     <div class="flex justify-between items-center mb-8"><h3>Product Systems</h3>
       <div class="flex gap-8 items-center"><select id="addSysSelect" style="width:auto"><option value="">Select system...</option>${systemOptions}</select>
@@ -1045,18 +1052,26 @@ function addSystemRow() {
 }
 
 function saveProject(editId) {
-  const name = $('projName').value.trim();
+  const name = $('projName')?.value?.trim();
   if (!name) { toast('Project name is required', 'error'); return; }
-  const systemCards = $('systemsList').querySelectorAll('.system-card');
+  const systemCards = $('systemsList')?.querySelectorAll('.system-card') || [];
+  const existingSystems = editId ? (projects[editId]?.systems || []) : [];
   const systems = [];
   let valid = true;
   systemCards.forEach(card => {
-    const sysName = card.querySelector('.sys-name').value;
-    const app = card.querySelector('.sys-app').value;
-    const area = parseFloat(card.querySelector('.sys-area').value) || 0;
-    const notes = card.querySelector('.sys-notes').value;
+    const sysId = card.querySelector('.sys-id')?.value || '';
+    const sysName = card.querySelector('.sys-name')?.value || '';
+    const app = card.querySelector('.sys-app')?.value || '';
+    const area = parseFloat(card.querySelector('.sys-area')?.value) || 0;
+    const notes = card.querySelector('.sys-notes')?.value || '';
     if (area <= 0) { toast(`Set area for ${sysName}`, 'warn'); valid = false; }
-    systems.push({ id: uid(), systemName: sysName, application: app, area, notes });
+    const orig = sysId ? existingSystems.find(s => s.id === sysId) : null;
+    systems.push({
+      id: sysId || uid(),
+      systemName: sysName, application: app, area, notes,
+      materialOverrides: orig?.materialOverrides,
+      extraProducts: orig?.extraProducts
+    });
   });
   if (!valid) return;
   if (systems.length === 0) {
@@ -1151,7 +1166,7 @@ function renderOverview(p) {
       <div class="delivery-stat" style="background:var(--green-light)"><div class="ds-val" style="color:var(--green)">${pct}%</div><div class="ds-label">Phases Done</div></div>
       <div class="delivery-stat" style="background:var(--amber-light)"><div class="ds-val" style="color:var(--amber)">${deliveryPct}%</div><div class="ds-label">Delivered</div></div>
     </div>
-    <div class="card mb-16"><div class="card-header"><h2>Product Systems</h2></div><div class="card-body"><div class="systems-list">${sysHtml || '<div class="text-muted">No systems added yet.</div>'}</div></div></div>
+    <div class="card mb-16"><div class="card-header"><h2>Product Systems</h2>${sampleAI ? '<button class="btn btn-secondary btn-sm" onclick="openImportOffer()" style="margin-left:auto">Import from Offer / Invoice</button>' : ''}</div><div class="card-body"><div class="systems-list">${sysHtml || '<div class="text-muted">No systems added yet.</div>'}</div></div></div>
     ${p.notes ? `<div class="card"><div class="card-header"><h2>Project Notes</h2></div><div class="card-body"><p>${p.notes}</p></div></div>` : ''}`;
 }
 
@@ -1200,7 +1215,7 @@ function openAddPhase(editId) {
     return `<div class="form-grid"><div><label>${s.systemName} (${s.application})</label><div class="text-sm text-muted">Total: ${s.area} m²</div></div><div><label>m² for this phase</label><input type="number" class="phase-alloc" data-sysid="${s.id}" value="${alloc}" min="0" max="${s.area}" placeholder="0"></div></div>`;
   }).join('');
   openModal(ph ? 'Edit Phase' : 'Add Phase', `
-    <div class="form-grid"><div class="form-row"><label>Phase Name</label><input type="text" id="phaseName" value="${ph ? ph.name : 'Phase ' + ((p.phases || []).length + 1)}" placeholder="e.g., Phase 1"></div>
+    <div class="form-grid"><div class="form-row"><label>Phase Name</label><input type="text" id="phaseName" value="${escAttr(ph ? ph.name : 'Phase ' + ((p.phases || []).length + 1))}" placeholder="e.g., Phase 1"></div>
     <div class="form-row"><label>Target Date</label><input type="date" id="phaseDate" value="${ph ? ph.targetDate || '' : ''}"></div></div>
     <hr style="border:none;border-top:1px solid var(--border-light);margin:16px 0">
     <h3 class="mb-8">Area Allocation</h3>
@@ -1850,10 +1865,10 @@ function openEditProjectMaterials(sysIdx) {
     const consumption = ov.consumption !== undefined ? ov.consumption : prod.consumption;
     const unit = ov.unit !== undefined ? ov.unit : prod.unit;
     return `<div class="inline-edit-row" data-idx="${i}">
-      <div style="flex:2"><label>Product</label><input type="text" class="ov-name" value="${name}"></div>
-      <div style="flex:1"><label>Pkg</label><input type="text" class="ov-pkg" value="${pkg}"></div>
+      <div style="flex:2"><label>Product</label><input type="text" class="ov-name" value="${escAttr(name)}"></div>
+      <div style="flex:1"><label>Pkg</label><input type="text" class="ov-pkg" value="${escAttr(pkg)}"></div>
       <div style="flex:1"><label>Consumption/${unit}</label><input type="number" class="ov-consumption" value="${consumption}" step="0.01" min="0"></div>
-      <div style="flex:0.5"><label>Unit</label><input type="text" class="ov-unit" value="${unit}" style="max-width:60px"></div>
+      <div style="flex:0.5"><label>Unit</label><input type="text" class="ov-unit" value="${escAttr(unit)}" style="max-width:60px"></div>
       <button class="remove-btn" onclick="this.closest('.inline-edit-row').remove()" title="Remove material">✕</button>
     </div>`;
   }).join('');
@@ -2277,6 +2292,233 @@ function drawBarChart(id, labels, data, token) {
   });
 }
 
+// ========== OFFER/INVOICE IMPORT ==========
+function openImportOffer() {
+  const p = projects[currentProject];
+  if (!p) return;
+  if (!sampleAI) { toast('AI scanning not available in this view', 'error'); return; }
+  openModal('Import from Offer / Invoice', `
+    <div class="form-grid">
+      <div class="form-row"><label>Document Type</label><select id="importDocType"><option value="offer">Offer</option><option value="invoice">Invoice</option></select></div>
+      <div class="form-row"><label>Upload PDF or Image</label>
+        <input type="file" id="importFile" accept=".pdf,image/jpeg,image/png,image/webp,image/gif" style="padding:8px">
+        <div class="form-help mt-4">Upload a PDF or photo of the offer/invoice. AI will scan and extract all materials.</div>
+      </div>
+    </div>
+    <div id="importStatus" hidden>
+      <div style="display:flex;align-items:center;gap:12px;padding:20px;background:var(--surface-alt);border-radius:var(--radius);margin-top:16px">
+        <div class="spinner"></div><div id="importStatusText">Preparing document...</div>
+      </div>
+    </div>
+    <div id="importPreview" hidden></div>
+  `, `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+     <button class="btn btn-primary" id="importScanBtn" onclick="processOfferUpload()">Scan Document</button>
+     <button class="btn btn-primary" id="importConfirmBtn" onclick="confirmImportMaterials()" hidden>Add to Project</button>`);
+}
+
+async function processOfferUpload() {
+  const fileInput = $('importFile');
+  const file = fileInput?.files?.[0];
+  if (!file) { toast('Please select a file', 'warn'); return; }
+  $('importStatus').hidden = false;
+  $('importScanBtn').disabled = true;
+  $('importStatusText').textContent = 'Preparing document...';
+  try {
+    let images = [];
+    if (file.type === 'application/pdf') {
+      $('importStatusText').textContent = 'Rendering PDF pages...';
+      images = await renderPdfToImages(file);
+    } else {
+      images = [file];
+    }
+    const limits = await sampleAI.limits().catch(() => null);
+    const canSendImages = !!limits?.images;
+    const knownProducts = [];
+    for (const sys of Object.values(CATALOG)) {
+      for (const products of Object.values(sys.applications)) {
+        products.forEach(p => { if (!knownProducts.includes(p.name)) knownProducts.push(p.name); });
+      }
+    }
+    const docType = $('importDocType').value;
+    const prompt = `You are analyzing a Cement Plus (microcement company) ${docType} document.
+Extract ALL material/product line items from this document.
+
+Known Cement Plus products: ${knownProducts.join(', ')}
+
+For EACH line item, extract:
+- name: product name (match to known products above when possible, keep original if no match)
+- pkg: packaging size as written (e.g. "20kg", "10lt", "5+1lt", "50m²", "25kg")
+- quantity: NUMBER OF PACKAGES ordered (integer)
+- unit: measurement unit (kg, lt, m²)
+
+Reply with ONLY a JSON array. Example:
+[{"name":"NANOSTUCCO 500 (POWDER)","pkg":"20kg","quantity":5,"unit":"kg"}]
+If no materials found, reply [].
+Do NOT include labor, transport, or discounts.`;
+
+    $('importStatusText').textContent = 'Scanning document with AI...';
+    let result;
+    if (canSendImages && images.length > 0) {
+      const maxImg = limits.images.maxCount || 5;
+      result = await sampleAI.json(prompt, { images: images.slice(0, maxImg), modelTier: 'default', cache: false });
+    } else if (file.type === 'application/pdf') {
+      $('importStatusText').textContent = 'Extracting text...';
+      const text = await extractPdfText(file);
+      if (!text) { toast('Cannot read this PDF', 'error'); resetImportUI(); return; }
+      result = await sampleAI.json(prompt + '\n\nDocument text:\n' + text.slice(0, 30000), { modelTier: 'default', cache: false });
+    } else {
+      toast('Image support not available — try a PDF instead', 'error'); resetImportUI(); return;
+    }
+    if (!Array.isArray(result) || result.length === 0) {
+      toast('No materials found in document', 'warn'); resetImportUI(); return;
+    }
+    showImportPreview(result);
+  } catch (e) {
+    const msg = e.code === 'not_granted' ? 'AI scanning permission denied' :
+                e.code === 'rate_limited' ? 'Rate limited — try again in a moment' :
+                e.code === 'image_rejected' ? 'Image could not be processed — try a different file' :
+                e.code === 'invalid_json' ? 'Could not parse materials — try a clearer scan' :
+                'Scan failed: ' + (e.message || 'unknown error');
+    toast(msg, 'error'); resetImportUI();
+  }
+}
+
+function resetImportUI() {
+  $('importStatus').hidden = true;
+  const btn = $('importScanBtn');
+  if (btn) btn.disabled = false;
+}
+
+async function renderPdfToImages(file) {
+  if (!window.pdfjsLib) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+  const data = await file.arrayBuffer();
+  const pdf = await window.pdfjsLib.getDocument({ data }).promise;
+  const imgs = [];
+  const max = Math.min(pdf.numPages, 5);
+  for (let i = 1; i <= max; i++) {
+    const page = await pdf.getPage(i);
+    const vp = page.getViewport({ scale: 2 });
+    const c = document.createElement('canvas');
+    c.width = vp.width; c.height = vp.height;
+    await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85));
+    if (blob) imgs.push(blob);
+  }
+  return imgs;
+}
+
+async function extractPdfText(file) {
+  if (!window.pdfjsLib) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+  const data = await file.arrayBuffer();
+  const pdf = await window.pdfjsLib.getDocument({ data }).promise;
+  let text = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    text += content.items.map(item => item.str).join(' ') + '\n';
+  }
+  return text;
+}
+
+function showImportPreview(items) {
+  $('importStatus').hidden = true;
+  if ($('importScanBtn')) $('importScanBtn').hidden = true;
+  if ($('importConfirmBtn')) $('importConfirmBtn').hidden = false;
+  const p = projects[currentProject];
+  const sysOpts = (p.systems || []).map((s, i) =>
+    `<option value="${i}">${escAttr(s.systemName)} (${s.area} m²)</option>`
+  ).join('');
+  const docType = $('importDocType')?.value || 'offer';
+  let html = `<div class="card mt-16"><div class="card-header"><h3>Extracted Materials (${items.length} items)</h3></div><div class="card-body">
+    <div class="form-help mb-16">Review and edit the extracted materials. Adjust names, quantities, or remove items as needed.</div>
+    <div class="form-row mb-16"><label>Add to System</label><select id="importTargetSystem">
+      <option value="new">+ Create new system ("${docType === 'invoice' ? 'Invoice' : 'Offer'} Import")</option>${sysOpts}
+    </select></div>
+    <div class="overflow-x"><table><thead><tr><th style="width:30px"></th><th>Product</th><th>Packaging</th><th>Qty (pkgs)</th><th>Unit</th><th style="width:30px"></th></tr></thead>
+    <tbody id="importItemsBody">`;
+  items.forEach((item, i) => {
+    html += `<tr class="import-row" data-idx="${i}">
+      <td><input type="checkbox" class="import-check" checked></td>
+      <td><input type="text" class="import-name" value="${escAttr(item.name || '')}" style="min-width:160px"></td>
+      <td><input type="text" class="import-pkg" value="${escAttr(item.pkg || '')}" style="width:80px"></td>
+      <td><input type="number" class="import-qty" value="${parseInt(item.quantity) || 1}" min="1" style="width:70px"></td>
+      <td><input type="text" class="import-unit" value="${escAttr(item.unit || 'kg')}" style="width:50px"></td>
+      <td><button class="remove-btn" onclick="this.closest('tr').remove()">✕</button></td></tr>`;
+  });
+  html += `</tbody></table></div><button class="btn btn-secondary btn-sm mt-8" onclick="addImportRow()">+ Add Row</button></div></div>`;
+  $('importPreview').innerHTML = html;
+  $('importPreview').hidden = false;
+}
+
+function addImportRow() {
+  const tbody = $('importItemsBody');
+  const tr = document.createElement('tr');
+  tr.className = 'import-row';
+  tr.innerHTML = `<td><input type="checkbox" class="import-check" checked></td>
+    <td><input type="text" class="import-name" value="" style="min-width:160px" placeholder="Product name"></td>
+    <td><input type="text" class="import-pkg" value="" style="width:80px" placeholder="e.g. 20kg"></td>
+    <td><input type="number" class="import-qty" value="1" min="1" style="width:70px"></td>
+    <td><input type="text" class="import-unit" value="kg" style="width:50px"></td>
+    <td><button class="remove-btn" onclick="this.closest('tr').remove()">✕</button></td>`;
+  tbody.appendChild(tr);
+}
+
+function confirmImportMaterials() {
+  const p = projects[currentProject];
+  if (!p) return;
+  const rows = document.querySelectorAll('#importItemsBody .import-row');
+  const items = [];
+  rows.forEach(row => {
+    if (!row.querySelector('.import-check')?.checked) return;
+    const name = row.querySelector('.import-name')?.value?.trim();
+    const pkg = row.querySelector('.import-pkg')?.value?.trim() || '1kg';
+    const qty = parseInt(row.querySelector('.import-qty')?.value) || 1;
+    const unit = row.querySelector('.import-unit')?.value?.trim() || 'kg';
+    if (!name) return;
+    items.push({ name, pkg, qty, unit });
+  });
+  if (items.length === 0) { toast('No materials selected', 'warn'); return; }
+  const targetVal = $('importTargetSystem')?.value;
+  let sys;
+  if (targetVal === 'new') {
+    const docType = $('importDocType')?.value || 'offer';
+    sys = { id: uid(), systemName: (docType === 'invoice' ? 'Invoice' : 'Offer') + ' Import', application: 'Imported materials', area: 1, notes: 'Imported on ' + fmtDate(today()) };
+    if (!p.systems) p.systems = [];
+    p.systems.push(sys);
+  } else {
+    sys = p.systems[parseInt(targetVal)];
+    if (!sys) { toast('System not found', 'error'); return; }
+  }
+  if (!sys.extraProducts) sys.extraProducts = [];
+  items.forEach(item => {
+    const pSize = pkgSize(item.pkg);
+    const totalQty = item.qty * pSize;
+    sys.extraProducts.push({ name: item.name, pkg: item.pkg, consumption: Math.round((totalQty / sys.area) * 100) / 100, unit: item.unit });
+  });
+  p.updatedAt = new Date().toISOString();
+  if (db) db.doc('projects/' + p.id).set(p);
+  logActivity(`imported ${items.length} materials from offer/invoice into "${p.name}"`);
+  closeModal();
+  toast(`${items.length} materials imported successfully`);
+  renderProjectDetail();
+}
+
 // ========== INIT ==========
 async function init() {
   $('todayDate').textContent = fmtDate(today());
@@ -2289,6 +2531,7 @@ async function init() {
       assets = await window.claude.use('assets');
       room = await window.claude.use('room');
       mcp = await window.claude.use('mcp');
+      sampleAI = await window.claude.use('sample');
     } catch (e) {}
   }
 
