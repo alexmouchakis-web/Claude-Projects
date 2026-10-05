@@ -340,6 +340,34 @@ tr:hover td{background:var(--surface-alt)}
 .pay-terms-box{background:var(--surface-alt);border-radius:var(--radius);padding:12px 14px;margin-bottom:16px;white-space:pre-wrap;font-size:.9rem}
 .pay-rows .pay-row{display:grid;grid-template-columns:2fr 70px 100px 150px 28px;gap:6px;align-items:center;margin-bottom:6px}
 @media(max-width:600px){.pay-rows .pay-row{grid-template-columns:1fr 1fr}}
+#chatFab{position:fixed;right:24px;bottom:24px;z-index:150;display:none;align-items:center;gap:8px;padding:12px 18px;border-radius:999px;background:var(--blue);color:#fff;font-weight:600;font-size:.875rem;box-shadow:var(--shadow-lg)}
+#chatFab.ready{display:flex}
+body.chat-open #chatFab{display:none}
+#chatPanel{position:fixed;top:0;right:0;bottom:0;width:400px;max-width:100vw;z-index:150;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;transform:translateX(100%);visibility:hidden;transition:transform .2s,visibility .2s;box-shadow:var(--shadow-lg)}
+body.chat-open #chatPanel{transform:none;visibility:visible}
+@media(max-width:1699px){body.chat-open main{margin-right:400px}}
+@media(max-width:900px){#chatPanel{width:100%}body.chat-open main{margin-right:0}}
+.chat-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 16px;border-bottom:1px solid var(--border-light)}
+.chat-head strong{font-family:'Archivo',sans-serif;font-size:.95rem}
+.chat-head .chat-sub{font-size:.7rem;color:var(--ink-3)}
+.chat-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+.chat-msg{max-width:92%;padding:10px 13px;border-radius:12px;font-size:.85rem;line-height:1.5;word-wrap:break-word;overflow-wrap:anywhere}
+.chat-msg.user{align-self:flex-end;background:var(--blue);color:#fff;white-space:pre-wrap}
+.chat-msg.assistant{align-self:flex-start;background:var(--surface-alt);color:var(--ink);max-width:100%}
+.chat-msg.assistant p{margin:0 0 8px}.chat-msg.assistant p:last-child{margin-bottom:0}
+.chat-msg.assistant ul,.chat-msg.assistant ol{margin:0 0 8px;padding-left:20px}
+.chat-msg.assistant code{background:var(--surface);border:1px solid var(--border-light);border-radius:4px;padding:0 4px;font-size:.8rem}
+.chat-msg.assistant .chat-tbl{overflow-x:auto;margin:0 0 8px}
+.chat-msg.assistant table{font-size:.78rem;width:auto}
+.chat-msg.assistant th,.chat-msg.assistant td{padding:4px 8px}
+.chat-status{display:inline-flex;align-items:center;gap:8px;color:var(--ink-3);font-size:.8rem}
+.chat-status:before{content:"";width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .6s linear infinite}
+.chat-err{color:var(--red)}
+.chat-sugg{display:flex;flex-direction:column;gap:6px}
+.chat-sugg button{text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;font-size:.8rem;color:var(--ink-2)}
+.chat-sugg button:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-light)}
+.chat-foot{padding:12px 16px;border-top:1px solid var(--border-light);display:flex;gap:8px;align-items:flex-end}
+.chat-foot textarea{resize:none;max-height:120px;min-height:38px}
 </style>
 
 <div class="app">
@@ -472,6 +500,15 @@ tr:hover td{background:var(--surface-alt)}
   </div>
 </main>
 </div>
+
+<button id="chatFab" onclick="toggleChat(true)" aria-label="Open AI chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Ask AI</button>
+<aside id="chatPanel" aria-label="AI assistant">
+  <div class="chat-head"><div><strong>Ask Cement Plus AI</strong><div class="chat-sub">Reads your live app data</div></div>
+    <div class="flex gap-8"><button class="btn btn-secondary btn-sm" onclick="clearChat()">Clear</button><button class="btn btn-secondary btn-sm" onclick="toggleChat(false)">Close</button></div></div>
+  <div class="chat-body" id="chatBody"></div>
+  <div class="chat-foot"><textarea id="chatInput" rows="1" placeholder="Ask anything about your app or data…" onkeydown="chatKey(event)" oninput="chatGrow(this)"></textarea>
+    <button class="btn btn-primary" id="chatSend" onclick="sendChat()">Send</button><button class="btn btn-danger" id="chatStop" onclick="stopChat()" hidden>Stop</button></div>
+</aside>
 
 <div class="preview-overlay" id="previewOverlay" onclick="if(event.target===this)closePreview()">
   <div class="preview-box">
@@ -3576,6 +3613,394 @@ function batchDeleteNotes() {
   });
 }
 
+// ========== AI CHAT ==========
+const CHAT_KEY = 'cpChat';
+const CHAT_SUGGESTIONS = [
+  'How many kg of NANOFIN 50 VELVET have we delivered since 1 Aug 2026?',
+  'Which projects have unpaid or overdue installments?',
+  'Which materials are low in stock right now?',
+  'How do I record a delivery and what happens to stock?',
+  'What is missing in this app that would help my business?'
+];
+let chatTurns = [];
+let chatCtl = null;
+let chatBusy = false;
+let chatHasTools = false;
+let chatLive = null;
+
+const chatStore = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+};
+
+function initChat() {
+  if (!sampleAI) return;
+  try {
+    const v = JSON.parse(chatStore.get(CHAT_KEY) || '[]');
+    if (Array.isArray(v)) chatTurns = v.filter(t => t && (t.role === 'user' || t.role === 'assistant') && typeof t.content === 'string' && t.content);
+  } catch (e) {}
+  $('chatFab').classList.add('ready');
+  sampleAI.limits().then(l => { chatHasTools = !!l?.tools; }).catch(() => { chatHasTools = false; });
+  renderChat();
+  if (chatStore.get('cpChatOpen') === '1') toggleChat(true);
+}
+
+function toggleChat(open) {
+  document.body.classList.toggle('chat-open', open);
+  chatStore.set('cpChatOpen', open ? '1' : '0');
+  if (open) { renderChat(); setTimeout(() => $('chatInput')?.focus(), 250); }
+}
+
+function clearChat() {
+  if (chatBusy) stopChat();
+  chatTurns = [];
+  chatStore.set(CHAT_KEY, '[]');
+  renderChat();
+}
+
+function chatKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+}
+function chatGrow(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; }
+function stopChat() { if (chatCtl) chatCtl.abort(); }
+
+function mdInline(s) {
+  return escAttr(s).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+}
+
+function mdLite(src) {
+  const lines = String(src || '').split('\n');
+  let out = '', i = 0;
+  while (i < lines.length) {
+    const ln = lines[i];
+    if (/^\s*\|/.test(ln)) {
+      const rows = [];
+      while (i < lines.length && /^\s*\|/.test(lines[i])) { rows.push(lines[i]); i++; }
+      const cells = r => r.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+      const body = rows.filter(r => !/^\s*\|?[\s:|-]+\|?\s*$/.test(r) || !/-/.test(r)).map(cells);
+      if (body.length) out += '<div class="chat-tbl"><table><thead><tr>' + body[0].map(c => `<th>${mdInline(c)}</th>`).join('') + '</tr></thead><tbody>' +
+        body.slice(1).map(r => '<tr>' + r.map(c => `<td>${mdInline(c)}</td>`).join('') + '</tr>').join('') + '</tbody></table></div>';
+    } else if (/^\s*([-*•])\s+/.test(ln)) {
+      out += '<ul>';
+      while (i < lines.length && /^\s*([-*•])\s+/.test(lines[i])) { out += `<li>${mdInline(lines[i].replace(/^\s*([-*•])\s+/, ''))}</li>`; i++; }
+      out += '</ul>';
+    } else if (/^\s*\d+[.)]\s+/.test(ln)) {
+      out += '<ol>';
+      while (i < lines.length && /^\s*\d+[.)]\s+/.test(lines[i])) { out += `<li>${mdInline(lines[i].replace(/^\s*\d+[.)]\s+/, ''))}</li>`; i++; }
+      out += '</ol>';
+    } else if (!ln.trim()) { i++; }
+    else {
+      const para = [];
+      while (i < lines.length && lines[i].trim() && !/^\s*(\||[-*•]\s|\d+[.)]\s)/.test(lines[i])) { para.push(lines[i]); i++; }
+      out += `<p>${mdInline(para.join('\n')).replace(/\n/g, '<br>')}</p>`;
+    }
+  }
+  return out;
+}
+
+function renderChat() {
+  const body = $('chatBody');
+  if (!body) return;
+  if (chatTurns.length === 0) {
+    body.innerHTML = `<div class="chat-msg assistant"><p>Hi ${escAttr(currentUser)}. I can explain how CP Dispatch works, point out what is missing, and answer questions from your live data: sales, deliveries, stock, orders, payments.</p><p>Try one of these:</p></div>
+      <div class="chat-sugg">${CHAT_SUGGESTIONS.map((s, i) => `<button onclick="sendChat(CHAT_SUGGESTIONS[${i}])">${escAttr(s)}</button>`).join('')}</div>`;
+    return;
+  }
+  body.innerHTML = chatTurns.map(t => t.role === 'user'
+    ? `<div class="chat-msg user">${escAttr(t.content)}</div>`
+    : `<div class="chat-msg assistant">${mdLite(t.content)}</div>`).join('');
+  body.scrollTop = body.scrollHeight;
+}
+
+function setChatUi() {
+  $('chatSend').hidden = chatBusy;
+  $('chatStop').hidden = !chatBusy;
+  $('chatInput').disabled = chatBusy;
+}
+
+function chatStatus(text) {
+  if (!chatLive) return;
+  chatLive.status = text;
+  paintLive();
+}
+
+function paintLive() {
+  if (!chatLive) return;
+  chatLive.bubble.innerHTML = (chatLive.text ? mdLite(chatLive.text) : '') + (chatLive.status ? `<span class="chat-status">${escAttr(chatLive.status)}</span>` : '');
+  const body = $('chatBody');
+  body.scrollTop = body.scrollHeight;
+}
+
+const CHAT_ERRORS = {
+  not_granted: 'AI access was declined for this app. Allow it when asked, or in your claude.ai settings.',
+  sampling_disabled: 'Claude is not available for this account or organization.',
+  rate_limited: 'Too many requests or usage limit reached. Wait a moment and try again.',
+  session_expired: 'Your session expired. Reload the page and sign in again.',
+  prompt_too_large: 'The question plus data was too large. Ask for something narrower (a date range or one material).',
+  refused: 'Claude declined to answer that.',
+  empty_completion: 'No answer came back. Try rephrasing.',
+  upstream_error: 'A temporary connection error occurred. Try again.'
+};
+
+async function sendChat(preset) {
+  if (chatBusy || !sampleAI) return;
+  const input = $('chatInput');
+  const text = String(preset != null ? preset : input.value).trim();
+  if (!text) return;
+  input.value = ''; chatGrow(input);
+  chatTurns.push({ role: 'user', content: text });
+  renderChat();
+  const body = $('chatBody');
+  body.insertAdjacentHTML('beforeend', '<div class="chat-msg assistant" id="chatLiveBubble"></div>');
+  chatLive = { bubble: $('chatLiveBubble'), text: '', status: 'Thinking…' };
+  paintLive();
+  chatBusy = true; setChatUi();
+  chatCtl = new AbortController();
+  try {
+    const opts = {
+      cache: false,
+      signal: chatCtl.signal,
+      onText: ({ text: t }) => { chatLive.text = t; chatLive.status = ''; paintLive(); }
+    };
+    if (chatHasTools) opts.tools = chatToolDefs();
+    const res = await sampleAI(buildChatInput(), opts);
+    chatTurns.push({ role: 'assistant', content: res.text + (res.truncated ? '\n\n(Answer was cut short — ask for less at a time.)' : '') });
+  } catch (e) {
+    if (e && e.text) chatTurns.push({ role: 'assistant', content: e.text + '\n\n(Interrupted)' });
+    else {
+      chatTurns.pop();
+      if (e && e.code !== 'cancelled') {
+        chatLive.bubble.innerHTML = `<span class="chat-err">${escAttr(CHAT_ERRORS[e.code] || ('Something went wrong: ' + (e.message || e.code || 'unknown error')))}</span>`;
+        chatLive = null; chatBusy = false; setChatUi(); input.value = text;
+        return;
+      }
+    }
+  }
+  chatLive = null; chatBusy = false; setChatUi();
+  chatStore.set(CHAT_KEY, JSON.stringify(chatTurns.slice(-30)));
+  renderChat();
+  $('chatInput').focus();
+}
+
+function viewContext() {
+  const page = document.querySelector('.page.active')?.id?.replace('page-', '') || 'dashboard';
+  let ctx = `[Context: today is ${today()}; user is ${currentUser}; viewing the "${page}" page`;
+  if (page === 'project-detail' && projects[currentProject]) ctx += ` for project "${projects[currentProject].name}"`;
+  return ctx + ']';
+}
+
+function buildChatInput() {
+  const enc = new TextEncoder();
+  let rules = chatRules();
+  if (!chatHasTools) rules += '\n\nLIVE DATA (JSON, because lookup tools are unavailable in this view):\n' + JSON.stringify(chatDigest()).slice(0, 28000);
+  let hist = chatTurns.slice(-14).map(t => ({ role: t.role, content: t.content.slice(0, 6000) }));
+  while (hist.length > 1 && hist[0].role !== 'user') hist.shift();
+  const last = hist.length - 1;
+  hist[last] = { role: 'user', content: viewContext() + '\n\n' + hist[last].content };
+  const size = () => enc.encode(rules).length + hist.reduce((s, t) => s + enc.encode(t.content).length, 0);
+  while (hist.length > 1 && size() > 56000) { hist.shift(); while (hist.length > 1 && hist[0].role !== 'user') hist.shift(); }
+  return [{ role: 'user', content: rules }, ...hist];
+}
+
+function chatRules() {
+  const names = Object.values(projects).map(p => `${p.name} (${p.client || '—'}, ${p.status})`).slice(0, 80).join('; ');
+  const sysNames = Object.keys(CATALOG).join(', ');
+  return `You are the built-in assistant of CP Dispatch, the project and warehouse management app of Cement Plus (microcement manufacturer/applicator, Larissa, Greece). You are talking to ${currentUser}, usually Alex, the managing director, a mechanical engineer who runs several SMEs: give simple but advanced, clearly stated answers, short by default, with numbers and units. Reply in the language the user writes in (Greek or English). Dates written by the user are Greek style day/month/year (11/8/2026 = 11 August 2026). Today is ${today()}.
+
+HOW TO ANSWER
+- For ANY number, total, list or status about projects, deliveries, stock, orders or payments, call the lookup tools; never estimate or invent figures. If a tool returns nothing, say so and mention what you searched.
+- "Sold" is ambiguous. Report DELIVERED (physically delivered to projects, dated by delivery date) and CONTRACTED (quantities in project offers, dated by project creation date) separately and say which is which. Amounts are units x pack size (e.g. 3 packs of 20kg = 60 kg).
+- Only data entered in the app exists. Say so when a question needs data the app does not hold (e.g. prices, costs, supplier data).
+- When asked how something works, explain using the app description below and name the exact page, tab or button. When asked what is missing, give a short prioritized list of concrete gaps and why each matters.
+- Never claim you changed anything: you can only read data.
+
+ABOUT THE APP
+Left menu: Dashboard (KPIs, alerts, analytics charts), Projects, Stock, Orders, Reminders, Timeline (Gantt of project phases).
+Projects list: New Project, table with checkboxes; selecting rows shows a bar with bulk actions (set status, export CSV, delete).
+New Project: "Attach Offer or Invoice" lets AI read a PDF/photo and fill client, location, deadline, notes, payment terms and the exact material quantities; each attached file has Preview, Edit and delete. Product systems can also be added manually from the catalog; materials are then calculated from consumption per m2.
+Project tabs: Overview (systems, progress), Phases (allocate m2 per system, dates, status), Materials (required units, in stock, delivered, remaining; "Generate Order for Missing"), Payment Terms (total, terms, installments with Paid/Pending/Overdue, mark paid), Deliveries (record a delivery: deducts stock, delivery note CSV, photos, email notification), Files (upload, preview), Production (batches planned > mixing > curing > ready), Notes.
+Stock: quantities and minimum levels per material (Update Stock). Orders: supplier orders pending > ordered > received (receiving adds to stock); AUTO-... orders are created by the auto-reorder check for active-project shortages. Reminders: assign to team members with date/time. Email notifications go to the team through Gmail. Data is shared by the whole team in one database; the header shows who is online.
+Catalog (17 product systems): ${sysNames}.
+Not in the app today (candidates when asked what is missing): unit prices, costs and margins per material or project; supplier database and supplier prices; a customer database (client is free text); issuing offers/invoices from the app; user roles and permissions; calendar sync; returns and credit notes; stock by batch number or warehouse location; multi-currency (EUR only); reports/export to accounting.
+
+CURRENT PROJECTS: ${names || 'none yet'}.
+Counts: ${Object.keys(projects).length} projects, ${Object.keys(deliveries).length} deliveries, ${Object.keys(orders).length} supplier orders, ${Object.keys(stockData).length} stocked materials.`;
+}
+
+// ---- lookup tools (read-only, run in the page) ----
+const chatNorm = s => String(s == null ? '' : s).toLowerCase().replace(/ς/g, 'σ').normalize('NFD').replace(/[̀-ͯ]/g, '');
+const chatMatch = (hay, q) => { const h = chatNorm(hay); return chatNorm(q).split(/\s+/).filter(Boolean).every(t => h.includes(t)); };
+const chatRound = n => Math.round((Number(n) || 0) * 100) / 100;
+const chatUnit = pkg => (String(pkg || '').match(/(kg|lt|m²)/i) || [, 'units'])[1].toLowerCase();
+
+function chatDate(s) {
+  s = String(s || '').trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
+  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  return '';
+}
+
+function chatAggregate(items, groupBy) {
+  const total = { units: 0, amounts: {} };
+  const groups = {};
+  items.forEach(it => {
+    const amt = it.units * pkgSize(it.pkg || ''), u = chatUnit(it.pkg);
+    total.units += it.units;
+    total.amounts[u] = (total.amounts[u] || 0) + amt;
+    if (groupBy && groupBy !== 'none') {
+      const k = groupBy === 'project' ? it.project : groupBy === 'month' ? (it.date || '').slice(0, 7) : `${it.name} (${it.pkg})`;
+      const g = groups[k] || (groups[k] = { group: k, units: 0, amounts: {} });
+      g.units += it.units;
+      g.amounts[u] = (g.amounts[u] || 0) + amt;
+    }
+  });
+  const fix = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, chatRound(v)]));
+  const rows = Object.values(groups).sort((a, b) => b.units - a.units).slice(0, 60).map(g => ({ ...g, amounts: fix(g.amounts) }));
+  return { total_units: chatRound(total.units), total_amounts: fix(total.amounts), ...(rows.length ? { groups: rows } : {}) };
+}
+
+function toolSalesReport(a) {
+  chatStatus('Reading deliveries and offers…');
+  const since = chatDate(a.since), until = chatDate(a.until), mat = String(a.material || ''), proj = String(a.project || '');
+  const basis = ['delivered', 'contracted', 'both'].includes(a.basis) ? a.basis : 'both';
+  const groupBy = ['material', 'project', 'month', 'none'].includes(a.group_by) ? a.group_by : 'none';
+  const inRange = d => (!since || d >= since) && (!until || d <= until);
+  const out = { filters: { material: mat || null, project_or_client: proj || null, since: since || null, until: until || null } };
+  const projOk = p => !proj || chatMatch((p?.name || '') + ' ' + (p?.client || ''), proj);
+  if (basis !== 'contracted') {
+    const items = [];
+    let n = 0;
+    Object.values(deliveries).forEach(d => {
+      const p = projects[d.projectId];
+      if (!inRange(d.date || '') || !projOk(p)) return;
+      let hit = false;
+      (d.items || []).forEach(i => {
+        if (mat && !chatMatch(i.name, mat)) return;
+        hit = true;
+        items.push({ name: i.name, pkg: i.pkg, units: Number(i.quantity) || 0, date: d.date, project: p?.name || '—' });
+      });
+      if (hit) n++;
+    });
+    out.delivered = { note: 'physically delivered to projects, by delivery date', delivery_count: n, ...chatAggregate(items, groupBy) };
+  }
+  if (basis !== 'delivered') {
+    const items = [];
+    let n = 0;
+    Object.values(projects).forEach(p => {
+      if (!inRange((p.createdAt || '').slice(0, 10)) || !projOk(p)) return;
+      let hit = false;
+      getAllMaterials(p.systems || []).forEach(m => {
+        if (mat && !chatMatch(m.name, mat)) return;
+        hit = true;
+        items.push({ name: m.name, pkg: m.pkg, units: m.totalUnits, date: (p.createdAt || '').slice(0, 10), project: p.name });
+      });
+      if (hit) n++;
+    });
+    out.contracted = { note: 'quantities in project offers/systems, by project creation date', project_count: n, ...chatAggregate(items, groupBy) };
+  }
+  const any = (out.delivered?.total_units || 0) + (out.contracted?.total_units || 0);
+  if (!any && mat) {
+    const names = new Set();
+    Object.values(deliveries).forEach(d => (d.items || []).forEach(i => names.add(i.name)));
+    Object.keys(CATALOG).forEach(s => Object.values(CATALOG[s].applications).forEach(ps => ps.forEach(p => names.add(p.name))));
+    out.no_match_hint = [...names].filter(nm => chatNorm(nm).includes(chatNorm(mat).split(/\s+/)[0])).slice(0, 12);
+  }
+  return out;
+}
+
+function projectPayment(p) {
+  const inst = p.payment?.installments || [];
+  const total = p.payment?.total || inst.reduce((s, i) => s + (i.amount || 0), 0);
+  const paid = inst.filter(i => i.paid).reduce((s, i) => s + (i.amount || 0), 0);
+  const overdue = inst.filter(i => !i.paid && i.dueDate && i.dueDate < today());
+  return { total: chatRound(total), paid: chatRound(paid), outstanding: chatRound(Math.max(0, total - paid)), overdue_installments: overdue.map(i => ({ label: i.label, amount: i.amount, due: i.dueDate })) };
+}
+
+function toolListProjects(a) {
+  chatStatus('Reading projects…');
+  const status = String(a.status || ''), text = String(a.text || '');
+  const rows = Object.values(projects).filter(p => (!status || p.status === status) && (!text || chatMatch(`${p.name} ${p.client} ${p.location}`, text))).slice(0, 60).map(p => ({
+    name: p.name, client: p.client, location: p.location, status: p.status, deadline: p.deadline || null,
+    created: (p.createdAt || '').slice(0, 10), area_m2: chatRound((p.systems || []).reduce((s, x) => s + (Number(x.area) || 0), 0)),
+    systems: (p.systems || []).map(s => s.systemName).join(', '), payment: projectPayment(p)
+  }));
+  return { count: rows.length, projects: rows };
+}
+
+function toolProjectDetails(a) {
+  chatStatus('Reading project…');
+  const q = String(a.name || '');
+  const p = Object.values(projects).find(x => chatMatch(`${x.name} ${x.client}`, q));
+  if (!p) return { error: 'No project matches "' + q + '"' };
+  const dels = Object.values(deliveries).filter(d => d.projectId === p.id).sort((x, y) => (x.date || '').localeCompare(y.date || ''));
+  const delivered = {};
+  dels.forEach(d => (d.items || []).forEach(i => { delivered[i.material] = (delivered[i.material] || 0) + (Number(i.quantity) || 0); }));
+  return {
+    name: p.name, client: p.client, location: p.location, status: p.status, deadline: p.deadline || null, notes: p.notes || '',
+    systems: (p.systems || []).map(s => ({ system: s.systemName, application: s.application, area_m2: s.area, from_offer: Array.isArray(s.offerItems) })),
+    materials: getAllMaterials(p.systems || []).slice(0, 60).map(m => { const k = m.name + '|' + m.pkg; return { name: m.name, pkg: m.pkg, units_needed: m.totalUnits, delivered_units: delivered[k] || 0, in_stock: (stockData[k] || {}).quantity || 0 }; }),
+    payment: { ...projectPayment(p), terms: p.payment?.terms || '', installments: (p.payment?.installments || []).map(i => ({ label: i.label, amount: i.amount, due: i.dueDate, paid: !!i.paid })) },
+    phases: (p.phases || []).map(ph => ({ name: ph.name, status: ph.status, start: ph.startDate, end: ph.endDate })),
+    deliveries: dels.slice(-15).map(d => ({ date: d.date, ref: d.ref, items: (d.items || []).map(i => `${i.name} (${i.pkg}) x${i.quantity}`).join('; ') })),
+    production_batches: (p.production || []).length, notes_count: (p.projectNotes || []).length
+  };
+}
+
+function toolListOrders(a) {
+  chatStatus('Reading orders…');
+  const status = String(a.status || ''), since = chatDate(a.since), mat = String(a.material || '');
+  const rows = Object.values(orders).filter(o => (!status || o.status === status) && (!since || (o.createdAt || '').slice(0, 10) >= since) && (!mat || (o.items || []).some(i => chatMatch(i.name, mat))))
+    .sort((x, y) => (y.createdAt || '').localeCompare(x.createdAt || '')).slice(0, 50)
+    .map(o => ({ ref: o.ref, project: o.projectName || '—', status: o.status, created: (o.createdAt || '').slice(0, 10), expected: o.expectedDate || null, items: (o.items || []).map(i => `${i.name} (${i.pkg}) x${i.quantity}`).join('; ').slice(0, 300) }));
+  return { count: rows.length, orders: rows };
+}
+
+function toolStockLevels(a) {
+  chatStatus('Reading stock…');
+  const mat = String(a.material || '');
+  let rows = Object.entries(stockData).map(([k, v]) => { const [name, pkg] = k.split('|'); return { name, pkg, quantity: v.quantity, min_stock: v.minStock || 0, low: v.quantity <= (v.minStock || 0) }; })
+    .filter(r => !mat || chatMatch(r.name, mat));
+  if (a.only_low) rows = rows.filter(r => r.low);
+  return { count: rows.length, stock: rows.slice(0, 80) };
+}
+
+function toolPayments() {
+  chatStatus('Reading payments…');
+  const rows = Object.values(projects).filter(p => p.payment).map(p => ({ project: p.name, client: p.client, ...projectPayment(p) }));
+  const sum = k => chatRound(rows.reduce((s, r) => s + r[k], 0));
+  return { projects_with_terms: rows.length, total: sum('total'), paid: sum('paid'), outstanding: sum('outstanding'), projects: rows.slice(0, 60) };
+}
+
+function chatToolDefs() {
+  const str = d => ({ type: 'string', description: d });
+  return [
+    { name: 'sales_report', description: 'Totals of a material delivered to projects and/or contracted in offers, filtered by material name, date range and project/client; optional grouping. Returns units and kg/lt/m2 amounts. Use for "how many kg of X since date" questions.',
+      inputSchema: { type: 'object', properties: { material: str('Material name words, e.g. "nanofin 50 velvet". Omit for all materials.'), since: str('Start date YYYY-MM-DD (inclusive)'), until: str('End date YYYY-MM-DD (inclusive)'), project: str('Project or client name words'), basis: { type: 'string', enum: ['delivered', 'contracted', 'both'] }, group_by: { type: 'string', enum: ['none', 'material', 'project', 'month'] } } },
+      execute: toolSalesReport },
+    { name: 'list_projects', description: 'List projects with client, location, status, deadline, area, systems and payment totals. Filter by status (planning, active, completed, archived) or text.',
+      inputSchema: { type: 'object', properties: { status: str('planning | active | completed | archived'), text: str('Words in name, client or location') } }, execute: toolListProjects },
+    { name: 'project_details', description: 'Full details of one project: systems, material requirements vs delivered vs stock, payment installments, phases, recent deliveries.',
+      inputSchema: { type: 'object', properties: { name: str('Project or client name words') }, required: ['name'] }, execute: toolProjectDetails },
+    { name: 'list_orders', description: 'Supplier orders (pending, ordered, received) with items, optionally filtered by status, creation date or material.',
+      inputSchema: { type: 'object', properties: { status: str('pending | ordered | received'), since: str('YYYY-MM-DD'), material: str('Material name words') } }, execute: toolListOrders },
+    { name: 'stock_levels', description: 'Warehouse stock per material with minimum level; can filter by material name or only low/out-of-stock items.',
+      inputSchema: { type: 'object', properties: { material: str('Material name words'), only_low: { type: 'boolean' } } }, execute: toolStockLevels },
+    { name: 'payments_summary', description: 'Payment totals across all projects: total, paid, outstanding and overdue installments per project.', execute: toolPayments }
+  ];
+}
+
+function chatDigest() {
+  return {
+    projects: toolListProjects({}).projects,
+    stock: toolStockLevels({}).stock,
+    orders: toolListOrders({}).orders,
+    deliveries: Object.values(deliveries).sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 120)
+      .map(d => ({ date: d.date, project: projects[d.projectId]?.name, items: (d.items || []).map(i => `${i.name} (${i.pkg}) x${i.quantity}`) }))
+  };
+}
+
 // ========== INIT ==========
 async function init() {
   $('todayDate').textContent = fmtDate(today());
@@ -3642,6 +4067,7 @@ async function init() {
   }
 
   renderDashboard();
+  initChat();
 }
 
 function renderCurrentPage() {
