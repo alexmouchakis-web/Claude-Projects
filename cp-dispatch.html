@@ -2694,12 +2694,22 @@ function toggleAll(cls, headerCb) {
   if (barId) updateBatchBar(cls, barId);
 }
 
+function syncHeaderCheckbox(cls) {
+  const first = document.querySelector('.' + cls);
+  if (!first) return;
+  const hdr = first.closest('table')?.querySelector('th .list-check');
+  if (!hdr) return;
+  const boxes = document.querySelectorAll('.' + cls);
+  hdr.checked = boxes.length > 0 && [...boxes].every(cb => cb.checked);
+}
+
 function updateBatchBar(cls, barId) {
   const bar = $(barId);
   if (!bar) return;
   const count = document.querySelectorAll('.' + cls + ':checked').length;
   bar.classList.toggle('visible', count > 0);
   bar.querySelector('.batch-count').textContent = count + ' selected';
+  syncHeaderCheckbox(cls);
 }
 
 function selectAllToggle(cls, barId, toggleId) {
@@ -2707,6 +2717,7 @@ function selectAllToggle(cls, barId, toggleId) {
   const allChecked = boxes.length > 0 && [...boxes].every(cb => cb.checked);
   boxes.forEach(cb => cb.checked = !allChecked);
   updateBatchBar(cls, barId);
+  syncHeaderCheckbox(cls);
   updateToggleLabel(cls, toggleId);
 }
 
