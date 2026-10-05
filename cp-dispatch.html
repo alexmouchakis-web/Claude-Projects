@@ -318,6 +318,26 @@ tr:hover td{background:var(--surface-alt)}
 .attached-file .af-status{font-size:.75rem;color:var(--ink-3)}
 .scan-progress{display:flex;align-items:center;gap:10px;padding:14px;background:var(--surface-alt);border-radius:var(--radius);margin-bottom:12px}
 .scan-progress .spinner{width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .6s linear infinite}
+.offer-mats{margin-top:12px;border-top:1px dashed var(--border);padding-top:10px}
+.offer-mats .om-title{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);margin-bottom:6px}
+.offer-mats table{width:100%;font-size:.8rem}
+.offer-mats td,.offer-mats th{padding:3px 4px}
+.offer-mats input{padding:5px 7px;font-size:.8rem}
+.system-card.flash{box-shadow:0 0 0 3px var(--blue-light);transition:box-shadow .3s}
+.preview-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:400;display:none;align-items:center;justify-content:center;padding:16px}
+.preview-overlay.open{display:flex}
+.preview-box{background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);width:100%;max-width:900px;max-height:94vh;display:flex;flex-direction:column;overflow:hidden}
+.preview-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border-light)}
+.preview-head strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.preview-body{overflow:auto;padding:16px;background:var(--surface-alt);display:flex;flex-direction:column;align-items:center;gap:12px}
+.pv-page{max-width:100%;height:auto;background:#fff;box-shadow:var(--shadow-sm);border-radius:2px}
+.pay-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.pay-kpi{background:var(--surface-alt);border-radius:var(--radius);padding:12px 14px}
+.pay-kpi .pk-val{font-size:1.25rem;font-weight:700;font-variant-numeric:tabular-nums}
+.pay-kpi .pk-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3)}
+.pay-terms-box{background:var(--surface-alt);border-radius:var(--radius);padding:12px 14px;margin-bottom:16px;white-space:pre-wrap;font-size:.9rem}
+.pay-rows .pay-row{display:grid;grid-template-columns:2fr 70px 100px 150px 28px;gap:6px;align-items:center;margin-bottom:6px}
+@media(max-width:600px){.pay-rows .pay-row{grid-template-columns:1fr 1fr}}
 </style>
 
 <div class="app">
@@ -409,6 +429,7 @@ tr:hover td{background:var(--surface-alt)}
       <button class="tab active" data-tab="overview">Overview</button>
       <button class="tab" data-tab="phases">Phases</button>
       <button class="tab" data-tab="materials">Materials</button>
+      <button class="tab" data-tab="payments">Payment Terms</button>
       <button class="tab" data-tab="deliveries">Deliveries</button>
       <button class="tab" data-tab="files">Files</button>
       <button class="tab" data-tab="production">Production</button>
@@ -417,6 +438,7 @@ tr:hover td{background:var(--surface-alt)}
     <div class="tab-panel active" id="tab-overview"></div>
     <div class="tab-panel" id="tab-phases"></div>
     <div class="tab-panel" id="tab-materials"></div>
+    <div class="tab-panel" id="tab-payments"></div>
     <div class="tab-panel" id="tab-deliveries"></div>
     <div class="tab-panel" id="tab-files"></div>
     <div class="tab-panel" id="tab-production"></div>
@@ -447,6 +469,13 @@ tr:hover td{background:var(--surface-alt)}
     <div class="card"><div class="card-body" id="timelineContent"></div></div>
   </div>
 </main>
+</div>
+
+<div class="preview-overlay" id="previewOverlay" onclick="if(event.target===this)closePreview()">
+  <div class="preview-box">
+    <div class="preview-head"><strong id="previewTitle">Preview</strong><button class="btn btn-secondary btn-sm" onclick="closePreview()">Close</button></div>
+    <div class="preview-body" id="previewBody"></div>
+  </div>
 </div>
 
 <!-- MODALS -->
@@ -743,6 +772,9 @@ function calcUnits(consumption, area, pkg) {
 }
 
 function getEffectiveProducts(sys) {
+  if (Array.isArray(sys.offerItems)) {
+    return sys.offerItems.map(it => ({ name: it.name, pkg: it.pkg || '', unit: it.unit || 'kg', consumption: 0, fixedUnits: parseFloat(it.quantity) || 0 }));
+  }
   const cat = CATALOG[sys.systemName];
   if (!cat || !cat.applications[sys.application]) return [];
   const defaults = cat.applications[sys.application];
@@ -764,10 +796,18 @@ function getAllMaterials(systems) {
   const mats = {};
   systems.forEach((sys, sysIdx) => {
     const products = getEffectiveProducts(sys);
+    const scale = sys.fullArea > 0 ? sys.area / sys.fullArea : 1;
     products.forEach(prod => {
-      const calc = calcUnits(prod.consumption, sys.area, prod.pkg);
+      let calc;
+      if (prod.fixedUnits !== undefined) {
+        const size = pkgSize(prod.pkg || '');
+        const units = Math.ceil(prod.fixedUnits * scale - 1e-9);
+        calc = { total: Math.round(units * size * 100) / 100, units };
+      } else {
+        calc = calcUnits(prod.consumption, sys.area, prod.pkg);
+      }
       const key = prod.name + '|' + prod.pkg;
-      if (!mats[key]) mats[key] = { name: prod.name, pkg: prod.pkg, unit: prod.unit, totalQty: 0, totalUnits: 0, sysIndices: [] };
+      if (!mats[key]) mats[key] = { name: prod.name, pkg: prod.pkg, unit: prod.unit, totalQty: 0, totalUnits: 0, sysIndices: [], fromOffer: prod.fixedUnits !== undefined };
       mats[key].totalQty += calc.total;
       mats[key].totalUnits += calc.units;
       if (!mats[key].sysIndices.includes(sysIdx)) mats[key].sysIndices.push(sysIdx);
@@ -781,7 +821,7 @@ function getPhaseMaterials(systems, phase) {
   const phaseSystems = systems.map(sys => {
     const alloc = phase.allocations[sys.id];
     if (!alloc || alloc <= 0) return null;
-    return { ...sys, area: alloc };
+    return { ...sys, area: alloc, fullArea: sys.area };
   }).filter(Boolean);
   return getAllMaterials(phaseSystems);
 }
@@ -1008,32 +1048,111 @@ function renderProjects() {
   </tr>`).join('')}</tbody></table>`;
 }
 
+// ---- shared form pieces ----
+function omRowHtml(it) {
+  return `<tr class="om-row"><td><input type="text" class="om-name" value="${escAttr(it.name)}" style="min-width:150px"></td>
+    <td><input type="text" class="om-pkg" value="${escAttr(it.pkg)}" style="width:72px"></td>
+    <td><input type="number" class="om-qty" value="${it.quantity == null ? 1 : it.quantity}" min="0" step="any" style="width:64px"></td>
+    <td><input type="text" class="om-unit" value="${escAttr(it.unit || 'kg')}" style="width:46px"></td>
+    <td><button type="button" class="remove-btn" title="Delete row" onclick="this.closest('tr').remove()">✕</button></td></tr>`;
+}
+
+function addOfferRow(btn) {
+  btn.closest('.offer-mats').querySelector('.om-body').insertAdjacentHTML('beforeend', omRowHtml({ name: '', pkg: '', quantity: 1, unit: 'kg' }));
+}
+
+function readOfferRows(root) {
+  return [...root.querySelectorAll('.om-row')].map(r => ({
+    name: r.querySelector('.om-name').value.trim(),
+    pkg: r.querySelector('.om-pkg').value.trim(),
+    quantity: parseFloat(r.querySelector('.om-qty').value) || 0,
+    unit: r.querySelector('.om-unit').value.trim() || 'kg'
+  })).filter(it => it.name);
+}
+
+function offerTableHtml(items) {
+  return `<table><thead><tr><th>Product</th><th>Pkg</th><th>Qty (pkgs)</th><th>Unit</th><th></th></tr></thead><tbody class="om-body">${items.map(omRowHtml).join('')}</tbody></table>
+    <button type="button" class="btn btn-secondary btn-sm mt-8" onclick="addOfferRow(this)">+ Add Row</button>`;
+}
+
+function systemCardHtml(sys, docId) {
+  const cat = CATALOG[sys.systemName];
+  const isOffer = Array.isArray(sys.offerItems);
+  const appField = cat
+    ? `<select class="sys-app">${Object.keys(cat.applications).map(a => `<option value="${escAttr(a)}" ${a === sys.application ? 'selected' : ''}>${a}</option>`).join('')}</select>`
+    : `<input type="text" class="sys-app" value="${escAttr(sys.application || 'Imported materials')}">`;
+  return `<div class="system-card" ${isOffer ? 'data-offer="1"' : ''} ${docId ? `data-doc="${docId}"` : ''} data-docname="${escAttr(sys.offerDoc || '')}">
+    <div class="system-card-header"><strong>${escAttr(sys.systemName)}</strong><button type="button" class="remove-btn" onclick="this.closest('.system-card').remove()">✕ Remove</button></div>
+    <div class="form-grid">
+      <div><label>Application</label>${appField}</div>
+      <div><label>Area (m²)</label><input type="number" class="sys-area" value="${sys.area || ''}" min="0" step="any" placeholder="0"></div>
+    </div>
+    <div class="form-row mt-8"><label>Notes</label><input type="text" class="sys-notes" value="${escAttr(sys.notes)}" placeholder="e.g., Main hall floors"></div>
+    ${isOffer ? `<div class="offer-mats"><div class="om-title">Materials from offer — exact quantities</div>${offerTableHtml(sys.offerItems)}</div>` : ''}
+    <input type="hidden" class="sys-name" value="${escAttr(sys.systemName)}">
+    <input type="hidden" class="sys-id" value="${escAttr(sys.id || '')}">
+  </div>`;
+}
+
+function payRowHtml(i) {
+  return `<div class="pay-row" data-id="${escAttr(i.id || '')}" data-paid="${i.paid ? 1 : ''}" data-paiddate="${escAttr(i.paidDate || '')}">
+    <input type="text" class="pr-label" value="${escAttr(i.label)}" placeholder="e.g., Advance">
+    <input type="number" class="pr-pct" value="${i.percent === undefined || i.percent === null ? '' : i.percent}" min="0" max="100" step="any" placeholder="%" oninput="payRecalc(this)">
+    <input type="number" class="pr-amt" value="${i.amount === undefined || i.amount === null ? '' : i.amount}" min="0" step="any" placeholder="€">
+    <input type="date" class="pr-due" value="${escAttr(i.dueDate || '')}">
+    <button type="button" class="remove-btn" title="Delete installment" onclick="this.closest('.pay-row').remove()">✕</button>
+  </div>`;
+}
+
+function paymentFormHtml(pay) {
+  pay = pay || {};
+  return `<div class="flex justify-between items-center mb-8"><h3>Payment Terms</h3><button type="button" class="btn btn-secondary btn-sm" onclick="addPayRow()">+ Installment</button></div>
+    <div class="form-grid">
+      <div class="form-row"><label>Total Amount (€)</label><input type="number" id="payTotal" value="${pay.total || ''}" min="0" step="any" oninput="payRecalcAll()"></div>
+      <div class="form-row"><label>Terms</label><textarea id="payTerms" rows="2" placeholder="e.g., 100% advance with the order, delivery in 10 days">${escAttr(pay.terms)}</textarea></div>
+    </div>
+    <div class="pay-rows" id="payRows">${(pay.installments || []).map(payRowHtml).join('')}</div>`;
+}
+
+function addPayRow() { $('payRows').insertAdjacentHTML('beforeend', payRowHtml({ label: '', percent: '', amount: '' })); }
+
+function payRecalc(el) {
+  const row = el.closest('.pay-row');
+  const total = parseFloat($('payTotal')?.value) || 0;
+  const pct = parseFloat(row.querySelector('.pr-pct').value);
+  if (total > 0 && !isNaN(pct)) row.querySelector('.pr-amt').value = Math.round(total * pct) / 100;
+}
+function payRecalcAll() { document.querySelectorAll('#payRows .pay-row .pr-pct').forEach(payRecalc); }
+
+// undefined = no payment section in the form, null = section present but empty
+function readPaymentForm() {
+  if (!$('payRows')) return undefined;
+  const installments = [...document.querySelectorAll('#payRows .pay-row')].map(r => ({
+    id: r.dataset.id || uid(),
+    label: r.querySelector('.pr-label').value.trim() || 'Payment',
+    percent: parseFloat(r.querySelector('.pr-pct').value) || 0,
+    amount: parseFloat(r.querySelector('.pr-amt').value) || 0,
+    dueDate: r.querySelector('.pr-due').value || '',
+    paid: !!r.dataset.paid,
+    paidDate: r.dataset.paiddate || ''
+  }));
+  const total = parseFloat($('payTotal').value) || 0;
+  const terms = $('payTerms').value.trim();
+  if (!total && !terms && installments.length === 0) return null;
+  return { total, terms, installments };
+}
+
+// ---- New / Edit project ----
 function openNewProject(editId, keepAttached) {
   if (!keepAttached) npAttachedDocs = [];
-  window._npEditId = editId || '';
   const p = editId ? projects[editId] : null;
   const systemOptions = Object.keys(CATALOG).map(s => `<option value="${s}">${s} (${CATALOG[s].category})</option>`).join('');
-  let systemsHtml = '';
-  if (p && p.systems) {
-    p.systems.forEach((sys, i) => {
-      const apps = CATALOG[sys.systemName] ? Object.keys(CATALOG[sys.systemName].applications).map(a => `<option value="${a}" ${a === sys.application ? 'selected' : ''}>${a}</option>`).join('') : '';
-      systemsHtml += `<div class="system-card" data-idx="${i}">
-        <div class="system-card-header"><strong>${sys.systemName}</strong><button class="remove-btn" onclick="this.closest('.system-card').remove()">✕ Remove</button></div>
-        <div class="form-grid">
-          <div><label>Application</label><select class="sys-app">${apps}</select></div>
-          <div><label>Area (m²)</label><input type="number" class="sys-area" value="${sys.area}" min="1"></div>
-        </div>
-        <div class="form-row mt-8"><label>Notes</label><input type="text" class="sys-notes" value="${escAttr(sys.notes)}" placeholder="e.g., Main hall floors"></div>
-        <input type="hidden" class="sys-name" value="${escAttr(sys.systemName)}">
-        <input type="hidden" class="sys-id" value="${sys.id || ''}">
-      </div>`;
-    });
-  }
+  const systemsHtml = p && p.systems ? p.systems.map(s => systemCardHtml(s)).join('') : '';
   const attachHtml = sampleAI ? `
     <div id="npAttachZone" class="attach-zone">
       <input type="file" id="npAttachFile" accept=".pdf,image/jpeg,image/png,image/webp" onchange="scanNewProjectFile()">
       <div class="az-label">📎 Attach Offer or Invoice</div>
-      <div class="az-sub">Upload a PDF or photo — AI will auto-fill project details & materials</div>
+      <div class="az-sub">Upload a PDF or photo — AI reads it and fills in the project, materials and payment terms</div>
     </div>
     <div id="npScanProgress" class="scan-progress" hidden><div class="spinner"></div><span id="npScanText">Preparing...</span></div>
     <div id="npAttachedFiles"></div>` : '';
@@ -1055,12 +1174,14 @@ function openNewProject(editId, keepAttached) {
     </select></div>
     <div class="form-row"><label>Notes</label><textarea id="projNotes" rows="2">${escAttr(p ? p.notes : '')}</textarea></div>
     <hr style="border:none;border-top:1px solid var(--border-light);margin:16px 0">
+    ${paymentFormHtml(p ? p.payment : null)}
+    <hr style="border:none;border-top:1px solid var(--border-light);margin:16px 0">
     <div class="flex justify-between items-center mb-8"><h3>Product Systems</h3>
       <div class="flex gap-8 items-center"><select id="addSysSelect" style="width:auto"><option value="">Select system...</option>${systemOptions}</select>
-      <button class="btn btn-secondary btn-sm" onclick="addSystemRow()">Add</button></div>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="addSystemRow()">Add</button></div>
     </div>
     <div class="systems-list" id="systemsList">${systemsHtml}</div>
-    <div class="form-help mt-8">Add the product systems needed for this project. The app will auto-calculate all materials.</div>
+    <div class="form-help mt-8">Add the product systems needed for this project. The app will auto-calculate all materials. Systems read from an offer use the exact quantities of the offer.</div>
   `, `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
      <button class="btn btn-primary" onclick="saveProject('${editId || ''}')">${p ? 'Save Changes' : 'Create Project'}</button>`);
   if (npAttachedDocs.length > 0) renderAttachedFiles();
@@ -1070,18 +1191,8 @@ function addSystemRow() {
   const sel = $('addSysSelect');
   const sysName = sel.value;
   if (!sysName) return;
-  const cat = CATALOG[sysName];
-  const apps = Object.keys(cat.applications).map(a => `<option value="${a}">${a}</option>`).join('');
-  const el = document.createElement('div');
-  el.className = 'system-card';
-  el.innerHTML = `<div class="system-card-header"><strong>${sysName}</strong><button class="remove-btn" onclick="this.closest('.system-card').remove()">✕ Remove</button></div>
-    <div class="form-grid">
-      <div><label>Application</label><select class="sys-app">${apps}</select></div>
-      <div><label>Area (m²)</label><input type="number" class="sys-area" value="" min="1" placeholder="0"></div>
-    </div>
-    <div class="form-row mt-8"><label>Notes</label><input type="text" class="sys-notes" placeholder="e.g., Main hall floors"></div>
-    <input type="hidden" class="sys-name" value="${sysName}">`;
-  $('systemsList').appendChild(el);
+  const firstApp = Object.keys(CATALOG[sysName].applications)[0];
+  $('systemsList').insertAdjacentHTML('beforeend', systemCardHtml({ systemName: sysName, application: firstApp, area: '' }));
   sel.value = '';
 }
 
@@ -1096,16 +1207,20 @@ function saveProject(editId) {
     const sysId = card.querySelector('.sys-id')?.value || '';
     const sysName = card.querySelector('.sys-name')?.value || '';
     const app = card.querySelector('.sys-app')?.value || '';
-    const area = parseFloat(card.querySelector('.sys-area')?.value) || 0;
+    let area = parseFloat(card.querySelector('.sys-area')?.value) || 0;
     const notes = card.querySelector('.sys-notes')?.value || '';
-    if (area <= 0) { toast(`Set area for ${sysName}`, 'warn'); valid = false; }
     const orig = sysId ? existingSystems.find(s => s.id === sysId) : null;
-    systems.push({
-      id: sysId || uid(),
-      systemName: sysName, application: app, area, notes,
-      materialOverrides: orig?.materialOverrides,
-      extraProducts: orig?.extraProducts
-    });
+    const sys = { id: sysId || uid(), systemName: sysName, application: app, area, notes };
+    if (card.dataset.offer === '1') {
+      if (area <= 0) sys.area = 1;
+      sys.offerItems = readOfferRows(card);
+      if (card.dataset.docname) sys.offerDoc = card.dataset.docname;
+    } else {
+      if (area <= 0) { toast(`Set area for ${sysName}`, 'warn'); valid = false; }
+      if (orig?.materialOverrides) sys.materialOverrides = orig.materialOverrides;
+      if (orig?.extraProducts) sys.extraProducts = orig.extraProducts;
+    }
+    systems.push(sys);
   });
   if (!valid) return;
   if (systems.length === 0) {
@@ -1115,9 +1230,19 @@ function saveProject(editId) {
   doSaveProject(editId, name, systems);
 }
 
+// Firestore-style stores reject `undefined`, so strip it before writing; never let a write error bubble into the UI flow
+function saveProjectDoc(p) {
+  if (!db) return;
+  try {
+    const r = db.doc('projects/' + p.id).set(JSON.parse(JSON.stringify(p)));
+    if (r && r.catch) r.catch(e => toast('Could not sync project: ' + (e.message || e.code || 'error'), 'error'));
+  } catch (e) { toast('Could not sync project: ' + e.message, 'error'); }
+}
+
 function doSaveProject(editId, name, systems) {
   const id = editId || 'proj_' + uid();
   const existing = editId ? projects[editId] : {};
+  const pay = readPaymentForm();
   const proj = {
     ...existing,
     id,
@@ -1132,13 +1257,34 @@ function doSaveProject(editId, name, systems) {
     createdAt: existing.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
+  if (pay === null) delete proj.payment;
+  else if (pay) proj.payment = pay;
   projects[id] = proj;
-  if (db) db.doc('projects/' + id).set(proj);
-  logActivity(`${editId ? 'updated' : 'created'} project "${name}"`);
+  const docs = npAttachedDocs.slice();
+  npAttachedDocs = [];
   closeModal();
+  try { saveProjectDoc(proj); logActivity(`${editId ? 'updated' : 'created'} project "${name}"`); } catch (e) { console.error(e); }
   toast(editId ? 'Project updated' : 'Project created');
-  if (currentProject === id) renderProjectDetail();
-  else navigate('projects');
+  try {
+    if (currentProject === id) renderProjectDetail();
+    else navigate('projects');
+  } catch (e) { console.error(e); }
+  if (docs.length) uploadOfferDocs(id, docs);
+}
+
+async function uploadOfferDocs(projectId, docs) {
+  if (!assets) return;
+  for (const d of docs) {
+    try {
+      const res = await assets.upload(d.file);
+      const p = projects[projectId];
+      if (!p) return;
+      if (!p.files) p.files = [];
+      p.files.push({ id: res.id, name: d.fileName, url: res.url, category: d.docType === 'invoice' ? 'Invoice' : 'Offer', uploadedAt: new Date().toISOString(), uploadedBy: currentUser });
+      saveProjectDoc(p);
+      if (currentProject === projectId) { renderFiles(p); renderPayments(p); }
+    } catch (e) { toast('Could not store "' + d.fileName + '": ' + (e.message || 'upload failed'), 'warn'); }
+  }
 }
 
 function editCurrentProject() { if (currentProject) openNewProject(currentProject); }
@@ -1181,6 +1327,7 @@ function renderProjectDetail() {
   renderOverview(p);
   renderPhases(p);
   renderMaterials(p);
+  renderPayments(p);
   renderDeliveries(p);
   renderFiles(p);
   renderProduction(p);
@@ -1200,8 +1347,9 @@ function renderOverview(p) {
 
   let sysHtml = (p.systems || []).map((s, idx) => {
     const hasOverrides = s.materialOverrides || s.extraProducts;
+    const fromOffer = Array.isArray(s.offerItems);
     return `<div class="system-card">
-    <div class="system-card-header"><strong>${s.systemName}</strong><div class="flex items-center gap-8">${hasOverrides ? '<span class="chip chip-amber" style="font-size:.65rem">CUSTOM</span>' : ''}<span class="chip chip-blue">${s.area} m²</span><button class="catalog-edit-btn" onclick="openEditProjectMaterials(${idx})">Edit Materials</button></div></div>
+    <div class="system-card-header"><strong>${s.systemName}</strong><div class="flex items-center gap-8">${fromOffer ? '<span class="chip chip-green" style="font-size:.65rem">FROM OFFER</span>' : hasOverrides ? '<span class="chip chip-amber" style="font-size:.65rem">CUSTOM</span>' : ''}<span class="chip chip-blue">${s.area} m²</span><button class="catalog-edit-btn" onclick="openEditProjectMaterials(${idx})">Edit Materials</button></div></div>
     <div class="system-card-meta"><span>${s.application}</span>${s.notes ? '<span>' + s.notes + '</span>' : ''}</div>
   </div>`;
   }).join('');
@@ -1353,7 +1501,7 @@ function renderMaterials(p) {
     const statusCls = remaining <= 0 ? 'chip-green' : diff >= 0 ? 'chip-blue' : 'chip-red';
     const statusText = remaining <= 0 ? 'Fully delivered' : diff >= 0 ? 'Stock OK' : 'Need ' + Math.abs(diff);
     const editIdx = m.sysIndices[0];
-    return `<tr><td><div class="flex items-center gap-8"><button class="catalog-edit-btn" onclick="openEditProjectMaterials(${editIdx})" title="Edit this material"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button><strong>${m.name}</strong></div></td><td>${m.pkg}</td><td>${m.totalQty} ${m.unit}</td><td>${m.totalUnits}</td><td>${stock}</td><td>${delivered}</td><td>${Math.max(0, remaining)}</td><td><span class="chip ${statusCls}">${statusText}</span></td></tr>`;
+    return `<tr><td><div class="flex items-center gap-8"><button class="catalog-edit-btn" onclick="openEditProjectMaterials(${editIdx})" title="Edit this material"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button><strong>${m.name}</strong>${m.fromOffer ? `<button class="remove-btn" title="Delete material" onclick="deleteOfferMaterial('${encodeURIComponent(sKey).replace(/'/g, '%27')}')">✕</button>` : ''}</div></td><td>${m.pkg}</td><td>${m.totalQty} ${m.unit}</td><td>${m.totalUnits}</td><td>${stock}</td><td>${delivered}</td><td>${Math.max(0, remaining)}</td><td><span class="chip ${statusCls}">${statusText}</span></td></tr>`;
   }).join('');
   $('tab-materials').innerHTML = `
     <div class="flex justify-between items-center mb-16"><h3>Material Requirements</h3>
@@ -1578,7 +1726,7 @@ function renderFiles(p) {
         <input type="checkbox" class="list-check chk-file" value="${f.id}" onchange="updateBatchBar('chk-file','batchFile');updateToggleLabel('chk-file','togFile')">
         <div class="file-icon" style="background:${bg[ext] || 'var(--surface-alt)'};color:${colors[ext] || 'var(--ink-3)'}">${ext || '?'}</div>
         <div class="file-info"><div class="file-name">${f.name}</div><div class="file-meta">${f.category || 'Document'} • ${fmtDate(f.uploadedAt)} • ${f.uploadedBy || ''}</div></div>
-        ${f.url ? `<a href="${f.url}" target="_blank" class="btn btn-secondary btn-sm">View</a>` : ''}
+        ${f.url ? `<button class="btn btn-secondary btn-sm" onclick="previewFile('${f.id}')">Preview</button><a href="${f.url}" target="_blank" class="btn btn-secondary btn-sm">Open</a>` : ''}
         <button class="remove-btn" onclick="removeFile('${f.id}')">✕</button>
       </div>`;
     });
@@ -2045,6 +2193,7 @@ function openEditProjectMaterials(sysIdx) {
   const p = projects[currentProject];
   if (!p || !p.systems[sysIdx]) return;
   const sys = p.systems[sysIdx];
+  if (Array.isArray(sys.offerItems)) { openEditOfferMaterials(sysIdx); return; }
   const catDef = CATALOG[sys.systemName];
   if (!catDef || !catDef.applications[sys.application]) { toast('System or application not found in catalog', 'error'); return; }
   const defaultProducts = catDef.applications[sys.application];
@@ -2690,19 +2839,22 @@ function confirmImportMaterials() {
   let sys;
   if (targetVal === 'new') {
     const docType = $('importDocType')?.value || 'offer';
-    sys = { id: uid(), systemName: (docType === 'invoice' ? 'Invoice' : 'Offer') + ' Import', application: 'Imported materials', area: 1, notes: 'Imported on ' + fmtDate(today()) };
+    sys = { id: uid(), systemName: (docType === 'invoice' ? 'Invoice' : 'Offer') + ' Import', application: 'Imported materials', area: 1, notes: 'Imported on ' + fmtDate(today()), offerItems: [] };
     if (!p.systems) p.systems = [];
     p.systems.push(sys);
   } else {
     sys = p.systems[parseInt(targetVal)];
     if (!sys) { toast('System not found', 'error'); return; }
   }
-  if (!sys.extraProducts) sys.extraProducts = [];
-  items.forEach(item => {
-    const pSize = pkgSize(item.pkg);
-    const totalQty = item.qty * pSize;
-    sys.extraProducts.push({ name: item.name, pkg: item.pkg, consumption: Math.round((totalQty / sys.area) * 100) / 100, unit: item.unit });
-  });
+  if (Array.isArray(sys.offerItems)) {
+    items.forEach(item => sys.offerItems.push({ name: item.name, pkg: item.pkg, quantity: item.qty, unit: item.unit }));
+  } else {
+    if (!sys.extraProducts) sys.extraProducts = [];
+    items.forEach(item => {
+      const totalQty = item.qty * pkgSize(item.pkg);
+      sys.extraProducts.push({ name: item.name, pkg: item.pkg, consumption: totalQty / sys.area, unit: item.unit });
+    });
+  }
   p.updatedAt = new Date().toISOString();
   if (db) db.doc('projects/' + p.id).set(p);
   logActivity(`imported ${items.length} materials from offer/invoice into "${p.name}"`);
@@ -2715,14 +2867,11 @@ function confirmImportMaterials() {
 let npAttachedDocs = [];
 
 async function scanNewProjectFile() {
-  const fileInput = $('npAttachFile');
-  const file = fileInput?.files?.[0];
+  const file = $('npAttachFile')?.files?.[0];
   if (!file) return;
   if (!sampleAI) { toast('AI scanning not available', 'error'); return; }
-  const zone = $('npAttachZone');
-  const prog = $('npScanProgress');
-  if (zone) zone.hidden = true;
-  if (prog) prog.hidden = false;
+  $('npAttachZone').hidden = true;
+  $('npScanProgress').hidden = false;
   $('npScanText').textContent = 'Preparing document...';
   try {
     let images = [];
@@ -2734,55 +2883,58 @@ async function scanNewProjectFile() {
     }
     const limits = await sampleAI.limits().catch(() => null);
     const canSendImages = !!limits?.images;
-    const systemNames = Object.keys(CATALOG);
     const knownProducts = [];
     for (const sys of Object.values(CATALOG)) {
       for (const products of Object.values(sys.applications)) {
-        products.forEach(p => { if (!knownProducts.includes(p.name)) knownProducts.push(p.name); });
+        products.forEach(pr => { if (!knownProducts.includes(pr.name)) knownProducts.push(pr.name); });
       }
     }
-    const prompt = `You are analyzing a document from a microcement company (Cement Plus).
-Extract project details AND material line items.
+    const prompt = `You are reading a commercial document (offer/quotation or invoice, usually in Greek) issued by Cement Plus, a microcement company in Greece.
+Read it VERY carefully, line by line: header, customer block, line-item table, totals, payment terms and small print. Copy values exactly as printed (keep Greek text, never translate or invent). If something is not in the document use "" (or 0 / []).
 
-Known product systems: ${systemNames.join(', ')}
+Known product systems: ${Object.keys(CATALOG).join(', ')}
 Known products: ${knownProducts.join(', ')}
 
-Return ONLY a JSON object with these fields:
+Return ONLY one JSON object:
 {
-  "clientName": "customer/client name or empty string",
-  "projectName": "project name/description or empty string",
-  "location": "destination/address or empty string",
-  "deadline": "deadline date in YYYY-MM-DD format or empty string",
-  "notes": "any relevant notes from the document or empty string",
+  "documentType": "offer" or "invoice",
+  "documentNumber": "e.g. 307",
+  "clientName": "customer name exactly as printed",
+  "projectName": "project / site name if printed, else empty",
+  "location": "destination / delivery or site address / city as printed",
+  "deadline": "YYYY-MM-DD only if an actual delivery or completion DATE is printed, else empty",
+  "notes": "delivery time, validity and other conditions, short, as printed",
+  "paymentTerms": {
+    "terms": "payment terms sentence exactly as printed (e.g. advance %, balance, method)",
+    "totalAmount": grand total payable as a number (final amount incl. VAT if shown) or 0,
+    "installments": [{"label":"Advance","percent":100,"amount":0,"dueDate":""}]
+  },
   "systems": [
     {
-      "systemName": "matched system name from known systems above, or 'Imported' if unsure",
-      "application": "matched application type or 'General'",
-      "area": estimated area in m² as number (or 1 if not stated),
-      "materials": [
-        {"name":"product name","pkg":"packaging e.g. 20kg","quantity":5,"unit":"kg"}
-      ]
+      "systemName": "matching name from the known product systems, else a short descriptive name",
+      "application": "matching application or empty",
+      "area": area in m² as a number if printed, else 0,
+      "materials": [{"name":"product name (use the known product name when it matches)","pkg":"pack size, e.g. 20kg, 10lt, 5+1lt, 50m²","quantity":number of packs/units on that line,"unit":"kg | lt | m² | pcs"}]
     }
   ]
 }
-Group materials by system when possible. Match product/system names to the known lists above.
-If you cannot determine a field, use empty string. Never omit a field.`;
+Rules for materials: only physical products (no labour, transport, discounts, VAT). "quantity" is the number of packs as ordered. If the quantity column is in kg/lt/m² (e.g. 60 kg of a 20kg product) convert it to number of packs (3). Keep EVERY product line; group lines under one system if the document does, otherwise use a single system. Installments: derive from the payment terms (e.g. "100% advance" -> one installment 100%; "50% advance, 50% on delivery" -> two); percent and amount may be 0 if unknown.`;
 
-    $('npScanText').textContent = 'Scanning document with AI...';
+    $('npScanText').textContent = 'Reading document carefully with AI...';
+    const opts = { modelTier: 'complex', cache: false };
     let result;
     if (canSendImages && images.length > 0) {
-      const maxImg = limits.images.maxCount || 5;
-      result = await sampleAI.json(prompt, { images: images.slice(0, maxImg), modelTier: 'default', cache: false });
+      result = await sampleAI.json(prompt, { ...opts, images: images.slice(0, limits.images.maxCount || 5) });
     } else if (file.type === 'application/pdf') {
       $('npScanText').textContent = 'Extracting text...';
       const text = await extractPdfText(file);
       if (!text) { toast('Cannot read this PDF', 'error'); resetNpScan(); return; }
-      result = await sampleAI.json(prompt + '\n\nDocument text:\n' + text.slice(0, 30000), { modelTier: 'default', cache: false });
+      result = await sampleAI.json(prompt + '\n\nDocument text:\n' + text.slice(0, 30000), opts);
     } else {
       toast('Image support not available — try a PDF instead', 'error'); resetNpScan(); return;
     }
-    if (!result || typeof result !== 'object') { toast('Could not extract data from document', 'warn'); resetNpScan(); return; }
-    applyScannedData(result, file.name);
+    if (!result || typeof result !== 'object' || Array.isArray(result)) { toast('Could not extract data from document', 'warn'); resetNpScan(); return; }
+    applyScannedData(result, file);
   } catch (e) {
     const msg = e.code === 'not_granted' ? 'AI scanning permission denied' :
                 e.code === 'rate_limited' ? 'Rate limited — try again in a moment' :
@@ -2794,136 +2946,326 @@ If you cannot determine a field, use empty string. Never omit a field.`;
 }
 
 function resetNpScan() {
-  const zone = $('npAttachZone');
-  const prog = $('npScanProgress');
-  if (zone) zone.hidden = false;
-  if (prog) prog.hidden = true;
-  const fi = $('npAttachFile');
-  if (fi) fi.value = '';
+  if ($('npAttachZone')) $('npAttachZone').hidden = false;
+  if ($('npScanProgress')) $('npScanProgress').hidden = true;
+  if ($('npAttachFile')) $('npAttachFile').value = '';
 }
 
-function applyScannedData(data, fileName) {
-  if (data.projectName && $('projName') && !$('projName').value.trim()) $('projName').value = data.projectName;
-  if (data.clientName && $('projClient') && !$('projClient').value.trim()) $('projClient').value = data.clientName;
-  if (data.location && $('projLocation') && !$('projLocation').value.trim()) $('projLocation').value = data.location;
-  if (data.deadline && $('projDeadline') && !$('projDeadline').value) $('projDeadline').value = data.deadline;
-  if (data.notes && $('projNotes') && !$('projNotes').value.trim()) $('projNotes').value = data.notes;
+function applyScannedData(data, file) {
+  const docType = String(data.documentType || '').toLowerCase() === 'invoice' ? 'invoice' : 'offer';
+  const label = docType === 'invoice' ? 'Invoice' : 'Offer';
+  const fill = (id, v) => { const el = $(id); if (el && v && !String(el.value).trim()) el.value = v; };
+  const fallbackName = data.documentNumber ? `${label} ${data.documentNumber}` : file.name.replace(/\.[^.]+$/, '');
+  fill('projName', String(data.projectName || '').trim() || fallbackName);
+  fill('projClient', String(data.clientName || '').trim());
+  fill('projLocation', String(data.location || '').trim());
+  if (/^\d{4}-\d{2}-\d{2}$/.test(data.deadline || '')) fill('projDeadline', data.deadline);
+  fill('projNotes', String(data.notes || '').trim());
 
-  if (Array.isArray(data.systems)) {
-    data.systems.forEach(sys => {
-      const sysName = sys.systemName && CATALOG[sys.systemName] ? sys.systemName : null;
-      if (sysName) {
-        const cat = CATALOG[sysName];
-        const apps = Object.keys(cat.applications).map(a => `<option value="${a}" ${a === sys.application ? 'selected' : ''}>${a}</option>`).join('');
-        const el = document.createElement('div');
-        el.className = 'system-card';
-        el.innerHTML = `<div class="system-card-header"><strong>${sysName}</strong><button class="remove-btn" onclick="this.closest('.system-card').remove()">✕ Remove</button></div>
-          <div class="form-grid">
-            <div><label>Application</label><select class="sys-app">${apps}</select></div>
-            <div><label>Area (m²)</label><input type="number" class="sys-area" value="${sys.area || 1}" min="1"></div>
-          </div>
-          <div class="form-row mt-8"><label>Notes</label><input type="text" class="sys-notes" value="${escAttr(sys.notes || '')}" placeholder="e.g., Main hall floors"></div>
-          <input type="hidden" class="sys-name" value="${escAttr(sysName)}">`;
-        $('systemsList').appendChild(el);
-      }
+  const pay = data.paymentTerms || {};
+  const total = parseFloat(pay.totalAmount) || 0;
+  fill('payTotal', total || '');
+  fill('payTerms', String(pay.terms || '').trim());
+  let payFound = !!(total || pay.terms);
+  if (Array.isArray(pay.installments) && $('payRows') && $('payRows').children.length === 0) {
+    pay.installments.forEach(i => {
+      const percent = parseFloat(i.percent) || 0;
+      const amount = parseFloat(i.amount) || (total && percent ? Math.round(total * percent) / 100 : 0);
+      $('payRows').insertAdjacentHTML('beforeend', payRowHtml({ label: String(i.label || '').trim(), percent: percent || '', amount: amount || '', dueDate: /^\d{4}-\d{2}-\d{2}$/.test(i.dueDate || '') ? i.dueDate : '' }));
+      payFound = true;
     });
   }
 
   const docId = uid();
-  npAttachedDocs.push({ id: docId, fileName, data });
+  let matCount = 0;
+  (Array.isArray(data.systems) ? data.systems : []).forEach((sys, n) => {
+    const key = Object.keys(CATALOG).find(k => k.toLowerCase() === String(sys.systemName || '').trim().toLowerCase());
+    const materials = (Array.isArray(sys.materials) ? sys.materials : []).map(m => ({
+      name: String(m.name || '').trim(), pkg: String(m.pkg || '').trim(),
+      quantity: parseFloat(m.quantity) || 0, unit: String(m.unit || 'kg').trim()
+    })).filter(m => m.name);
+    if (!key && materials.length === 0) return;
+    const app = key && CATALOG[key].applications[sys.application] ? sys.application : (key ? Object.keys(CATALOG[key].applications)[0] : 'Imported materials');
+    const card = { systemName: key || String(sys.systemName || '').trim() || `${label} ${data.documentNumber || ''} items ${n + 1}`.trim(), application: app, area: parseFloat(sys.area) || 0, notes: '', offerDoc: file.name };
+    if (materials.length) { card.offerItems = materials; matCount += materials.length; }
+    $('systemsList').insertAdjacentHTML('beforeend', systemCardHtml(card, docId));
+  });
+
+  npAttachedDocs.push({ id: docId, fileName: file.name, file, docType, matCount, payFound });
   renderAttachedFiles();
   resetNpScan();
-  toast('Document scanned — fields auto-filled');
+  if (matCount === 0) toast('Document read, but no material lines were found — add them manually', 'warn');
+  else toast(`Document read — ${matCount} materials${payFound ? ' and payment terms' : ''} filled in`);
 }
 
 function renderAttachedFiles() {
-  const container = $('npAttachedFiles');
-  if (!container) return;
-  container.innerHTML = npAttachedDocs.map(doc => `
-    <div class="attached-file" id="af-${doc.id}">
-      <div class="af-icon">PDF</div>
+  const c = $('npAttachedFiles');
+  if (!c) return;
+  c.innerHTML = npAttachedDocs.map(d => `
+    <div class="attached-file">
+      <div class="af-icon">${/\.pdf$/i.test(d.fileName) ? 'PDF' : 'IMG'}</div>
       <div class="af-info">
-        <div class="af-name">${escAttr(doc.fileName)}</div>
-        <div class="af-status">Scanned — ${doc.data.systems ? doc.data.systems.reduce((n, s) => n + (s.materials?.length || 0), 0) : 0} materials extracted</div>
+        <div class="af-name">${escAttr(d.fileName)}</div>
+        <div class="af-status">${d.docType === 'invoice' ? 'Invoice' : 'Offer'} — ${d.matCount} materials${d.payFound ? ' • payment terms' : ''}</div>
       </div>
-      <button class="btn btn-secondary btn-sm" onclick="editAttachedDoc('${doc.id}')" style="padding:4px 10px;font-size:.75rem">Edit</button>
-      <button class="remove-btn" onclick="deleteAttachedDoc('${doc.id}')">✕</button>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="previewAttachedDoc('${d.id}')">Preview</button>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="editAttachedDoc('${d.id}')">Edit</button>
+      <button type="button" class="remove-btn" title="Remove document and its materials" onclick="deleteAttachedDoc('${d.id}')">✕</button>
     </div>`).join('');
 }
 
-function deleteAttachedDoc(docId) {
-  const doc = npAttachedDocs.find(d => d.id === docId);
-  if (!doc) return;
-  npAttachedDocs = npAttachedDocs.filter(d => d.id !== docId);
-  renderAttachedFiles();
-  toast('Attached document removed');
+function previewAttachedDoc(docId) {
+  const d = npAttachedDocs.find(x => x.id === docId);
+  if (d) previewDocument(d.file, d.fileName);
 }
 
 function editAttachedDoc(docId) {
-  const doc = npAttachedDocs.find(d => d.id === docId);
-  if (!doc) return;
-  const d = doc.data;
-  const materialsHtml = (d.systems || []).flatMap((sys, si) =>
-    (sys.materials || []).map((m, mi) => `
-      <tr>
-        <td><input type="text" class="ed-name" data-si="${si}" data-mi="${mi}" value="${escAttr(m.name)}" style="min-width:140px"></td>
-        <td><input type="text" class="ed-pkg" data-si="${si}" data-mi="${mi}" value="${escAttr(m.pkg || '')}" style="width:70px"></td>
-        <td><input type="number" class="ed-qty" data-si="${si}" data-mi="${mi}" value="${parseInt(m.quantity) || 1}" min="1" style="width:60px"></td>
-        <td><input type="text" class="ed-unit" data-si="${si}" data-mi="${mi}" value="${escAttr(m.unit || 'kg')}" style="width:50px"></td>
-        <td><button class="remove-btn" onclick="this.closest('tr').remove()">✕</button></td>
-      </tr>`)
-  ).join('');
-  openModal('Edit Scanned Data — ' + doc.fileName, `
-    <div class="form-grid">
-      <div class="form-row"><label>Client Name</label><input type="text" id="edClient" value="${escAttr(d.clientName || '')}"></div>
-      <div class="form-row"><label>Project Name</label><input type="text" id="edProjName" value="${escAttr(d.projectName || '')}"></div>
-    </div>
-    <div class="form-grid">
-      <div class="form-row"><label>Location</label><input type="text" id="edLocation" value="${escAttr(d.location || '')}"></div>
-      <div class="form-row"><label>Deadline</label><input type="date" id="edDeadline" value="${d.deadline || ''}"></div>
-    </div>
-    <div class="form-row"><label>Notes</label><textarea id="edNotes" rows="2">${escAttr(d.notes || '')}</textarea></div>
-    <hr style="border:none;border-top:1px solid var(--border-light);margin:16px 0">
-    <h3 class="mb-8">Extracted Materials</h3>
-    <div class="overflow-x"><table><thead><tr><th>Product</th><th>Pkg</th><th>Qty</th><th>Unit</th><th style="width:30px"></th></tr></thead>
-    <tbody id="edMaterialsBody">${materialsHtml}</tbody></table></div>
-  `, `<button class="btn btn-secondary" onclick="closeModal();openNewProject(window._npEditId||'',true);renderAttachedFiles()">Cancel</button>
-     <button class="btn btn-primary" onclick="saveAttachedDocEdits('${docId}')">Save Changes</button>`);
-  window._npEditId = '';
+  const card = document.querySelector(`#systemsList .system-card[data-doc="${docId}"]`);
+  if (!card) { toast('Nothing to edit — the document produced no systems', 'warn'); return; }
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  card.classList.add('flash');
+  setTimeout(() => card.classList.remove('flash'), 1600);
 }
 
-function saveAttachedDocEdits(docId) {
-  const doc = npAttachedDocs.find(d => d.id === docId);
-  if (!doc) return;
-  doc.data.clientName = $('edClient')?.value?.trim() || '';
-  doc.data.projectName = $('edProjName')?.value?.trim() || '';
-  doc.data.location = $('edLocation')?.value?.trim() || '';
-  doc.data.deadline = $('edDeadline')?.value || '';
-  doc.data.notes = $('edNotes')?.value?.trim() || '';
-  const rows = document.querySelectorAll('#edMaterialsBody tr');
-  const matBySys = {};
-  rows.forEach(row => {
-    const si = row.querySelector('.ed-name')?.dataset?.si;
-    const name = row.querySelector('.ed-name')?.value?.trim();
-    const pkg = row.querySelector('.ed-pkg')?.value?.trim() || '';
-    const qty = parseInt(row.querySelector('.ed-qty')?.value) || 1;
-    const unit = row.querySelector('.ed-unit')?.value?.trim() || 'kg';
-    if (!name) return;
-    if (!matBySys[si]) matBySys[si] = [];
-    matBySys[si].push({ name, pkg, quantity: qty, unit });
-  });
-  if (doc.data.systems) {
-    doc.data.systems.forEach((sys, i) => { sys.materials = matBySys[i] || []; });
-  }
-  closeModal();
-  openNewProject(window._npEditId || '', true);
-  if (doc.data.clientName && $('projClient')) $('projClient').value = doc.data.clientName;
-  if (doc.data.projectName && $('projName')) $('projName').value = doc.data.projectName;
-  if (doc.data.location && $('projLocation')) $('projLocation').value = doc.data.location;
-  if (doc.data.deadline && $('projDeadline')) $('projDeadline').value = doc.data.deadline;
-  if (doc.data.notes && $('projNotes')) $('projNotes').value = doc.data.notes;
+function deleteAttachedDoc(docId) {
+  npAttachedDocs = npAttachedDocs.filter(d => d.id !== docId);
+  const cards = document.querySelectorAll(`#systemsList .system-card[data-doc="${docId}"]`);
+  cards.forEach(c => c.remove());
   renderAttachedFiles();
-  toast('Scanned data updated');
+  toast('Document and its materials removed');
+}
+
+// ========== DOCUMENT PREVIEW ==========
+async function loadPdfJs() {
+  if (window.pdfjsLib) return;
+  await new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+const blobToDataUrl = blob => new Promise((resolve, reject) => {
+  const r = new FileReader();
+  r.onload = () => resolve(r.result); r.onerror = reject;
+  r.readAsDataURL(blob);
+});
+
+async function previewDocument(src, name) {
+  $('previewTitle').textContent = name || 'Document';
+  $('previewBody').innerHTML = '<div class="scan-progress"><div class="spinner"></div><span>Loading preview...</span></div>';
+  $('previewOverlay').classList.add('open');
+  try {
+    let blob = src;
+    if (typeof src === 'string') {
+      const r = await fetch(src);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      blob = await r.blob();
+    }
+    let html = '';
+    if (blob.type === 'application/pdf' || /\.pdf$/i.test(name || '')) {
+      await loadPdfJs();
+      const pdf = await window.pdfjsLib.getDocument({ data: await blob.arrayBuffer() }).promise;
+      for (let i = 1; i <= Math.min(pdf.numPages, 15); i++) {
+        const page = await pdf.getPage(i);
+        const vp = page.getViewport({ scale: 1.6 });
+        const c = document.createElement('canvas');
+        c.width = vp.width; c.height = vp.height;
+        await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+        html += `<img class="pv-page" alt="Page ${i}" src="${c.toDataURL('image/jpeg', 0.88)}">`;
+      }
+      if (pdf.numPages > 15) html += `<div class="form-help">Showing first 15 of ${pdf.numPages} pages.</div>`;
+    } else {
+      html = `<img class="pv-page" alt="${escAttr(name)}" src="${await blobToDataUrl(blob)}">`;
+    }
+    $('previewBody').innerHTML = html;
+  } catch (e) {
+    $('previewBody').innerHTML = `<div class="empty-state"><p>Preview not available (${escAttr(e.message || 'error')}).</p>${typeof src === 'string' ? `<a class="btn btn-secondary btn-sm" href="${escAttr(src)}" target="_blank">Open in new tab</a>` : ''}</div>`;
+  }
+}
+
+function closePreview() { $('previewOverlay').classList.remove('open'); $('previewBody').innerHTML = ''; }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePreview(); });
+
+// ========== PAYMENT TERMS TAB ==========
+const fmtMoney = n => '€' + (Number(n) || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function installmentStatus(i) {
+  if (i.paid) return { cls: 'chip-green', text: 'Paid' + (i.paidDate ? ' ' + fmtDate(i.paidDate) : '') };
+  if (i.dueDate && i.dueDate < today()) return { cls: 'chip-red', text: 'Overdue' };
+  return { cls: 'chip-amber', text: i.dueDate ? 'Due ' + fmtDate(i.dueDate) : 'Pending' };
+}
+
+function commitPayment(p, msg) {
+  p.updatedAt = new Date().toISOString();
+  saveProjectDoc(p);
+  if (msg) logActivity(msg + ` — "${p.name}"`);
+  renderPayments(p);
+}
+
+function renderPayments(p) {
+  const pay = p.payment;
+  const docs = (p.files || []).filter(f => /^(offer|invoice)$/i.test(f.category || '') && f.url);
+  const docsHtml = docs.length ? `<h3 class="mb-8 mt-16">Source Documents</h3>` + docs.map(f => `
+    <div class="file-item"><div class="file-icon" style="background:var(--surface-alt)">${(f.name || '').split('.').pop().toUpperCase()}</div>
+      <div class="file-info"><div class="file-name">${escAttr(f.name)}</div><div class="file-meta">${escAttr(f.category)} • ${fmtDate(f.uploadedAt)}</div></div>
+      <button class="btn btn-secondary btn-sm" onclick="previewFile('${f.id}')">Preview</button></div>`).join('') : '';
+  if (!pay) {
+    $('tab-payments').innerHTML = `<div class="flex justify-between items-center mb-16"><h3>Payment Terms</h3>
+      <button class="btn btn-primary btn-sm" onclick="openPaymentTerms()">Set Payment Terms</button></div>
+      <div class="empty-state"><p>No payment terms yet. Attach an offer when creating a project, or set them here.</p></div>${docsHtml}`;
+    return;
+  }
+  const inst = pay.installments || [];
+  const total = pay.total || inst.reduce((s, i) => s + (i.amount || 0), 0);
+  const paid = inst.filter(i => i.paid).reduce((s, i) => s + (i.amount || 0), 0);
+  const pct = total > 0 ? Math.min(100, Math.round(paid / total * 100)) : 0;
+  const rows = inst.map(i => {
+    const st = installmentStatus(i);
+    return `<tr><td><strong>${escAttr(i.label)}</strong></td><td>${i.percent ? i.percent + '%' : '—'}</td><td>${fmtMoney(i.amount)}</td>
+      <td><span class="chip ${st.cls}">${st.text}</span></td>
+      <td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" onclick="toggleInstallmentPaid('${i.id}')">${i.paid ? 'Undo' : 'Mark Paid'}</button>
+        <button class="btn btn-secondary btn-sm" onclick="openInstallment('${i.id}')">Edit</button>
+        <button class="remove-btn" title="Delete installment" onclick="deleteInstallment('${i.id}')">✕</button></td></tr>`;
+  }).join('');
+  $('tab-payments').innerHTML = `
+    <div class="flex justify-between items-center mb-16"><h3>Payment Terms</h3>
+      <div class="flex gap-8"><button class="btn btn-secondary btn-sm" onclick="openPaymentTerms()">Edit Terms</button>
+      <button class="btn btn-danger btn-sm" onclick="deletePaymentTerms()">Delete</button></div></div>
+    <div class="pay-kpis">
+      <div class="pay-kpi"><div class="pk-val">${fmtMoney(total)}</div><div class="pk-label">Total</div></div>
+      <div class="pay-kpi"><div class="pk-val" style="color:var(--green)">${fmtMoney(paid)}</div><div class="pk-label">Paid (${pct}%)</div></div>
+      <div class="pay-kpi"><div class="pk-val" style="color:var(--red)">${fmtMoney(Math.max(0, total - paid))}</div><div class="pk-label">Outstanding</div></div>
+    </div>
+    ${pay.terms ? `<div class="pay-terms-box">${escAttr(pay.terms)}</div>` : ''}
+    <div class="flex justify-between items-center mb-8"><h3>Installments</h3><button class="btn btn-primary btn-sm" onclick="openInstallment('')">+ Add Installment</button></div>
+    ${inst.length ? `<div class="overflow-x"><table><thead><tr><th>Payment</th><th>%</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : '<div class="empty-state"><p>No installments. Add one to track payments.</p></div>'}
+    ${docsHtml}`;
+}
+
+function openPaymentTerms() {
+  const p = projects[currentProject];
+  if (!p) return;
+  const pay = p.payment || {};
+  openModal('Payment Terms', `
+    <div class="form-row"><label>Total Amount (€)</label><input type="number" id="ptTotal" value="${pay.total || ''}" min="0" step="any"></div>
+    <div class="form-row"><label>Terms</label><textarea id="ptTerms" rows="4">${escAttr(pay.terms)}</textarea></div>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePaymentTerms()">Save</button>`);
+}
+
+function savePaymentTerms() {
+  const p = projects[currentProject];
+  p.payment = { installments: [], ...(p.payment || {}), total: parseFloat($('ptTotal').value) || 0, terms: $('ptTerms').value.trim() };
+  closeModal();
+  commitPayment(p, 'updated payment terms');
+  toast('Payment terms saved');
+}
+
+function deletePaymentTerms() {
+  showWarning('Delete Payment Terms', 'Remove the payment terms and all installments of this project?', () => {
+    const p = projects[currentProject];
+    delete p.payment;
+    commitPayment(p, 'deleted payment terms');
+    toast('Payment terms deleted');
+  });
+}
+
+function openInstallment(id) {
+  const p = projects[currentProject];
+  const i = (p.payment?.installments || []).find(x => x.id === id) || { label: '', percent: '', amount: '', dueDate: '', paid: false };
+  openModal(id ? 'Edit Installment' : 'Add Installment', `
+    <div class="form-row"><label>Label</label><input type="text" id="inLabel" value="${escAttr(i.label)}" placeholder="e.g., Advance, On delivery"></div>
+    <div class="form-grid">
+      <div class="form-row"><label>Percent (%)</label><input type="number" id="inPct" value="${i.percent || ''}" min="0" max="100" step="any" oninput="instPctChange()"></div>
+      <div class="form-row"><label>Amount (€)</label><input type="number" id="inAmt" value="${i.amount || ''}" min="0" step="any"></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-row"><label>Due Date</label><input type="date" id="inDue" value="${escAttr(i.dueDate)}"></div>
+      <div class="form-row"><label>Status</label><select id="inPaid"><option value="0" ${i.paid ? '' : 'selected'}>Pending</option><option value="1" ${i.paid ? 'selected' : ''}>Paid</option></select></div>
+    </div>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveInstallment('${id}')">Save</button>`);
+}
+
+function instPctChange() {
+  const total = projects[currentProject]?.payment?.total || 0;
+  const pct = parseFloat($('inPct').value);
+  if (total > 0 && !isNaN(pct)) $('inAmt').value = Math.round(total * pct) / 100;
+}
+
+function saveInstallment(id) {
+  const p = projects[currentProject];
+  if (!p.payment) p.payment = { total: 0, terms: '', installments: [] };
+  const list = p.payment.installments = p.payment.installments || [];
+  const paid = $('inPaid').value === '1';
+  const prev = list.find(x => x.id === id);
+  const item = {
+    id: id || uid(), label: $('inLabel').value.trim() || 'Payment',
+    percent: parseFloat($('inPct').value) || 0, amount: parseFloat($('inAmt').value) || 0,
+    dueDate: $('inDue').value || '', paid, paidDate: paid ? (prev?.paidDate || today()) : ''
+  };
+  if (prev) Object.assign(prev, item); else list.push(item);
+  closeModal();
+  commitPayment(p, (id ? 'edited' : 'added') + ` installment "${item.label}"`);
+  toast('Installment saved');
+}
+
+function toggleInstallmentPaid(id) {
+  const p = projects[currentProject];
+  const i = (p.payment?.installments || []).find(x => x.id === id);
+  if (!i) return;
+  i.paid = !i.paid;
+  i.paidDate = i.paid ? today() : '';
+  commitPayment(p, `${i.paid ? 'marked paid' : 'unmarked'} installment "${i.label}"`);
+}
+
+function deleteInstallment(id) {
+  showWarning('Delete Installment', 'Delete this installment?', () => {
+    const p = projects[currentProject];
+    p.payment.installments = p.payment.installments.filter(x => x.id !== id);
+    commitPayment(p, 'deleted an installment');
+  });
+}
+
+function previewFile(fileId) {
+  const f = (projects[currentProject]?.files || []).find(x => x.id === fileId);
+  if (f && f.url) previewDocument(f.url, f.name);
+}
+
+// ========== OFFER MATERIAL EDITING ==========
+function openEditOfferMaterials(sysIdx) {
+  const p = projects[currentProject];
+  const sys = p.systems[sysIdx];
+  openModal('Edit Materials — ' + sys.systemName, `
+    <div class="form-help mb-16">These quantities come from the offer. Edit names, packaging or quantities, or delete rows.</div>
+    <div class="offer-mats" id="omEdit" style="border:none;padding:0">${offerTableHtml(sys.offerItems)}</div>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveOfferMaterials(${sysIdx})">Save Changes</button>`);
+}
+
+function saveOfferMaterials(sysIdx) {
+  const p = projects[currentProject];
+  p.systems[sysIdx].offerItems = readOfferRows($('omEdit'));
+  p.updatedAt = new Date().toISOString();
+  saveProjectDoc(p);
+  logActivity(`edited offer materials in "${p.name}"`);
+  closeModal();
+  toast('Materials saved');
+  renderProjectDetail();
+}
+
+function deleteOfferMaterial(encKey) {
+  const key = decodeURIComponent(encKey);
+  showWarning('Delete Material', 'Remove this material from the project?', () => {
+    const p = projects[currentProject];
+    p.systems.forEach(s => {
+      if (Array.isArray(s.offerItems)) s.offerItems = s.offerItems.filter(it => (it.name + '|' + (it.pkg || '')) !== key);
+    });
+    p.updatedAt = new Date().toISOString();
+    saveProjectDoc(p);
+    toast('Material deleted');
+    renderProjectDetail();
+  });
 }
 
 // ========== BATCH SELECT & DELETE ==========
