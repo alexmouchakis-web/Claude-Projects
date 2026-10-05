@@ -383,6 +383,7 @@ tr:hover td{background:var(--surface-alt)}
       <div class="flex gap-8">
         <button class="btn btn-secondary btn-sm" onclick="editCurrentProject()">Edit</button>
         <button class="btn btn-secondary btn-sm" onclick="duplicateProject()">Duplicate</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteProject()">Delete</button>
       </div>
     </div>
     <div id="projDetailMeta" class="text-sm text-muted mb-16"></div>
@@ -1122,6 +1123,19 @@ function duplicateProject() {
   navigate('project-detail', newId);
 }
 
+function deleteProject() {
+  const p = projects[currentProject];
+  if (!p) return;
+  showWarning('Delete Project', `Are you sure you want to delete "<strong>${p.name}</strong>"? This will permanently remove the project, all its phases, notes, and file references. Deliveries and orders linked to it will remain in the system.`, () => {
+    delete projects[currentProject];
+    if (db) db.doc('projects/' + currentProject).delete();
+    logActivity(`deleted project "${p.name}"`);
+    currentProject = null;
+    toast('Project deleted');
+    navigate('projects');
+  });
+}
+
 // ========== PROJECT DETAIL ==========
 function renderProjectDetail() {
   const p = projects[currentProject];
@@ -1360,7 +1374,7 @@ function renderDeliveries(p) {
       const ph = d.phaseId ? (p.phases || []).find(x => x.id === d.phaseId) : null;
       const itemCount = (d.items || []).reduce((s, i) => s + (i.quantity || 0), 0);
       html += `<tr><td>${fmtDate(d.date)}</td><td>${d.ref || '—'}</td><td>${ph ? ph.name : '—'}</td><td>${itemCount} units (${(d.items || []).length} types)</td><td>${d.deliveredBy || '—'}</td>
-        <td><button class="btn btn-secondary btn-sm" onclick="viewDelivery('${d.id}')">View</button> <button class="btn btn-secondary btn-sm" onclick="downloadDeliveryNote('${d.id}')">Download</button></td></tr>`;
+        <td><button class="btn btn-secondary btn-sm" onclick="viewDelivery('${d.id}')">View</button> <button class="btn btn-secondary btn-sm" onclick="downloadDeliveryNote('${d.id}')">Download</button> <button class="remove-btn" onclick="deleteDelivery('${d.id}')" title="Delete delivery">✕</button></td></tr>`;
     });
     html += '</tbody></table></div>';
   }
@@ -1499,6 +1513,18 @@ async function downloadDeliveryNote(delId) {
   }
 }
 
+function deleteDelivery(delId) {
+  const d = deliveries[delId];
+  if (!d) return;
+  showWarning('Delete Delivery', `Delete delivery "${d.ref || delId}"? Stock will NOT be automatically restored — adjust manually if needed.`, () => {
+    delete deliveries[delId];
+    if (db) db.doc('deliveries/' + delId).delete();
+    logActivity(`deleted delivery ${d.ref || delId}`);
+    toast('Delivery deleted');
+    renderProjectDetail();
+  });
+}
+
 // ========== FILES ==========
 function renderFiles(p) {
   const fileList = p.files || [];
@@ -1559,7 +1585,7 @@ function renderNotes(p) {
     <div class="flex justify-between items-center mb-16"><h3>Team Notes</h3></div>
     <div class="form-row"><textarea id="newNote" rows="2" placeholder="Add a note for the team..."></textarea></div>
     <button class="btn btn-primary btn-sm mb-16" onclick="addNote()">Add Note</button>
-    ${notes.length === 0 ? '<div class="text-muted">No notes yet.</div>' : notes.slice().reverse().map(n => `<div style="padding:12px 0;border-bottom:1px solid var(--border-light)"><div class="flex justify-between"><strong>${n.author}</strong><span class="text-sm text-muted">${fmtDate(n.time)}</span></div><p style="margin-top:4px">${n.text}</p></div>`).join('')}`;
+    ${notes.length === 0 ? '<div class="text-muted">No notes yet.</div>' : notes.slice().reverse().map((n, ri) => { const idx = notes.length - 1 - ri; return `<div style="padding:12px 0;border-bottom:1px solid var(--border-light)"><div class="flex justify-between items-center"><div><strong>${n.author}</strong> <span class="text-sm text-muted">${fmtDate(n.time)}</span></div><div class="flex gap-8"><button class="catalog-edit-btn" onclick="editNote(${idx})">Edit</button><button class="remove-btn" onclick="deleteNote(${idx})">✕</button></div></div><p style="margin-top:4px">${n.text}</p></div>`; }).join('')}`;
 }
 
 function addNote() {
@@ -1570,6 +1596,35 @@ function addNote() {
   p.projectNotes.push({ text, author: currentUser, time: new Date().toISOString() });
   if (db) db.doc('projects/' + p.id).set(p);
   toast('Note added');
+  renderNotes(p);
+}
+
+function editNote(idx) {
+  const p = projects[currentProject];
+  const note = (p.projectNotes || [])[idx];
+  if (!note) return;
+  openModal('Edit Note', `<div class="form-row"><label>Note</label><textarea id="editNoteText" rows="3">${escAttr(note.text)}</textarea></div>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveEditNote(${idx})">Save</button>`);
+}
+
+function saveEditNote(idx) {
+  const p = projects[currentProject];
+  const text = $('editNoteText')?.value?.trim();
+  if (!text) { toast('Note cannot be empty', 'error'); return; }
+  p.projectNotes[idx].text = text;
+  p.projectNotes[idx].editedAt = new Date().toISOString();
+  if (db) db.doc('projects/' + p.id).set(p);
+  closeModal();
+  toast('Note updated');
+  renderNotes(p);
+}
+
+function deleteNote(idx) {
+  const p = projects[currentProject];
+  if (!p.projectNotes || !p.projectNotes[idx]) return;
+  p.projectNotes.splice(idx, 1);
+  if (db) db.doc('projects/' + p.id).set(p);
+  toast('Note deleted');
   renderNotes(p);
 }
 
@@ -1666,6 +1721,8 @@ function renderOrders() {
         ${o.status === 'pending' ? `<button class="btn btn-secondary btn-sm" onclick="markOrdered('${o.id}')">Mark Ordered</button>` : ''}
         ${o.status === 'ordered' ? `<button class="btn btn-primary btn-sm" onclick="receiveOrder('${o.id}')">Receive</button>` : ''}
         <button class="btn btn-secondary btn-sm" onclick="viewOrder('${o.id}')">View</button>
+        ${o.status === 'pending' ? `<button class="btn btn-secondary btn-sm" onclick="editOrder('${o.id}')">Edit</button>` : ''}
+        ${o.status !== 'received' ? `<button class="remove-btn" onclick="deleteOrder('${o.id}')" title="Delete order">✕</button>` : ''}
       </td>
     </tr>`;
   }).join('');
@@ -1759,6 +1816,70 @@ function viewOrder(ordId) {
   `, `<button class="btn btn-secondary" onclick="closeModal()">Close</button>`);
 }
 
+function editOrder(ordId) {
+  const o = orders[ordId];
+  if (!o || o.status !== 'pending') { toast('Only pending orders can be edited', 'warn'); return; }
+  const allMats = new Set();
+  Object.values(CATALOG).forEach(sys => Object.values(sys.applications).forEach(app => app.forEach(prod => allMats.add(prod.name + '|' + prod.pkg))));
+  Object.keys(stockData).forEach(k => allMats.add(k));
+  const sorted = [...allMats].sort();
+  const existingQty = {};
+  (o.items || []).forEach(i => { existingQty[i.material] = i.quantity; });
+  const rows = sorted.map(key => {
+    const [name, pkg] = key.split('|');
+    return `<div class="form-grid" style="grid-template-columns:2fr 1fr;align-items:end;margin-bottom:6px"><div class="text-sm"><strong>${name}</strong> (${pkg})</div><div><input type="number" class="order-qty" data-mat="${key}" value="${existingQty[key] || 0}" min="0"></div></div>`;
+  }).join('');
+  const projOpts = Object.values(projects).map(p => `<option value="${p.id}" ${p.id === o.projectId ? 'selected' : ''}>${p.name}</option>`).join('');
+  openModal('Edit Order', `
+    <div class="form-grid"><div class="form-row"><label>Order Reference</label><input type="text" id="ordRef" value="${escAttr(o.ref)}"></div>
+    <div class="form-row"><label>Related Project</label><select id="ordProject"><option value="">None</option>${projOpts}</select></div></div>
+    <div class="form-row"><label>Expected Delivery Date</label><input type="date" id="ordExpected" value="${o.expectedDate || ''}"></div>
+    <div class="form-row"><label>Notes</label><textarea id="ordNotes" rows="2">${escAttr(o.notes || '')}</textarea></div>
+    <hr style="border:none;border-top:1px solid var(--border-light);margin:16px 0"><h3 class="mb-8">Materials to Order</h3>${rows}
+  `, `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveEditOrder('${ordId}')">Save Changes</button>`);
+}
+
+function saveEditOrder(ordId) {
+  const o = orders[ordId];
+  if (!o) return;
+  const items = [];
+  document.querySelectorAll('.order-qty').forEach(inp => {
+    const qty = parseInt(inp.value) || 0;
+    if (qty > 0) {
+      const sKey = inp.dataset.mat;
+      items.push({ material: sKey, name: sKey.split('|')[0], pkg: sKey.split('|')[1], quantity: qty });
+    }
+  });
+  if (items.length === 0) { toast('No materials selected', 'warn'); return; }
+  const projId = $('ordProject').value;
+  Object.assign(o, {
+    ref: $('ordRef').value.trim(),
+    projectId: projId,
+    projectName: projId ? projects[projId]?.name : '',
+    items,
+    expectedDate: $('ordExpected').value,
+    notes: $('ordNotes').value.trim(),
+    updatedAt: new Date().toISOString()
+  });
+  if (db) db.doc('orders/' + ordId).set(o);
+  logActivity(`updated order ${o.ref}`);
+  closeModal();
+  toast('Order updated');
+  renderOrders();
+}
+
+function deleteOrder(ordId) {
+  const o = orders[ordId];
+  if (!o) return;
+  showWarning('Delete Order', `Delete order "${o.ref || ordId}"? This cannot be undone.`, () => {
+    delete orders[ordId];
+    if (db) db.doc('orders/' + ordId).delete();
+    logActivity(`deleted order ${o.ref || ordId}`);
+    toast('Order deleted');
+    renderOrders();
+  });
+}
+
 // ========== REMINDERS ==========
 function renderReminders() {
   const remArr = Object.values(reminders).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
@@ -1775,7 +1896,7 @@ function renderReminders() {
         const urgent = days !== null && days <= 0;
         html += `<div class="reminder-item" style="${urgent ? 'border-color:var(--red)' : ''}">
           <div style="flex:1"><div class="rem-msg">${r.message}</div><div class="rem-date">${r.date ? fmtDate(r.date) + (r.time ? ' at ' + r.time : '') : 'No date'} • For: ${(r.assignees || []).join(', ') || 'All'} ${urgent ? ' • <strong style="color:var(--red)">DUE</strong>' : ''}</div></div>
-          <div class="rem-actions"><button class="btn btn-secondary btn-sm" onclick="completeReminder('${r.id}')">Done</button><button class="remove-btn" onclick="deleteReminder('${r.id}')">✕</button></div>
+          <div class="rem-actions"><button class="btn btn-secondary btn-sm" onclick="editReminder('${r.id}')">Edit</button><button class="btn btn-secondary btn-sm" onclick="completeReminder('${r.id}')">Done</button><button class="remove-btn" onclick="deleteReminder('${r.id}')">✕</button></div>
         </div>`;
       });
     }
@@ -1835,6 +1956,33 @@ function deleteReminder(id) {
     renderReminders();
     updateBadges();
   }
+}
+
+function editReminder(id) {
+  const r = reminders[id];
+  if (!r) return;
+  const teamChecks = TEAM.map(t => `<label style="display:flex;align-items:center;gap:6px;font-size:.875rem;text-transform:none;letter-spacing:0"><input type="checkbox" class="rem-assignee" value="${t.name}" ${(r.assignees || []).includes(t.name) ? 'checked' : ''}> ${t.name}</label>`).join('');
+  openModal('Edit Reminder', `
+    <div class="form-row"><label>Message</label><textarea id="remMsg" rows="2">${escAttr(r.message)}</textarea></div>
+    <div class="form-grid"><div class="form-row"><label>Date</label><input type="date" id="remDate" value="${r.date || ''}"></div>
+    <div class="form-row"><label>Time</label><input type="time" id="remTime" value="${r.time || '09:00'}"></div></div>
+    <div class="form-row"><label>Assign To</label><div class="flex gap-8 flex-wrap">${teamChecks}</div></div>
+    <div class="form-row"><label>Related Project</label><select id="remProject"><option value="">None</option>${Object.values(projects).map(p => `<option value="${p.id}" ${p.id === r.projectId ? 'selected' : ''}>${p.name}</option>`).join('')}</select></div>
+  `, `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveEditReminder('${id}')">Save Changes</button>`);
+}
+
+function saveEditReminder(id) {
+  const r = reminders[id];
+  if (!r) return;
+  const msg = $('remMsg').value.trim();
+  if (!msg) { toast('Reminder message is required', 'error'); return; }
+  const assignees = [];
+  document.querySelectorAll('.rem-assignee:checked').forEach(cb => assignees.push(cb.value));
+  Object.assign(r, { message: msg, date: $('remDate').value, time: $('remTime').value, assignees, projectId: $('remProject').value, updatedAt: new Date().toISOString() });
+  if (db) db.doc('reminders/' + id).set(r);
+  closeModal();
+  toast('Reminder updated');
+  renderReminders();
 }
 
 // ========== ALERTS MODAL (from dashboard KPI tap) ==========
