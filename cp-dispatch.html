@@ -306,6 +306,8 @@ tr:hover td{background:var(--surface-alt)}
 .stock-note{font-size:.72rem;color:var(--ink-3);margin-top:2px}
 .erp-summary{background:var(--surface-alt);border-radius:var(--radius);padding:12px 14px;font-size:.85rem;margin-bottom:8px}
 .erp-unm{font-size:.8rem}.erp-unm td,.erp-unm th{padding:3px 4px}.erp-unm input{padding:5px 7px;font-size:.8rem}
+#plannerView table th,#plannerView table td,#reconView table th,#reconView table td{padding:10px 8px;font-size:.82rem}
+#plannerView .chip{white-space:nowrap}
 .batch-select{width:auto;padding:5px 30px 5px 10px;font-size:.8rem;background-position:right 10px center;cursor:pointer}
 .batch-bar.visible{display:flex}
 .batch-bar .batch-count{font-weight:600;color:var(--red)}
@@ -491,8 +493,9 @@ body.chat-open #chatPanel{transform:none;visibility:visible}
 
   <!-- ORDERS -->
   <div class="page" id="page-orders">
-    <div class="page-header"><h1>Orders</h1><button class="btn btn-primary" onclick="openNewOrder()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> New Order</button></div>
-    <div class="card"><div class="card-body no-pad overflow-x" id="ordersList"></div></div>
+    <div class="page-header"><h1 id="ordersTitle">Orders</h1><div class="flex gap-8"><button class="btn btn-secondary" id="plannerBackBtn" onclick="closePlannerView()" hidden>← Back to Orders</button><button class="btn btn-secondary" id="plannerBtn" onclick="openPlanner()">Reorder Planner</button><button class="btn btn-primary" id="newOrderBtn" onclick="openNewOrder()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> New Order</button></div></div>
+    <div class="card" id="ordersMain"><div class="card-body no-pad overflow-x" id="ordersList"></div></div>
+    <div id="plannerView" hidden></div>
   </div>
 
   <!-- REMINDERS -->
@@ -929,6 +932,7 @@ function logActivity(text) {
 // ========== NAVIGATION ==========
 function navigate(page, projectId) {
   closeReconcileView();
+  closePlannerView();
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-link').forEach(a => a.classList.remove('active'));
   const pg = $('page-' + page);
@@ -2161,6 +2165,219 @@ function erpAddUnmatched(i) {
   toast('Added — press Save Stock to keep it');
 }
 
+// ========== REORDER PLANNER ==========
+let plannerSettings = { lead: 14, includePlanning: false, leads: {} };
+let plannerOpen = false;
+let plannerOnlyOrder = true;
+const plannerQty = {};
+
+const addDaysIso = (iso, n) => new Date(new Date(iso + 'T00:00:00Z').getTime() + n * 86400000).toISOString().slice(0, 10);
+
+function nextOrderRef(prefix) {
+  const y = new Date().getFullYear();
+  const re = new RegExp('^' + prefix + '-' + y + '-(\\d+)$');
+  const max = Object.values(orders).reduce((m, o) => { const x = re.exec(o.ref || ''); return x ? Math.max(m, +x[1]) : m; }, 0);
+  return `${prefix}-${y}-${String(max + 1).padStart(3, '0')}`;
+}
+
+function materialNeedDate(p, key) {
+  let best = '';
+  (p.phases || []).forEach(ph => {
+    if (ph.status === 'completed' || !ph.targetDate) return;
+    if (getPhaseMaterials(p.systems || [], ph).some(m => m.name + '|' + m.pkg === key) && (!best || ph.targetDate < best)) best = ph.targetDate;
+  });
+  return best || p.deadline || '';
+}
+
+function plannerRows() {
+  const statuses = plannerSettings.includePlanning ? ['active', 'planning'] : ['active'];
+  const demand = {};
+  Object.values(projects).filter(p => statuses.includes(p.status)).forEach(p => {
+    const delivered = {};
+    Object.values(deliveries).filter(d => d.projectId === p.id).forEach(d => (d.items || []).forEach(i => { delivered[i.material] = (delivered[i.material] || 0) + (Number(i.quantity) || 0); }));
+    getAllMaterials(p.systems || []).forEach(m => {
+      const key = m.name + '|' + m.pkg;
+      const rem = Math.max(0, m.totalUnits - (delivered[key] || 0));
+      if (!rem) return;
+      const by = materialNeedDate(p, key);
+      const d = demand[key] || (demand[key] = { total: 0, needBy: '', projects: [] });
+      d.total += rem;
+      d.projects.push({ project: p.name, units: rem, by });
+      if (by && (!d.needBy || by < d.needBy)) d.needBy = by;
+    });
+  });
+  const incoming = {}, drafts = {};
+  Object.values(orders).forEach(o => {
+    const bucket = o.status === 'ordered' ? incoming : o.status === 'pending' ? drafts : null;
+    if (!bucket) return;
+    (o.items || []).forEach(i => {
+      const b = bucket[i.material] || (bucket[i.material] = { units: 0, orders: 0 });
+      b.units += Number(i.quantity) || 0; b.orders++;
+    });
+  });
+  const keys = new Set([...Object.keys(stockData), ...Object.keys(demand), ...Object.keys(incoming)]);
+  const t = today(), soon = addDaysIso(t, 7);
+  return [...keys].map(key => {
+    const [name, pkg] = key.split('|');
+    const st = stockData[key] || {};
+    const stock = st.quantity || 0, min = st.minStock || 0;
+    const dem = demand[key]?.total || 0, inc = incoming[key]?.units || 0, dr = drafts[key] || { units: 0, orders: 0 };
+    const needBy = demand[key]?.needBy || '';
+    const lead = plannerSettings.leads[key] != null ? plannerSettings.leads[key] : plannerSettings.lead;
+    const orderBy = needBy ? addDaysIso(needBy, -lead) : '';
+    const suggest = Math.max(0, dem + min - stock - inc);
+    let urgency = 'ok';
+    if (suggest > 0) urgency = orderBy ? (orderBy < t ? 'late' : orderBy <= soon ? 'soon' : 'planned') : 'nodate';
+    return { key, name, pkg, stock, min, demand: dem, incoming: inc, draftUnits: dr.units, draftOrders: dr.orders, needBy, lead, orderBy, suggest, urgency, projects: demand[key]?.projects || [] };
+  }).filter(r => r.stock || r.min || r.demand || r.incoming)
+    .sort((a, b) => ({ late: 0, soon: 1, nodate: 2, planned: 3, ok: 4 }[a.urgency] - { late: 0, soon: 1, nodate: 2, planned: 3, ok: 4 }[b.urgency]) || (a.orderBy || '9').localeCompare(b.orderBy || '9') || a.name.localeCompare(b.name));
+}
+
+const PLAN_STATUS = { late: ['chip-red', 'Order now — late'], soon: ['chip-amber', 'Order within 7 days'], planned: ['chip-blue', 'Planned'], nodate: ['chip-gray', 'No needed-by date'], ok: ['chip-green', 'Covered'] };
+const planQty = r => plannerQty[r.key] != null ? plannerQty[r.key] : r.suggest;
+
+function applyPlannerVisibility() {
+  if (!$('plannerView')) return;
+  $('ordersMain').hidden = plannerOpen;
+  $('plannerView').hidden = !plannerOpen;
+  $('ordersTitle').textContent = plannerOpen ? 'Reorder Planner' : 'Orders';
+  $('plannerBackBtn').hidden = !plannerOpen;
+  $('plannerBtn').hidden = plannerOpen;
+  $('newOrderBtn').hidden = plannerOpen;
+}
+function openPlanner() { plannerOpen = true; applyPlannerVisibility(); renderPlanner(); }
+function closePlannerView() { plannerOpen = false; applyPlannerVisibility(); }
+
+function savePlannerSettings() {
+  if (!db) return;
+  try { const r = db.doc('settings/planner').set(JSON.parse(JSON.stringify(plannerSettings))); if (r && r.catch) r.catch(() => {}); } catch (e) {}
+}
+function plannerSetDefaultLead(v) { plannerSettings.lead = Math.max(0, parseInt(v) || 0); savePlannerSettings(); renderPlanner(); }
+function plannerSetInclude(v) { plannerSettings.includePlanning = !!v; savePlannerSettings(); renderPlanner(); }
+function plannerSetLead(key, v) {
+  if (v === '' || v == null) delete plannerSettings.leads[key]; else plannerSettings.leads[key] = Math.max(0, parseInt(v) || 0);
+  savePlannerSettings(); renderPlanner();
+}
+function plannerQtyChange(el) { plannerQty[el.dataset.key] = Math.max(0, parseInt(el.value) || 0); }
+
+function renderPlanner() {
+  const el = $('plannerView');
+  if (!el) return;
+  const all = plannerRows();
+  const todo = all.filter(r => r.suggest > 0);
+  const cnt = u => all.filter(r => r.urgency === u).length;
+  const totalPacks = todo.reduce((s, r) => s + planQty(r), 0);
+  const shown = plannerOnlyOrder ? todo : all;
+  const fmt = d => d ? fmtDate(d) : '—';
+  const rows = shown.map(r => {
+    const [cls, label] = PLAN_STATUS[r.urgency];
+    const why = r.projects.map(p => `${p.project}: ${p.units}${p.by ? ' by ' + fmtDate(p.by) : ''}`).join('\n');
+    return `<tr>
+      <td>${r.suggest > 0 ? `<input type="checkbox" class="list-check chk-plan" value="${escAttr(r.key)}" onchange="updateBatchBar('chk-plan','batchPlan');updateToggleLabel('chk-plan','togPlan')">` : ''}</td>
+      <td><strong>${escAttr(r.name)}</strong></td><td>${escAttr(r.pkg)}</td>
+      <td>${r.stock}</td><td>${r.min}</td>
+      <td title="${escAttr(why)}" style="cursor:${why ? 'help' : 'default'}">${r.demand}</td>
+      <td>${r.incoming || '—'}</td>
+      <td>${r.draftUnits ? `<span class="chip chip-gray" title="${r.draftOrders} draft order(s) not yet placed">${r.draftUnits} draft</span>` : '—'}</td>
+      <td style="white-space:nowrap">${fmt(r.needBy)}</td>
+      <td><input type="number" min="0" value="${plannerSettings.leads[r.key] != null ? plannerSettings.leads[r.key] : ''}" placeholder="${plannerSettings.lead}" style="width:64px;padding:5px 7px;font-size:.8rem" onchange="plannerSetLead(${JSON.stringify(r.key).replace(/"/g, '&quot;')},this.value)"></td>
+      <td style="white-space:nowrap">${fmt(r.orderBy)}</td>
+      <td>${r.suggest > 0 ? `<input type="number" class="plan-qty" data-key="${escAttr(r.key)}" min="0" value="${planQty(r)}" style="width:72px;padding:5px 7px;font-size:.8rem;font-weight:600" onchange="plannerQtyChange(this)">` : '—'}</td>
+      <td style="white-space:nowrap"><span class="chip ${cls}">${label}</span></td></tr>`;
+  }).join('');
+  el.innerHTML = `
+    <div class="card mb-16"><div class="card-body">
+      <div class="text-sm text-muted mb-8">For each material: <strong>suggested order = remaining demand of active projects + minimum stock − stock − already ordered</strong>. "Order by" = needed-by date − lead time. Needed-by is the earliest phase target date that uses the material, otherwise the project deadline. Hover the demand number to see which projects need it.</div>
+      <div class="flex items-center gap-8" style="flex-wrap:wrap">
+        <label style="margin:0;text-transform:none;letter-spacing:0;font-size:.85rem;display:flex;align-items:center;gap:6px">Default lead time <input type="number" min="0" value="${plannerSettings.lead}" style="width:70px" onchange="plannerSetDefaultLead(this.value)"> days</label>
+        <label style="margin:0;text-transform:none;letter-spacing:0;font-size:.85rem;display:flex;align-items:center;gap:6px"><input type="checkbox" class="list-check" ${plannerSettings.includePlanning ? 'checked' : ''} onchange="plannerSetInclude(this.checked)"> Include projects in "planning"</label>
+        <span style="flex:1"></span>
+        <button class="btn btn-secondary btn-sm" onclick="plannerExport()">Export CSV</button>
+        <button class="btn btn-primary btn-sm" onclick="plannerOrderUrgent()">Order all late + soon</button>
+      </div>
+    </div></div>
+    <div class="pay-kpis">
+      <div class="pay-kpi"><div class="pk-val" style="color:var(--red)">${cnt('late')}</div><div class="pk-label">Order now — late</div></div>
+      <div class="pay-kpi"><div class="pk-val" style="color:var(--amber)">${cnt('soon')}</div><div class="pk-label">Within 7 days</div></div>
+      <div class="pay-kpi"><div class="pk-val">${cnt('planned') + cnt('nodate')}</div><div class="pk-label">Later / no date</div></div>
+      <div class="pay-kpi"><div class="pk-val" style="color:var(--green)">${cnt('ok')}</div><div class="pk-label">Covered</div></div>
+      <div class="pay-kpi"><div class="pk-val">${totalPacks}</div><div class="pk-label">Packs to order</div></div>
+    </div>
+    <div class="card"><div class="card-body no-pad overflow-x">
+      <div class="flex items-center gap-8" style="padding:12px 16px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:6px;margin:0;text-transform:none;letter-spacing:0;font-size:.85rem"><input type="checkbox" class="list-check" ${plannerOnlyOrder ? 'checked' : ''} onchange="plannerOnlyOrder=this.checked;renderPlanner()"> Only items to order (${todo.length})</label>
+        ${todo.length ? `<button class="select-toggle" id="togPlan" onclick="selectAllToggle('chk-plan','batchPlan','togPlan')">Select All</button>` : ''}
+      </div>
+      <div style="padding:0 16px">${batchBar('batchPlan')}</div>
+      ${shown.length ? `<table><thead><tr><th style="width:36px">${todo.length ? `<input type="checkbox" class="list-check" onchange="toggleAll('chk-plan',this);updateToggleLabel('chk-plan','togPlan')">` : ''}</th><th>Material</th><th>Pack</th><th>Stock</th><th>Min</th><th>Demand</th><th>Ordered</th><th>Drafts</th><th>Needed by</th><th>Lead (d)</th><th>Order by</th><th>Suggest</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`
+        : `<div class="empty-state" style="padding:32px"><p>${all.length ? 'Everything is covered — nothing to order.' : 'No stock or project demand yet.'}</p></div>`}
+    </div></div>
+    <div class="form-help mt-8">"Drafts" are pending orders not yet placed with a supplier; they are not counted as incoming, so check them before creating another order.</div>`;
+}
+
+function plannerKeysFor(keys) { return plannerRows().filter(r => keys.includes(r.key) && planQty(r) > 0); }
+
+function batchPlannerOrder() { openPlannerOrder(selIds('chk-plan')); }
+function plannerOrderUrgent() {
+  const keys = plannerRows().filter(r => r.urgency === 'late' || r.urgency === 'soon').map(r => r.key);
+  if (!keys.length) { toast('Nothing is late or due within 7 days', 'warn'); return; }
+  openPlannerOrder(keys);
+}
+
+function openPlannerOrder(keys) {
+  const rows = plannerKeysFor(keys);
+  if (!rows.length) { toast('Select items with a quantity to order', 'warn'); return; }
+  const dr = rows.filter(r => r.draftOrders > 0).length;
+  openModal(`Create Order — ${rows.length} item${rows.length === 1 ? '' : 's'}`, `
+    ${dr ? `<div class="chat-err text-sm mb-8">${dr} of these already ${dr === 1 ? 'has' : 'have'} a draft order. Delete the old draft if this replaces it.</div>` : ''}
+    <div class="overflow-x"><table><thead><tr><th>Material</th><th>Pack</th><th>Packs</th></tr></thead><tbody>${rows.map(r => `<tr><td>${escAttr(r.name)}</td><td>${escAttr(r.pkg)}</td><td>${planQty(r)}</td></tr>`).join('')}</tbody></table></div>
+    <div class="form-grid mt-16"><div class="form-row"><label>Expected delivery (optional)</label><input type="date" id="poExpected"></div>
+    <div class="form-row"><label>Supplier / notes</label><input type="text" id="poNotes" placeholder="e.g., Supplier, reference"></div></div>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="createPlannerOrder(${JSON.stringify(rows.map(r => r.key)).replace(/"/g, '&quot;')})">Create Order</button>`);
+}
+
+function createPlannerOrder(keys) {
+  const rows = plannerKeysFor(keys);
+  if (!rows.length) return;
+  const id = 'ord_' + uid();
+  const order = {
+    id, ref: nextOrderRef('ORD'), projectId: '', projectName: 'Reorder planner', status: 'pending',
+    items: rows.map(r => ({ material: r.key, name: r.name, pkg: r.pkg, quantity: planQty(r) })),
+    createdAt: new Date().toISOString(), createdBy: currentUser,
+    expectedDate: $('poExpected')?.value || '',
+    notes: ($('poNotes')?.value?.trim() ? $('poNotes').value.trim() + ' — ' : '') + 'Created from Reorder Planner'
+  };
+  orders[id] = order;
+  if (db) db.doc('orders/' + id).set(order);
+  rows.forEach(r => { delete plannerQty[r.key]; });
+  logActivity(`created order ${order.ref} from reorder planner (${rows.length} items)`);
+  closeModal();
+  toast(`Order ${order.ref} created with ${rows.length} items`);
+  renderPlanner();
+}
+
+function plannerExport() {
+  const rows = plannerRows().filter(r => !plannerOnlyOrder || r.suggest > 0);
+  saveCsv('reorder-plan.csv', [['Material', 'Pack', 'Stock', 'Min', 'Demand', 'Ordered', 'Drafts', 'Needed by', 'Lead days', 'Order by', 'Suggested packs', 'Status']]
+    .concat(rows.map(r => [r.name, r.pkg, r.stock, r.min, r.demand, r.incoming, r.draftUnits, r.needBy, r.lead, r.orderBy, planQty(r), PLAN_STATUS[r.urgency][1]])));
+}
+
+function batchPlannerExport() {
+  const sel = selIds('chk-plan');
+  saveCsv('reorder-plan.csv', [['Material', 'Pack', 'Stock', 'Demand', 'Order by', 'Suggested packs']]
+    .concat(plannerRows().filter(r => sel.includes(r.key)).map(r => [r.name, r.pkg, r.stock, r.demand, r.orderBy, planQty(r)])));
+}
+
+function toolReorderPlan() {
+  chatStatus('Reading reorder plan…');
+  const rows = plannerRows(), todo = rows.filter(r => r.suggest > 0);
+  return {
+    unit: 'packs', default_lead_days: plannerSettings.lead, includes_planning_projects: plannerSettings.includePlanning,
+    counts: { late: rows.filter(r => r.urgency === 'late').length, soon: rows.filter(r => r.urgency === 'soon').length, later_or_no_date: rows.filter(r => r.urgency === 'planned' || r.urgency === 'nodate').length, covered: rows.filter(r => r.urgency === 'ok').length },
+    to_order: todo.slice(0, 60).map(r => ({ material: r.name, pack: r.pkg, stock: r.stock, min: r.min, demand: r.demand, ordered: r.incoming, draft_units: r.draftUnits, needed_by: r.needBy || null, order_by: r.orderBy || null, suggest: r.suggest, status: PLAN_STATUS[r.urgency][1], for_projects: r.projects.map(p => p.project).join(', ') }))
+  };
+}
+
 // ========== RECONCILE WITH ERP ==========
 let recon = null;
 let reconOpen = false;
@@ -2386,6 +2603,7 @@ function toolErpReconciliation() {
 
 // ========== ORDERS ==========
 function renderOrders() {
+  if (plannerOpen) renderPlanner();
   const ordArr = Object.values(orders).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   if (ordArr.length === 0) {
     $('ordersList').innerHTML = '<div class="empty-state" style="padding:48px"><p>No orders yet. Orders are generated automatically from project material needs.</p></div>';
@@ -2971,25 +3189,19 @@ function renderTimeline() {
 }
 
 // ========== AUTO-REORDER ENGINE ==========
+const dataLoaded = { projects: false, stock: false, orders: false, deliveries: false };
+let autoReorderChecked = false;
+function appDataReady() { return !db || Object.values(dataLoaded).every(Boolean); }
+function markLoaded(name) {
+  dataLoaded[name] = true;
+  if (!autoReorderChecked && appDataReady()) { autoReorderChecked = true; checkAutoReorder(); }
+}
+
 function checkAutoReorder() {
-  const active = Object.values(projects).filter(p => p.status === 'active');
-  if (active.length === 0) return;
-  const needs = {};
-  active.forEach(p => {
-    getAllMaterials(p.systems || []).forEach(m => {
-      const key = m.name + '|' + m.pkg;
-      if (!needs[key]) needs[key] = { name: m.name, pkg: m.pkg, total: 0 };
-      needs[key].total += m.totalUnits;
-    });
-  });
-  const toReorder = [];
-  Object.entries(needs).forEach(([key, need]) => {
-    const stock = (stockData[key] || {}).quantity || 0;
-    const minStock = (stockData[key] || {}).minStock || 0;
-    if (stock > minStock || stock >= need.total) return;
-    const hasPending = Object.values(orders).some(o => (o.status==='pending'||o.status==='ordered') && (o.items||[]).some(i => i.material===key));
-    if (!hasPending) toReorder.push({ material: key, name: need.name, pkg: need.pkg, quantity: Math.max(1, need.total - stock) });
-  });
+  if (!appDataReady()) return;
+  const toReorder = plannerRows()
+    .filter(r => r.suggest > 0 && (r.urgency === 'late' || r.urgency === 'soon' || r.stock <= r.min) && r.draftOrders === 0)
+    .map(r => ({ material: r.key, name: r.name, pkg: r.pkg, quantity: r.suggest }));
   if (toReorder.length === 0) return;
   const todayStr = today();
   const alreadyToday = Object.values(orders).some(o => o.autoGenerated && o.createdAt && o.createdAt.startsWith(todayStr));
@@ -2997,16 +3209,16 @@ function checkAutoReorder() {
   const orderId = 'ord_' + uid();
   const order = {
     id: orderId,
-    ref: 'AUTO-' + new Date().getFullYear() + '-' + String(Object.keys(orders).length + 1).padStart(3, '0'),
+    ref: nextOrderRef('AUTO'),
     projectId: '', projectName: 'Auto-reorder', status: 'pending',
     items: toReorder, createdAt: new Date().toISOString(), createdBy: 'System',
     autoGenerated: true, expectedDate: '',
-    notes: 'Auto-generated: stock below minimum for active project needs (' + toReorder.length + ' items)'
+    notes: 'Auto-generated from the reorder planner: stock below minimum or order-by date reached (' + toReorder.length + ' items)'
   };
   orders[orderId] = order;
   if (db) db.doc('orders/' + orderId).set(order);
   logActivity(`auto-reorder ${order.ref} created (${toReorder.length} items)`);
-  toast(`Auto-reorder ${order.ref}: ${toReorder.length} items below minimum`, 'warn');
+  toast(`Auto-reorder ${order.ref}: ${toReorder.length} items`, 'warn');
 }
 
 // ========== DELIVERY PHOTOS ==========
@@ -3780,6 +3992,9 @@ const BATCH_CFG = {
     <button class="btn btn-primary btn-sm" onclick="batchCompleteReminders()">Mark Done</button>
     <button class="btn btn-secondary btn-sm" onclick="batchRescheduleReminders()">Reschedule</button>` },
   batchFile: { del: 'batchDeleteFiles', actions: `<button class="btn btn-secondary btn-sm" onclick="batchFileCategory()">Change Category</button>` },
+  batchPlan: { del: null, actions: `
+    <button class="btn btn-primary btn-sm" onclick="batchPlannerOrder()">Create order</button>
+    <button class="btn btn-secondary btn-sm" onclick="batchPlannerExport()">Export CSV</button>` },
   batchRec: { del: null, actions: `
     <button class="btn btn-primary btn-sm" onclick="batchReconApply()">Use ERP quantity</button>
     <button class="btn btn-secondary btn-sm" onclick="reconExport(true)">Export CSV</button>` },
@@ -3967,7 +4182,7 @@ async function batchCopyNotes() {
 // ========== BATCH SELECT & DELETE ==========
 function toggleAll(cls, headerCb) {
   document.querySelectorAll('.' + cls).forEach(cb => cb.checked = headerCb.checked);
-  const barId = { 'chk-proj':'batchProj','chk-ord':'batchOrd','chk-del':'batchDel','chk-rem':'batchRem','chk-file':'batchFile','chk-note':'batchNote','chk-rec':'batchRec' }[cls];
+  const barId = { 'chk-proj':'batchProj','chk-ord':'batchOrd','chk-del':'batchDel','chk-rem':'batchRem','chk-file':'batchFile','chk-note':'batchNote','chk-rec':'batchRec','chk-plan':'batchPlan' }[cls];
   if (barId) updateBatchBar(cls, barId);
 }
 
@@ -4281,7 +4496,7 @@ Left menu: Dashboard (KPIs, alerts, analytics charts), Projects, Stock, Orders, 
 Projects list: New Project, table with checkboxes; selecting rows shows a bar with bulk actions (set status, export CSV, delete).
 New Project: "Attach Offer or Invoice" lets AI read a PDF/photo and fill client, location, deadline, notes, payment terms and the exact material quantities; each attached file has Preview, Edit and delete. Product systems can also be added manually from the catalog; materials are then calculated from consumption per m2.
 Project tabs: Overview (systems, progress), Phases (allocate m2 per system, dates, status), Materials (required units, in stock, delivered, remaining; "Generate Order for Missing"), Payment Terms (total, terms, installments with Paid/Pending/Overdue, mark paid), Deliveries (record a delivery: deducts stock, delivery note CSV, photos, email notification), Files (upload, preview), Production (batches planned > mixing > curing > ready), Notes.
-Stock: quantities and minimum levels per material (Update Stock; it can also read ERP stock files with AI). Reconcile with ERP (Stock page): upload ERP stock file(s), see differences vs app stock, apply ERP values per material or in bulk. Orders: supplier orders pending > ordered > received (receiving adds to stock); AUTO-... orders are created by the auto-reorder check for active-project shortages. Reminders: assign to team members with date/time. Email notifications go to the team through Gmail. Data is shared by the whole team in one database; the header shows who is online.
+Stock: quantities and minimum levels per material (Update Stock; it can also read ERP stock files with AI). Reconcile with ERP (Stock page): upload ERP stock file(s), see differences vs app stock, apply ERP values per material or in bulk. Orders: supplier orders pending > ordered > received (receiving adds to stock); Reorder Planner (Orders page): per material suggested order = remaining demand of active projects + minimum stock - stock - already ordered, with needed-by date (earliest phase target date or project deadline), lead time and order-by date, plus one-click order creation; AUTO-... orders are created by the auto-reorder check for active-project shortages. Reminders: assign to team members with date/time. Email notifications go to the team through Gmail. Data is shared by the whole team in one database; the header shows who is online.
 Catalog (17 product systems): ${sysNames}.
 Not in the app today (candidates when asked what is missing): unit prices, costs and margins per material or project; supplier database and supplier prices; a customer database (client is free text); issuing offers/invoices from the app; user roles and permissions; calendar sync; returns and credit notes; stock by batch number or warehouse location; multi-currency (EUR only); reports/export to accounting.
 
@@ -4404,7 +4619,7 @@ function toolProjectDetails(a) {
     systems: (p.systems || []).map(s => ({ system: s.systemName, application: s.application, area_m2: s.area, from_offer: Array.isArray(s.offerItems) })),
     materials: getAllMaterials(p.systems || []).slice(0, 60).map(m => { const k = m.name + '|' + m.pkg; return { name: m.name, pkg: m.pkg, units_needed: m.totalUnits, delivered_units: delivered[k] || 0, in_stock: (stockData[k] || {}).quantity || 0 }; }),
     payment: { ...projectPayment(p), terms: p.payment?.terms || '', installments: (p.payment?.installments || []).map(i => ({ label: i.label, amount: i.amount, due: i.dueDate, paid: !!i.paid })) },
-    phases: (p.phases || []).map(ph => ({ name: ph.name, status: ph.status, start: ph.startDate, end: ph.endDate })),
+    phases: (p.phases || []).map(ph => ({ name: ph.name, status: ph.status, target_date: ph.targetDate })),
     deliveries: dels.slice(-15).map(d => ({ date: d.date, ref: d.ref, items: (d.items || []).map(i => `${i.name} (${i.pkg}) x${i.quantity}`).join('; ') })),
     production_batches: (p.production || []).length, notes_count: (p.projectNotes || []).length
   };
@@ -4449,6 +4664,7 @@ function chatToolDefs() {
       inputSchema: { type: 'object', properties: { status: str('pending | ordered | received'), since: str('YYYY-MM-DD'), material: str('Material name words') } }, execute: toolListOrders },
     { name: 'stock_levels', description: 'Warehouse stock per material with minimum level; can filter by material name or only low/out-of-stock items.',
       inputSchema: { type: 'object', properties: { material: str('Material name words'), only_low: { type: 'boolean' } } }, execute: toolStockLevels },
+    { name: 'reorder_plan', description: 'Reorder planner result: materials to order now/soon/later with stock, minimum, remaining demand of active projects, already ordered quantity, draft orders, needed-by and order-by dates and suggested packs.', execute: toolReorderPlan },
     { name: 'erp_reconciliation', description: 'Result of the last ERP stock file comparison: counts of matching/different materials and the list of differences (ERP minus app, in packs) with last delivery/received dates.', execute: toolErpReconciliation },
     { name: 'payments_summary', description: 'Payment totals across all projects: total, paid, outstanding and overdue installments per project.', execute: toolPayments }
   ];
@@ -4485,23 +4701,27 @@ async function init() {
     db.collection('projects').onSnapshot(snap => {
       snap.docs.forEach(doc => { if (doc.exists) projects[doc.id] = doc.data(); });
       snap.docChanges().forEach(ch => { if (ch.type === 'removed') delete projects[ch.doc.id]; });
+      markLoaded('projects');
       renderCurrentPage();
     });
     // Subscribe to stock
     db.doc('stock/materials').onSnapshot(snap => {
       if (snap.exists) stockData = snap.data();
+      markLoaded('stock');
       renderCurrentPage();
     });
     // Subscribe to orders
     db.collection('orders').onSnapshot(snap => {
       snap.docs.forEach(doc => { if (doc.exists) orders[doc.id] = doc.data(); });
       snap.docChanges().forEach(ch => { if (ch.type === 'removed') delete orders[ch.doc.id]; });
+      markLoaded('orders');
       renderCurrentPage();
     });
     // Subscribe to deliveries
     db.collection('deliveries').onSnapshot(snap => {
       snap.docs.forEach(doc => { if (doc.exists) deliveries[doc.id] = doc.data(); });
       snap.docChanges().forEach(ch => { if (ch.type === 'removed') delete deliveries[ch.doc.id]; });
+      markLoaded('deliveries');
       renderCurrentPage();
     });
     // Subscribe to reminders
@@ -4509,6 +4729,12 @@ async function init() {
       snap.docs.forEach(doc => { if (doc.exists) reminders[doc.id] = doc.data(); });
       snap.docChanges().forEach(ch => { if (ch.type === 'removed') delete reminders[ch.doc.id]; });
       renderCurrentPage();
+    });
+    // Subscribe to planner settings
+    db.doc('settings/planner').onSnapshot(snap => {
+      if (snap.exists) plannerSettings = { lead: 14, includePlanning: false, leads: {}, ...snap.data() };
+      if (!plannerSettings.leads) plannerSettings.leads = {};
+      if (plannerOpen) renderPlanner();
     });
     // Subscribe to ERP reconciliation snapshot
     db.doc('recon/last').onSnapshot(snap => {
