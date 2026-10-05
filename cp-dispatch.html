@@ -1,4 +1,4 @@
-<title>CP Dispatch</title>
+<title>Cement Plus Daily</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
 :root {
@@ -374,7 +374,7 @@ body.chat-open #chatPanel{transform:none;visibility:visible}
 <nav>
   <div class="logo">
     <div class="logo-mark">CP</div>
-    <div class="logo-text">Dispatch<span>Cement Plus</span></div>
+    <div class="logo-text">Cement Plus<span>Daily</span></div>
   </div>
   <ul>
     <li><a href="#dashboard" class="nav-link active" data-page="dashboard">
@@ -2570,8 +2570,8 @@ async function sendTeamEmail(subject, body) {
   try {
     await mcp.callTool('Gmail', 'send_message', {
       to: TEAM.map(t => t.email),
-      subject: '[CP Dispatch] ' + subject,
-      body: body + '\n\n—\nCement Plus Dispatch'
+      subject: '[Cement Plus Daily] ' + subject,
+      body: body + '\n\n—\nCement Plus Daily'
     });
     toast('Email sent to team');
     return true;
@@ -3702,7 +3702,7 @@ function renderChat() {
   const body = $('chatBody');
   if (!body) return;
   if (chatTurns.length === 0) {
-    body.innerHTML = `<div class="chat-msg assistant"><p>Hi ${escAttr(currentUser)}, I'm Cement Plus AI. I can explain how CP Dispatch works, point out what is missing, and answer questions from your live data: sales, deliveries, stock, orders, payments.</p><p>Try one of these:</p></div>
+    body.innerHTML = `<div class="chat-msg assistant"><p>Hi ${escAttr(currentUser)}, I'm Cement Plus AI. I can explain how Cement Plus Daily works, point out what is missing, and answer questions from your live data: sales, deliveries, stock, orders, payments.</p><p>Try one of these:</p></div>
       <div class="chat-sugg">${CHAT_SUGGESTIONS.map((s, i) => `<button onclick="sendChat(CHAT_SUGGESTIONS[${i}])">${escAttr(s)}</button>`).join('')}</div>`;
     return;
   }
@@ -3805,7 +3805,7 @@ function buildChatInput() {
 function chatRules() {
   const names = Object.values(projects).map(p => `${p.name} (${p.client || '—'}, ${p.status})`).slice(0, 80).join('; ');
   const sysNames = Object.keys(CATALOG).join(', ');
-  return `You are "Cement Plus AI", the built-in assistant of CP Dispatch, the project and warehouse management app of Cement Plus (microcement manufacturer/applicator, Larissa, Greece). You are talking to ${currentUser}, usually Alex, the managing director, a mechanical engineer who runs several SMEs: give simple but advanced, clearly stated answers, short by default, with numbers and units. Reply in the language the user writes in (Greek or English). Dates written by the user are Greek style day/month/year (11/8/2026 = 11 August 2026). Today is ${today()}.
+  return `You are "Cement Plus AI", the built-in assistant of Cement Plus Daily, the project and warehouse management app of Cement Plus (microcement manufacturer/applicator, Larissa, Greece). You are talking to ${currentUser}, usually Alex, the managing director, a mechanical engineer who runs several SMEs: give simple but advanced, clearly stated answers, short by default, with numbers and units. Reply in the language the user writes in (Greek or English). Dates written by the user are Greek style day/month/year (11/8/2026 = 11 August 2026). Today is ${today()}.
 
 HOW TO ANSWER
 - For ANY number, total, list or status about projects, deliveries, stock, orders or payments, call the lookup tools; never estimate or invent figures. If a tool returns nothing, say so and mention what you searched.
