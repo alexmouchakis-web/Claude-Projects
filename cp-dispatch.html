@@ -302,6 +302,10 @@ tr:hover td{background:var(--surface-alt)}
 @media(max-width:768px){.an-grid{grid-template-columns:1fr}.gantt-label{width:100px}}
 .batch-bar{display:none;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 16px;background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;font-size:.85rem}
 .batch-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.stock-changed{background:var(--amber-light);border-radius:6px}
+.stock-note{font-size:.72rem;color:var(--ink-3);margin-top:2px}
+.erp-summary{background:var(--surface-alt);border-radius:var(--radius);padding:12px 14px;font-size:.85rem;margin-bottom:8px}
+.erp-unm{font-size:.8rem}.erp-unm td,.erp-unm th{padding:3px 4px}.erp-unm input{padding:5px 7px;font-size:.8rem}
 .batch-select{width:auto;padding:5px 30px 5px 10px;font-size:.8rem;background-position:right 10px center;cursor:pointer}
 .batch-bar.visible{display:flex}
 .batch-bar .batch-count{font-weight:600;color:var(--red)}
@@ -1888,17 +1892,20 @@ function openStockEdit() {
     });
   });
   const sorted = [...allMats].sort();
-  const rows = sorted.map(key => {
-    const [name, pkg] = key.split('|');
-    const val = stockData[key] || { quantity: 0, minStock: 0 };
-    return `<div class="form-grid" style="grid-template-columns:2fr 1fr 1fr;align-items:end;margin-bottom:6px;padding:4px 0;border-bottom:1px solid var(--border-light)">
-      <div class="text-sm"><strong>${name}</strong> <span class="text-muted">(${pkg})</span></div>
-      <div><label>Qty</label><input type="number" class="stock-qty" data-key="${key}" value="${val.quantity}" min="0"></div>
-      <div><label>Min</label><input type="number" class="stock-min" data-key="${key}" value="${val.minStock || 0}" min="0"></div>
-    </div>`;
-  }).join('');
+  const rows = sorted.map(key => stockRowHtml(key, stockData[key] || { quantity: 0, minStock: 0 })).join('');
+  const erpHtml = sampleAI ? `
+    <div class="attach-zone" id="erpZone">
+      <input type="file" id="erpFiles" multiple accept=".xls,.xlsx,.xlsm,.csv,.tsv,.txt,.pdf,image/jpeg,image/png,image/webp" onchange="importErpFiles(this.files)">
+      <div class="az-label">📎 Upload ERP file(s)</div>
+      <div class="az-sub">One or more Excel, CSV or PDF files with stock quantities — AI matches them to your materials</div>
+    </div>
+    <div id="erpProgress" class="scan-progress" hidden><div class="spinner"></div><span id="erpProgressText" style="flex:1">Reading…</span><button class="btn btn-secondary btn-sm" onclick="erpStop()">Stop</button></div>
+    <div class="flex items-center gap-8 mb-8"><label style="margin:0;white-space:nowrap">When importing</label>
+      <select id="erpMode" style="width:auto"><option value="replace">Replace quantities (ERP is correct)</option><option value="add">Add to current quantities</option></select></div>
+    <div id="erpResult"></div>
+    <hr style="border:none;border-top:1px solid var(--border-light);margin:12px 0">` : '';
 
-  openModal('Update Stock', `<div class="form-help mb-16">Update current warehouse quantities and minimum stock levels.</div>${rows}`,
+  openModal('Update Stock', `${erpHtml}<div class="form-help mb-16">Update current warehouse quantities and minimum stock levels.</div><div id="stockRows">${rows}</div>`,
     `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveStock()">Save Stock</button>`);
 }
 
@@ -1923,6 +1930,220 @@ function saveStock() {
   toast('Stock updated');
   logActivity('updated warehouse stock');
   renderStock();
+}
+
+// ========== STOCK IMPORT FROM ERP FILES ==========
+let erpCtl = null;
+let erpUnmatched = [];
+
+function loadScriptOnce(src, isLoaded) {
+  if (isLoaded()) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve;
+    s.onerror = () => reject(new Error('Could not load ' + src.split('/').pop()));
+    document.head.appendChild(s);
+  });
+}
+
+async function erpFileToText(file) {
+  const name = file.name.toLowerCase();
+  if (/\.(xlsx|xls|xlsm|ods)$/.test(name)) {
+    await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js', () => window.XLSX);
+    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    return wb.SheetNames.map(n => `# Sheet: ${n}\n` + XLSX.utils.sheet_to_csv(wb.Sheets[n], { blankrows: false })).join('\n');
+  }
+  if (/\.(csv|tsv|txt)$/.test(name)) {
+    const buf = await file.arrayBuffer();
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+    catch (e) { return new TextDecoder('windows-1253').decode(buf); }
+  }
+  if (name.endsWith('.pdf')) return await extractPdfText(file);
+  return '';
+}
+
+function erpChunks(text, max = 14000) {
+  const lines = text.split('\n').filter(l => l.replace(/[\s,;|"]/g, ''));
+  const head = lines.slice(0, 3).join('\n');
+  const chunks = [];
+  let cur = [], size = 0;
+  lines.forEach(l => {
+    if (size + l.length > max && cur.length) { chunks.push(cur.join('\n')); cur = []; size = 0; }
+    cur.push(l); size += l.length + 1;
+  });
+  if (cur.length) chunks.push(cur.join('\n'));
+  return chunks.map((c, i) => i === 0 ? c : head + '\n' + c);
+}
+
+function erpPrompt(known) {
+  return `You are reading an inventory / stock export from the ERP of Cement Plus (microcement, Greece). It is Excel/CSV/PDF content, usually Greek. Extract the CURRENT ON-HAND STOCK quantity per product.
+
+Known stock keys ("PRODUCT NAME|PACK SIZE"):
+${known.join('\n')}
+
+Rules:
+- Use the on-hand quantity column (e.g. Υπόλοιπο, Διαθέσιμο, Απόθεμα, Stock, Qty, Ποσότητα). Never use price, value, cost, VAT or discount columns.
+- One output item per product line. If the same product appears on several lines (warehouses, lots), output each line; skip "Total/Σύνολο" rows.
+- "k": the EXACT known key when it is the same product AND the same pack size; if the pack size is not printed and exactly one known key has that product name, use it; otherwise null.
+- "n": product name as printed. "p": pack size as printed (e.g. 20kg, 10lt) or "".
+- "q": the quantity as a number. Greek number format 1.234,50 means 1234.5.
+- "b": "p" if the quantity counts packs/pieces (τεμ, pcs, units, κιβώτια), "a" if it is an amount in kg, lt or m².
+- Skip headers, empty lines and products clearly unrelated to microcement / construction chemicals.
+
+Reply with ONLY this JSON: {"column":"name of the quantity column you used","items":[{"k":null,"n":"","p":"","q":0,"b":"p"}]}`;
+}
+
+function erpErrorText(e) {
+  return e.code === 'not_granted' ? 'AI permission denied'
+    : e.code === 'rate_limited' ? 'rate limited, try again in a moment'
+    : e.code === 'invalid_json' ? 'could not read the AI reply, try a smaller or cleaner file'
+    : e.code === 'prompt_too_large' ? 'file part too large'
+    : (e.message || e.code || 'unknown error');
+}
+
+async function erpReadFile(file, known, progress, signal) {
+  const prompt = erpPrompt(known);
+  const ask = (input, extra) => sampleAI.json(input, { modelTier: 'default', cache: false, signal, ...extra });
+  const items = [];
+  const columns = [];
+  const take = r => {
+    if (r && Array.isArray(r.items)) r.items.forEach(it => items.push({ ...it, file: file.name }));
+    if (r && r.column) columns.push(String(r.column));
+  };
+  let text = '';
+  const isImage = file.type.startsWith('image/');
+  if (!isImage) text = await erpFileToText(file);
+  if (!isImage && text.replace(/\s/g, '').length >= 40) {
+    let chunks = erpChunks(text);
+    let cut = 0;
+    if (chunks.length > 8) { cut = chunks.length - 8; chunks = chunks.slice(0, 8); }
+    for (let i = 0; i < chunks.length; i++) {
+      progress(`${file.name}: reading part ${i + 1}/${chunks.length}…`);
+      take(await ask(prompt + '\n\nFILE CONTENT:\n' + chunks[i]));
+    }
+    if (cut) items.warning = `${file.name}: only the first 8 parts were read`;
+  } else {
+    const limits = await sampleAI.limits().catch(() => null);
+    if (!limits?.images) throw new Error('this is a scanned file and images cannot be read in this view; export it as Excel/CSV or a text PDF');
+    progress(`${file.name}: reading scanned pages…`);
+    const imgs = file.type === 'application/pdf' || /\.pdf$/i.test(file.name) ? await renderPdfToImages(file) : [file];
+    take(await ask(prompt + '\n\nThe stock list is in the attached image(s).', { images: imgs.slice(0, limits.images.maxCount || 5) }));
+  }
+  return { items, columns, warning: items.warning };
+}
+
+function erpResolveKey(it, known) {
+  if (it.k && known.includes(it.k)) return it.k;
+  const toks = chatNorm(it.n).replace(/[^a-z0-9α-ω.]+/g, ' ').split(/\s+/).filter(Boolean);
+  if (!toks.length) return null;
+  let cands = known.filter(k => { const h = chatNorm(k.split('|')[0]).replace(/[^a-z0-9α-ω.]+/g, ' '); return toks.every(t => h.includes(t)); });
+  if (cands.length > 1 && it.p) { const sized = cands.filter(k => chatNorm(k.split('|')[1]) === chatNorm(it.p)); if (sized.length) cands = sized; }
+  return cands.length === 1 ? cands[0] : null;
+}
+
+function stockRowHtml(key, val, note) {
+  const [name, pkg] = key.split('|');
+  return `<div class="form-grid stock-row${note ? ' stock-changed' : ''}" style="grid-template-columns:2fr 1fr 1fr;align-items:end;margin-bottom:6px;padding:4px 6px;border-bottom:1px solid var(--border-light)">
+      <div class="text-sm"><strong>${escAttr(name)}</strong> <span class="text-muted">(${escAttr(pkg)})</span>${note ? `<div class="stock-note">${escAttr(note)}</div>` : ''}</div>
+      <div><label>Qty</label><input type="number" class="stock-qty" data-key="${escAttr(key)}" value="${val.quantity}" min="0"></div>
+      <div><label>Min</label><input type="number" class="stock-min" data-key="${escAttr(key)}" value="${val.minStock || 0}" min="0"></div>
+    </div>`;
+}
+
+function erpStop() { if (erpCtl) erpCtl.abort(); }
+
+async function importErpFiles(fileList) {
+  const files = [...fileList];
+  const inputEl = $('erpFiles');
+  if (!files.length || !sampleAI) return;
+  const known = [...document.querySelectorAll('.stock-qty')].map(i => i.dataset.key);
+  const mode = $('erpMode').value;
+  const setProgress = t => { $('erpProgressText').textContent = t; };
+  $('erpZone').hidden = true; $('erpProgress').hidden = false; $('erpResult').innerHTML = '';
+  erpCtl = new AbortController();
+  const all = [], columns = [], problems = [];
+  try {
+    for (let i = 0; i < files.length; i++) {
+      try {
+        const r = await erpReadFile(files[i], known, t => setProgress(`File ${i + 1}/${files.length} — ${t}`), erpCtl.signal);
+        all.push(...r.items); columns.push(...r.columns);
+        if (r.warning) problems.push(r.warning);
+      } catch (e) {
+        if (e && e.code === 'cancelled') throw e;
+        problems.push(`${files[i].name}: ${erpErrorText(e || {})}`);
+      }
+    }
+  } catch (e) {
+    $('erpZone').hidden = false; $('erpProgress').hidden = true; inputEl.value = '';
+    toast('Import cancelled', 'warn');
+    return;
+  }
+  $('erpZone').hidden = false; $('erpProgress').hidden = true; inputEl.value = '';
+
+  const agg = {};
+  erpUnmatched = [];
+  all.forEach(it => {
+    const q = parseFloat(it.q);
+    if (!isFinite(q) || q < 0) return;
+    const key = erpResolveKey(it, known);
+    const size = pkgSize(key ? key.split('|')[1] : (it.p || ''));
+    const hasSize = key ? true : /(kg|lt|m²)/i.test(it.p || '');
+    const isAmount = it.b === 'a';
+    if (isAmount && !hasSize) { erpUnmatched.push({ n: it.n, p: it.p || '', q: 0, raw: `${q} (amount, pack size unknown)`, file: it.file }); return; }
+    const packs = Math.round(isAmount ? q / size : q);
+    if (key) {
+      const a = agg[key] || (agg[key] = { packs: 0, lines: 0, raw: [] });
+      a.packs += packs; a.lines++;
+      if (isAmount) a.raw.push(`${q} ÷ ${size}`);
+    } else erpUnmatched.push({ n: it.n, p: it.p || '', q: packs, raw: String(q), file: it.file });
+  });
+
+  let updated = 0;
+  Object.entries(agg).forEach(([key, a]) => {
+    const inp = document.querySelector(`.stock-qty[data-key="${CSS.escape(key)}"]`);
+    if (!inp) return;
+    const was = parseInt(inp.value) || 0;
+    const next = mode === 'add' ? was + a.packs : a.packs;
+    inp.value = next;
+    const row = inp.closest('.stock-row');
+    row.classList.add('stock-changed');
+    row.querySelector('.stock-note')?.remove();
+    row.firstElementChild.insertAdjacentHTML('beforeend', `<div class="stock-note">ERP: ${a.packs}${a.raw.length ? ` (${escAttr(a.raw.join(' + '))})` : ''} · was ${was}${a.lines > 1 ? ` · ${a.lines} lines summed` : ''}</div>`);
+    updated++;
+  });
+  erpRenderResult(files.length, updated, columns, problems, mode);
+  $('erpResult').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function erpRenderResult(nFiles, updated, columns, problems, mode) {
+  const cols = [...new Set(columns)].join(', ');
+  let html = `<div class="erp-summary"><strong>${updated} material${updated === 1 ? '' : 's'} ${mode === 'add' ? 'increased' : 'set'} from ${nFiles} file${nFiles === 1 ? '' : 's'}.</strong>
+    Highlighted rows below were changed — check them, then press <strong>Save Stock</strong>.${cols ? `<div class="text-sm text-muted mt-4">Quantity column read: ${escAttr(cols)}</div>` : ''}`;
+  if (problems.length) html += `<div class="chat-err text-sm mt-4">${problems.map(escAttr).join('<br>')}</div>`;
+  if (erpUnmatched.length) {
+    html += `<div class="mt-8"><strong>${erpUnmatched.length} line${erpUnmatched.length === 1 ? '' : 's'} not matched to a material</strong> <span class="text-sm text-muted">— add as new stock items if they are yours:</span>
+      <div class="overflow-x"><table class="erp-unm"><thead><tr><th>Product</th><th>Pack</th><th>Qty (packs)</th><th></th></tr></thead><tbody>${erpUnmatched.slice(0, 40).map((u, i) => `<tr id="erpU${i}">
+        <td><input type="text" class="eu-name" value="${escAttr(u.n)}" style="min-width:150px"></td>
+        <td><input type="text" class="eu-pkg" value="${escAttr(u.p)}" placeholder="20kg" style="width:70px"></td>
+        <td><input type="number" class="eu-qty" value="${u.q}" min="0" style="width:70px"></td>
+        <td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" onclick="erpAddUnmatched(${i})">Add</button> <button class="remove-btn" title="Ignore" onclick="this.closest('tr').remove()">✕</button></td></tr>`).join('')}</tbody></table></div>
+      ${erpUnmatched.length > 40 ? `<div class="text-sm text-muted">Showing first 40.</div>` : ''}</div>`;
+  }
+  $('erpResult').innerHTML = html + '</div>';
+}
+
+function erpAddUnmatched(i) {
+  const row = $('erpU' + i);
+  if (!row) return;
+  const name = row.querySelector('.eu-name').value.trim().replace(/\|/g, '/');
+  const pkg = row.querySelector('.eu-pkg').value.trim().replace(/\|/g, '/');
+  const qty = parseInt(row.querySelector('.eu-qty').value) || 0;
+  if (!name || !pkg) { toast('Enter the product name and pack size (e.g. 20kg)', 'warn'); return; }
+  const key = name + '|' + pkg;
+  if (document.querySelector(`.stock-qty[data-key="${CSS.escape(key)}"]`)) { toast('That material already exists — it is in the list below', 'warn'); return; }
+  $('stockRows').insertAdjacentHTML('afterbegin', stockRowHtml(key, { quantity: qty, minStock: 0 }, 'New from ERP file'));
+  row.remove();
+  toast('Added — press Save Stock to keep it');
 }
 
 // ========== ORDERS ==========
