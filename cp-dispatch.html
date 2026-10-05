@@ -300,6 +300,10 @@ tr:hover td{background:var(--surface-alt)}
 .email-btn:hover{background:var(--blue-light)}
 .email-btn svg{width:14px;height:14px}
 @media(max-width:768px){.an-grid{grid-template-columns:1fr}.gantt-label{width:100px}}
+.batch-bar{display:none;align-items:center;gap:12px;padding:8px 16px;background:var(--red-light);border-radius:var(--radius);margin-bottom:12px;font-size:.85rem}
+.batch-bar.visible{display:flex}
+.batch-bar .batch-count{font-weight:600;color:var(--red)}
+.list-check{width:18px;height:18px;accent-color:var(--blue);cursor:pointer;flex-shrink:0}
 </style>
 
 <div class="app">
@@ -980,7 +984,9 @@ function renderProjects() {
     return;
   }
   const statusChip = s => ({ planning: 'chip-blue', active: 'chip-green', completed: 'chip-gray', archived: 'chip-gray' }[s] || 'chip-gray');
-  $('projectsList').innerHTML = `<table><thead><tr><th>Project</th><th>Client</th><th>Location</th><th>Status</th><th>Systems</th><th>Deadline</th></tr></thead><tbody>${pArr.map(p => `<tr class="clickable" onclick="navigate('project-detail','${p.id}')">
+  $('projectsList').innerHTML = `<div class="batch-bar" id="batchProj"><span class="batch-count">0</span><button class="btn btn-danger btn-sm" onclick="batchDeleteProjects()">Delete Selected</button></div>
+    <table><thead><tr><th style="width:36px"><input type="checkbox" class="list-check" onchange="toggleAll('chk-proj',this)"></th><th>Project</th><th>Client</th><th>Location</th><th>Status</th><th>Systems</th><th>Deadline</th></tr></thead><tbody>${pArr.map(p => `<tr class="clickable" onclick="navigate('project-detail','${p.id}')">
+    <td onclick="event.stopPropagation()"><input type="checkbox" class="list-check chk-proj" value="${p.id}" onchange="updateBatchBar('chk-proj','batchProj')"></td>
     <td><strong>${p.name}</strong></td><td>${p.client || '—'}</td><td>${p.location || '—'}</td>
     <td><span class="chip ${statusChip(p.status)}">${p.status}</span></td>
     <td>${(p.systems || []).length}</td><td>${fmtDate(p.deadline)}</td>
@@ -1369,11 +1375,12 @@ function renderDeliveries(p) {
   if (projDels.length === 0) {
     html += '<div class="empty-state"><p>No deliveries recorded yet.</p></div>';
   } else {
-    html += '<div class="overflow-x"><table><thead><tr><th>Date</th><th>Ref</th><th>Phase</th><th>Items</th><th>By</th><th>Actions</th></tr></thead><tbody>';
+    html += `<div class="batch-bar" id="batchDel"><span class="batch-count">0</span><button class="btn btn-danger btn-sm" onclick="batchDeleteDeliveries()">Delete Selected</button></div>`;
+    html += '<div class="overflow-x"><table><thead><tr><th style="width:36px"><input type="checkbox" class="list-check" onchange="toggleAll(\'chk-del\',this)"></th><th>Date</th><th>Ref</th><th>Phase</th><th>Items</th><th>By</th><th>Actions</th></tr></thead><tbody>';
     projDels.forEach(d => {
       const ph = d.phaseId ? (p.phases || []).find(x => x.id === d.phaseId) : null;
       const itemCount = (d.items || []).reduce((s, i) => s + (i.quantity || 0), 0);
-      html += `<tr><td>${fmtDate(d.date)}</td><td>${d.ref || '—'}</td><td>${ph ? ph.name : '—'}</td><td>${itemCount} units (${(d.items || []).length} types)</td><td>${d.deliveredBy || '—'}</td>
+      html += `<tr><td><input type="checkbox" class="list-check chk-del" value="${d.id}" onchange="updateBatchBar('chk-del','batchDel')"></td><td>${fmtDate(d.date)}</td><td>${d.ref || '—'}</td><td>${ph ? ph.name : '—'}</td><td>${itemCount} units (${(d.items || []).length} types)</td><td>${d.deliveredBy || '—'}</td>
         <td><button class="btn btn-secondary btn-sm" onclick="viewDelivery('${d.id}')">View</button> <button class="btn btn-secondary btn-sm" onclick="downloadDeliveryNote('${d.id}')">Download</button> <button class="remove-btn" onclick="deleteDelivery('${d.id}')" title="Delete delivery">✕</button></td></tr>`;
     });
     html += '</tbody></table></div>';
@@ -1533,11 +1540,13 @@ function renderFiles(p) {
   if (fileList.length === 0) {
     html += '<div class="empty-state"><p>No files attached. Upload delivery notes, invoices, or offers here.</p></div>';
   } else {
+    html += `<div class="batch-bar" id="batchFile"><span class="batch-count">0</span><button class="btn btn-danger btn-sm" onclick="batchDeleteFiles()">Delete Selected</button></div>`;
     fileList.forEach(f => {
       const ext = (f.name || '').split('.').pop().toUpperCase();
       const colors = { PDF: 'var(--red)', DOC: 'var(--blue)', XLS: 'var(--green)', JPG: 'var(--amber)', PNG: 'var(--amber)' };
       const bg = { PDF: 'var(--red-light)', DOC: 'var(--blue-light)', XLS: 'var(--green-light)', JPG: 'var(--amber-light)', PNG: 'var(--amber-light)' };
       html += `<div class="file-item">
+        <input type="checkbox" class="list-check chk-file" value="${f.id}" onchange="updateBatchBar('chk-file','batchFile')">
         <div class="file-icon" style="background:${bg[ext] || 'var(--surface-alt)'};color:${colors[ext] || 'var(--ink-3)'}">${ext || '?'}</div>
         <div class="file-info"><div class="file-name">${f.name}</div><div class="file-meta">${f.category || 'Document'} • ${fmtDate(f.uploadedAt)} • ${f.uploadedBy || ''}</div></div>
         ${f.url ? `<a href="${f.url}" target="_blank" class="btn btn-secondary btn-sm">View</a>` : ''}
@@ -1585,7 +1594,7 @@ function renderNotes(p) {
     <div class="flex justify-between items-center mb-16"><h3>Team Notes</h3></div>
     <div class="form-row"><textarea id="newNote" rows="2" placeholder="Add a note for the team..."></textarea></div>
     <button class="btn btn-primary btn-sm mb-16" onclick="addNote()">Add Note</button>
-    ${notes.length === 0 ? '<div class="text-muted">No notes yet.</div>' : notes.slice().reverse().map((n, ri) => { const idx = notes.length - 1 - ri; return `<div style="padding:12px 0;border-bottom:1px solid var(--border-light)"><div class="flex justify-between items-center"><div><strong>${n.author}</strong> <span class="text-sm text-muted">${fmtDate(n.time)}</span></div><div class="flex gap-8"><button class="catalog-edit-btn" onclick="editNote(${idx})">Edit</button><button class="remove-btn" onclick="deleteNote(${idx})">✕</button></div></div><p style="margin-top:4px">${n.text}</p></div>`; }).join('')}`;
+    ${notes.length === 0 ? '<div class="text-muted">No notes yet.</div>' : '<div class="batch-bar" id="batchNote"><span class="batch-count">0</span><button class="btn btn-danger btn-sm" onclick="batchDeleteNotes()">Delete Selected</button></div>' + notes.slice().reverse().map((n, ri) => { const idx = notes.length - 1 - ri; return `<div style="padding:12px 0;border-bottom:1px solid var(--border-light)" class="flex items-center gap-8"><input type="checkbox" class="list-check chk-note" value="${idx}" onchange="updateBatchBar('chk-note','batchNote')" style="margin-top:2px"><div style="flex:1"><div class="flex justify-between items-center"><div><strong>${n.author}</strong> <span class="text-sm text-muted">${fmtDate(n.time)}</span></div><div class="flex gap-8"><button class="catalog-edit-btn" onclick="editNote(${idx})">Edit</button><button class="remove-btn" onclick="deleteNote(${idx})">✕</button></div></div><p style="margin-top:4px">${n.text}</p></div></div>`; }).join('')}`;
 }
 
 function addNote() {
@@ -1711,6 +1720,7 @@ function renderOrders() {
   let rows = ordArr.map(o => {
     const itemCount = (o.items || []).reduce((s, i) => s + (i.quantity || 0), 0);
     return `<tr>
+      <td><input type="checkbox" class="list-check chk-ord" value="${o.id}" onchange="updateBatchBar('chk-ord','batchOrd')"></td>
       <td><strong>${o.ref || o.id}</strong></td>
       <td>${o.projectName || '—'}</td>
       <td><span class="chip ${statusChip(o.status)}">${o.status}</span></td>
@@ -1726,7 +1736,8 @@ function renderOrders() {
       </td>
     </tr>`;
   }).join('');
-  $('ordersList').innerHTML = `<table><thead><tr><th>Reference</th><th>Project</th><th>Status</th><th>Items</th><th>Created</th><th>Expected</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`;
+  $('ordersList').innerHTML = `<div class="batch-bar" id="batchOrd"><span class="batch-count">0</span><button class="btn btn-danger btn-sm" onclick="batchDeleteOrders()">Delete Selected</button></div>
+    <table><thead><tr><th style="width:36px"><input type="checkbox" class="list-check" onchange="toggleAll('chk-ord',this)"></th><th>Reference</th><th>Project</th><th>Status</th><th>Items</th><th>Created</th><th>Expected</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function openNewOrder() {
@@ -1891,10 +1902,12 @@ function renderReminders() {
   } else {
     if (active.length > 0) {
       html += '<h3 class="mb-8">Active</h3>';
+      html += `<div class="batch-bar" id="batchRem"><span class="batch-count">0</span><button class="btn btn-danger btn-sm" onclick="batchDeleteReminders()">Delete Selected</button></div>`;
       active.forEach(r => {
         const days = r.date ? daysDiff(r.date, new Date()) : null;
         const urgent = days !== null && days <= 0;
         html += `<div class="reminder-item" style="${urgent ? 'border-color:var(--red)' : ''}">
+          <input type="checkbox" class="list-check chk-rem" value="${r.id}" onchange="updateBatchBar('chk-rem','batchRem')" style="margin-top:2px">
           <div style="flex:1"><div class="rem-msg">${r.message}</div><div class="rem-date">${r.date ? fmtDate(r.date) + (r.time ? ' at ' + r.time : '') : 'No date'} • For: ${(r.assignees || []).join(', ') || 'All'} ${urgent ? ' • <strong style="color:var(--red)">DUE</strong>' : ''}</div></div>
           <div class="rem-actions"><button class="btn btn-secondary btn-sm" onclick="editReminder('${r.id}')">Edit</button><button class="btn btn-secondary btn-sm" onclick="completeReminder('${r.id}')">Done</button><button class="remove-btn" onclick="deleteReminder('${r.id}')">✕</button></div>
         </div>`;
@@ -2665,6 +2678,90 @@ function confirmImportMaterials() {
   closeModal();
   toast(`${items.length} materials imported successfully`);
   renderProjectDetail();
+}
+
+// ========== BATCH SELECT & DELETE ==========
+function toggleAll(cls, headerCb) {
+  document.querySelectorAll('.' + cls).forEach(cb => cb.checked = headerCb.checked);
+  const barId = { 'chk-proj':'batchProj','chk-ord':'batchOrd','chk-del':'batchDel','chk-rem':'batchRem','chk-file':'batchFile','chk-note':'batchNote' }[cls];
+  if (barId) updateBatchBar(cls, barId);
+}
+
+function updateBatchBar(cls, barId) {
+  const bar = $(barId);
+  if (!bar) return;
+  const count = document.querySelectorAll('.' + cls + ':checked').length;
+  bar.classList.toggle('visible', count > 0);
+  bar.querySelector('.batch-count').textContent = count + ' selected';
+}
+
+function batchDeleteProjects() {
+  const ids = [...document.querySelectorAll('.chk-proj:checked')].map(cb => cb.value);
+  if (ids.length === 0) return;
+  showWarning('Delete ' + ids.length + ' Projects', 'Permanently delete ' + ids.length + ' selected projects? This cannot be undone.', () => {
+    ids.forEach(id => { const p = projects[id]; delete projects[id]; if (db) db.doc('projects/' + id).delete(); if (p) logActivity('deleted project "' + p.name + '"'); });
+    toast(ids.length + ' projects deleted');
+    renderProjects();
+  });
+}
+
+function batchDeleteOrders() {
+  const ids = [...document.querySelectorAll('.chk-ord:checked')].map(cb => cb.value);
+  if (ids.length === 0) return;
+  const received = ids.filter(id => orders[id]?.status === 'received');
+  if (received.length > 0) { toast('Cannot delete received orders', 'warn'); return; }
+  showWarning('Delete ' + ids.length + ' Orders', 'Permanently delete ' + ids.length + ' selected orders?', () => {
+    ids.forEach(id => { const o = orders[id]; delete orders[id]; if (db) db.doc('orders/' + id).delete(); if (o) logActivity('deleted order ' + (o.ref || id)); });
+    toast(ids.length + ' orders deleted');
+    renderOrders();
+  });
+}
+
+function batchDeleteDeliveries() {
+  const ids = [...document.querySelectorAll('.chk-del:checked')].map(cb => cb.value);
+  if (ids.length === 0) return;
+  showWarning('Delete ' + ids.length + ' Deliveries', 'Delete ' + ids.length + ' deliveries? Stock will NOT be auto-restored.', () => {
+    ids.forEach(id => { const d = deliveries[id]; delete deliveries[id]; if (db) db.doc('deliveries/' + id).delete(); if (d) logActivity('deleted delivery ' + (d.ref || id)); });
+    toast(ids.length + ' deliveries deleted');
+    renderProjectDetail();
+  });
+}
+
+function batchDeleteReminders() {
+  const ids = [...document.querySelectorAll('.chk-rem:checked')].map(cb => cb.value);
+  if (ids.length === 0) return;
+  showWarning('Delete ' + ids.length + ' Reminders', 'Permanently delete ' + ids.length + ' selected reminders?', () => {
+    ids.forEach(id => { delete reminders[id]; if (db) db.doc('reminders/' + id).delete(); });
+    toast(ids.length + ' reminders deleted');
+    renderReminders();
+    updateBadges();
+  });
+}
+
+function batchDeleteFiles() {
+  const ids = [...document.querySelectorAll('.chk-file:checked')].map(cb => cb.value);
+  if (ids.length === 0) return;
+  const p = projects[currentProject];
+  if (!p) return;
+  showWarning('Delete ' + ids.length + ' Files', 'Remove ' + ids.length + ' selected files from this project?', () => {
+    p.files = (p.files || []).filter(f => !ids.includes(f.id));
+    if (db) db.doc('projects/' + p.id).set(p);
+    toast(ids.length + ' files removed');
+    renderFiles(p);
+  });
+}
+
+function batchDeleteNotes() {
+  const idxs = [...document.querySelectorAll('.chk-note:checked')].map(cb => parseInt(cb.value)).sort((a, b) => b - a);
+  if (idxs.length === 0) return;
+  const p = projects[currentProject];
+  if (!p || !p.projectNotes) return;
+  showWarning('Delete ' + idxs.length + ' Notes', 'Permanently delete ' + idxs.length + ' selected notes?', () => {
+    idxs.forEach(idx => p.projectNotes.splice(idx, 1));
+    if (db) db.doc('projects/' + p.id).set(p);
+    toast(idxs.length + ' notes deleted');
+    renderNotes(p);
+  });
 }
 
 // ========== INIT ==========
