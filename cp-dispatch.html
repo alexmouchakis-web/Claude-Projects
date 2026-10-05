@@ -481,8 +481,12 @@ body.chat-open #chatPanel{transform:none;visibility:visible}
 
   <!-- STOCK -->
   <div class="page" id="page-stock">
-    <div class="page-header"><h1>Warehouse Stock</h1><button class="btn btn-secondary btn-sm" onclick="openStockEdit()">Update Stock</button></div>
-    <div class="card"><div class="card-body no-pad overflow-x" id="stockTable"></div></div>
+    <div class="page-header"><h1 id="stockTitle">Warehouse Stock</h1><div class="flex gap-8">
+      <button class="btn btn-secondary btn-sm" id="reconBackBtn" onclick="closeReconcileView()" hidden>← Back to Stock</button>
+      <button class="btn btn-secondary btn-sm" id="reconBtn" onclick="openReconcile()">Reconcile with ERP</button>
+      <button class="btn btn-secondary btn-sm" id="stockEditBtn" onclick="openStockEdit()">Update Stock</button></div></div>
+    <div class="card" id="stockMain"><div class="card-body no-pad overflow-x" id="stockTable"></div></div>
+    <div id="reconView" hidden></div>
   </div>
 
   <!-- ORDERS -->
@@ -924,6 +928,7 @@ function logActivity(text) {
 
 // ========== NAVIGATION ==========
 function navigate(page, projectId) {
+  closeReconcileView();
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-link').forEach(a => a.classList.remove('active'));
   const pg = $('page-' + page);
@@ -1859,6 +1864,7 @@ function deleteNote(idx) {
 
 // ========== STOCK ==========
 function renderStock() {
+  if (reconOpen) renderRecon();
   const entries = Object.entries(stockData).sort((a, b) => a[0].localeCompare(b[0]));
   if (entries.length === 0) {
     $('stockTable').innerHTML = '<div class="empty-state" style="padding:48px"><p>No stock data yet. Update your warehouse inventory to get started.</p><button class="btn btn-primary" onclick="openStockEdit()">Update Stock</button></div>';
@@ -2052,6 +2058,41 @@ function stockRowHtml(key, val, note) {
 
 function erpStop() { if (erpCtl) erpCtl.abort(); }
 
+async function erpReadAll(files, known, setProgress, signal) {
+  const all = [], columns = [], problems = [];
+  for (let i = 0; i < files.length; i++) {
+    try {
+      const r = await erpReadFile(files[i], known, t => setProgress(`File ${i + 1}/${files.length} — ${t}`), signal);
+      all.push(...r.items); columns.push(...r.columns);
+      if (r.warning) problems.push(r.warning);
+    } catch (e) {
+      if (e && e.code === 'cancelled') throw e;
+      problems.push(`${files[i].name}: ${erpErrorText(e || {})}`);
+    }
+  }
+  return { all, columns, problems };
+}
+
+function erpAggregate(all, known) {
+  const agg = {}, unmatched = [];
+  all.forEach(it => {
+    const q = parseFloat(it.q);
+    if (!isFinite(q) || q < 0) return;
+    const key = erpResolveKey(it, known);
+    const size = pkgSize(key ? key.split('|')[1] : (it.p || ''));
+    const hasSize = key ? true : /(kg|lt|m²)/i.test(it.p || '');
+    const isAmount = it.b === 'a';
+    if (isAmount && !hasSize) { unmatched.push({ n: it.n, p: it.p || '', q: 0, raw: `${q} (amount, pack size unknown)`, file: it.file }); return; }
+    const packs = Math.round(isAmount ? q / size : q);
+    if (key) {
+      const a = agg[key] || (agg[key] = { packs: 0, lines: 0, raw: [] });
+      a.packs += packs; a.lines++;
+      if (isAmount) a.raw.push(`${q} ÷ ${size}`);
+    } else unmatched.push({ n: it.n, p: it.p || '', q: packs, raw: String(q), file: it.file });
+  });
+  return { agg, unmatched };
+}
+
 async function importErpFiles(fileList) {
   const files = [...fileList];
   const inputEl = $('erpFiles');
@@ -2061,42 +2102,16 @@ async function importErpFiles(fileList) {
   const setProgress = t => { $('erpProgressText').textContent = t; };
   $('erpZone').hidden = true; $('erpProgress').hidden = false; $('erpResult').innerHTML = '';
   erpCtl = new AbortController();
-  const all = [], columns = [], problems = [];
-  try {
-    for (let i = 0; i < files.length; i++) {
-      try {
-        const r = await erpReadFile(files[i], known, t => setProgress(`File ${i + 1}/${files.length} — ${t}`), erpCtl.signal);
-        all.push(...r.items); columns.push(...r.columns);
-        if (r.warning) problems.push(r.warning);
-      } catch (e) {
-        if (e && e.code === 'cancelled') throw e;
-        problems.push(`${files[i].name}: ${erpErrorText(e || {})}`);
-      }
-    }
-  } catch (e) {
+  let res;
+  try { res = await erpReadAll(files, known, setProgress, erpCtl.signal); }
+  catch (e) {
     $('erpZone').hidden = false; $('erpProgress').hidden = true; inputEl.value = '';
     toast('Import cancelled', 'warn');
     return;
   }
   $('erpZone').hidden = false; $('erpProgress').hidden = true; inputEl.value = '';
-
-  const agg = {};
-  erpUnmatched = [];
-  all.forEach(it => {
-    const q = parseFloat(it.q);
-    if (!isFinite(q) || q < 0) return;
-    const key = erpResolveKey(it, known);
-    const size = pkgSize(key ? key.split('|')[1] : (it.p || ''));
-    const hasSize = key ? true : /(kg|lt|m²)/i.test(it.p || '');
-    const isAmount = it.b === 'a';
-    if (isAmount && !hasSize) { erpUnmatched.push({ n: it.n, p: it.p || '', q: 0, raw: `${q} (amount, pack size unknown)`, file: it.file }); return; }
-    const packs = Math.round(isAmount ? q / size : q);
-    if (key) {
-      const a = agg[key] || (agg[key] = { packs: 0, lines: 0, raw: [] });
-      a.packs += packs; a.lines++;
-      if (isAmount) a.raw.push(`${q} ÷ ${size}`);
-    } else erpUnmatched.push({ n: it.n, p: it.p || '', q: packs, raw: String(q), file: it.file });
-  });
+  const { agg, unmatched } = erpAggregate(res.all, known);
+  erpUnmatched = unmatched;
 
   let updated = 0;
   Object.entries(agg).forEach(([key, a]) => {
@@ -2111,7 +2126,7 @@ async function importErpFiles(fileList) {
     row.firstElementChild.insertAdjacentHTML('beforeend', `<div class="stock-note">ERP: ${a.packs}${a.raw.length ? ` (${escAttr(a.raw.join(' + '))})` : ''} · was ${was}${a.lines > 1 ? ` · ${a.lines} lines summed` : ''}</div>`);
     updated++;
   });
-  erpRenderResult(files.length, updated, columns, problems, mode);
+  erpRenderResult(files.length, updated, res.columns, res.problems, mode);
   $('erpResult').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
@@ -2144,6 +2159,229 @@ function erpAddUnmatched(i) {
   $('stockRows').insertAdjacentHTML('afterbegin', stockRowHtml(key, { quantity: qty, minStock: 0 }, 'New from ERP file'));
   row.remove();
   toast('Added — press Save Stock to keep it');
+}
+
+// ========== RECONCILE WITH ERP ==========
+let recon = null;
+let reconOpen = false;
+let reconOnlyDiff = true;
+let reconBusy = false;
+let reconMsg = '';
+let reconCtl = null;
+
+function allMaterialKeys() {
+  const keys = new Set(Object.keys(stockData));
+  Object.values(CATALOG).forEach(sys => Object.values(sys.applications).forEach(ps => ps.forEach(p => keys.add(p.name + '|' + p.pkg))));
+  return [...keys];
+}
+
+function applyReconVisibility() {
+  if (!$('reconView')) return;
+  $('stockMain').hidden = reconOpen;
+  $('reconView').hidden = !reconOpen;
+  $('stockTitle').textContent = reconOpen ? 'Reconcile with ERP' : 'Warehouse Stock';
+  $('reconBackBtn').hidden = !reconOpen;
+  $('reconBtn').hidden = reconOpen;
+  $('stockEditBtn').hidden = reconOpen;
+}
+function openReconcile() { reconOpen = true; applyReconVisibility(); renderRecon(); }
+function closeReconcileView() { reconOpen = false; applyReconVisibility(); }
+
+function reconRowsData() {
+  const erpMap = {};
+  (recon?.erp || []).forEach(e => { erpMap[e.k] = e; });
+  const lastDel = {}, lastRec = {};
+  Object.values(deliveries).forEach(d => (d.items || []).forEach(i => { if (d.date && d.date > (lastDel[i.material] || '')) lastDel[i.material] = d.date; }));
+  Object.values(orders).filter(o => o.status === 'received').forEach(o => (o.items || []).forEach(i => { const dt = (o.receivedAt || '').slice(0, 10); if (dt > (lastRec[i.material] || '')) lastRec[i.material] = dt; }));
+  const keys = new Set([...Object.keys(stockData), ...Object.keys(erpMap)]);
+  const rank = { erphigher: 0, apphigher: 0, notinfile: 1, match: 2 };
+  return [...keys].map(key => {
+    const [name, pkg] = key.split('|');
+    const app = (stockData[key] || {}).quantity || 0;
+    const e = erpMap[key];
+    const diff = e ? e.packs - app : null;
+    const status = !e ? 'notinfile' : diff === 0 ? 'match' : diff > 0 ? 'erphigher' : 'apphigher';
+    return { key, name, pkg, app, erp: e ? e.packs : null, diff, status, raw: e?.raw || '', lines: e?.lines || 0, lastDel: lastDel[key] || '', lastRec: lastRec[key] || '' };
+  }).filter(r => !(r.status === 'notinfile' && r.app === 0))
+    .sort((a, b) => rank[a.status] - rank[b.status] || Math.abs(b.diff || 0) - Math.abs(a.diff || 0) || a.name.localeCompare(b.name));
+}
+
+const RECON_STATUS = {
+  match: ['chip-green', 'Match'], erphigher: ['chip-amber', 'ERP higher'], apphigher: ['chip-red', 'App higher'], notinfile: ['chip-gray', 'Not in file']
+};
+
+function reconUploadHtml(label) {
+  return `<div class="attach-zone" id="reconZone" ${reconBusy ? 'hidden' : ''}>
+      <input type="file" id="reconFiles" multiple accept=".xls,.xlsx,.xlsm,.csv,.tsv,.txt,.pdf,image/jpeg,image/png,image/webp" onchange="reconUpload(this.files)">
+      <div class="az-label">📎 ${label}</div>
+      <div class="az-sub">Excel, CSV or PDF stock export from your ERP. Select all files at once — nothing is changed in the app until you choose to.</div>
+    </div>
+    <div id="reconProgress" class="scan-progress" ${reconBusy ? '' : 'hidden'}><div class="spinner"></div><span id="reconProgressText" style="flex:1">${escAttr(reconMsg)}</span><button class="btn btn-secondary btn-sm" onclick="reconStop()">Stop</button></div>`;
+}
+
+function renderRecon() {
+  const el = $('reconView');
+  if (!el) return;
+  if (!sampleAI) { el.innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><p>AI file reading is not available in this view.</p></div></div></div>'; return; }
+  if (!recon) {
+    el.innerHTML = `<div class="card"><div class="card-body">${reconUploadHtml('Upload ERP stock file(s) to compare')}
+      <div class="form-help">Compares the quantities in your ERP with the warehouse stock in this app and lists every difference, with the last delivery and last received order to help find the cause.</div></div></div>`;
+    return;
+  }
+  const all = reconRowsData();
+  const cnt = s => all.filter(r => r.status === s).length;
+  const net = all.reduce((s, r) => s + (r.diff || 0), 0);
+  const shown = reconOnlyDiff ? all.filter(r => r.status === 'erphigher' || r.status === 'apphigher') : all;
+  const diffRows = all.filter(r => r.status === 'erphigher' || r.status === 'apphigher').length;
+  const rows = shown.map(r => {
+    const [cls, label] = RECON_STATUS[r.status];
+    const isDiff = r.status === 'erphigher' || r.status === 'apphigher';
+    const move = [r.lastDel ? 'Delivery ' + fmtDate(r.lastDel) : '', r.lastRec ? 'Received ' + fmtDate(r.lastRec) : ''].filter(Boolean).join(' · ') || '—';
+    return `<tr>
+      <td>${isDiff ? `<input type="checkbox" class="list-check chk-rec" value="${escAttr(r.key)}" onchange="updateBatchBar('chk-rec','batchRec');updateToggleLabel('chk-rec','togRec')">` : ''}</td>
+      <td><strong>${escAttr(r.name)}</strong></td><td>${escAttr(r.pkg)}</td>
+      <td>${r.app}</td><td style="white-space:nowrap">${r.erp === null ? '—' : r.erp}${r.raw ? `<div class="stock-note">${escAttr(r.raw)}</div>` : ''}${r.lines > 1 ? `<div class="stock-note">${r.lines} lines</div>` : ''}</td>
+      <td style="font-weight:600;color:${r.diff > 0 ? 'var(--amber)' : r.diff < 0 ? 'var(--red)' : 'var(--ink-3)'}">${r.diff === null ? '—' : (r.diff > 0 ? '+' : '') + r.diff}</td>
+      <td style="white-space:nowrap"><span class="chip ${cls}">${label}</span></td>
+      <td class="text-sm text-muted">${move}</td>
+      <td>${isDiff ? `<button class="btn btn-secondary btn-sm" onclick="reconApply([${JSON.stringify(r.key).replace(/"/g, '&quot;')}])">Use ERP</button>` : ''}</td></tr>`;
+  }).join('');
+  const unm = (recon.unmatched || []);
+  el.innerHTML = `
+    <div class="card mb-16"><div class="card-body">
+      <div class="flex justify-between items-center mb-8" style="flex-wrap:wrap;gap:8px">
+        <div class="text-sm text-muted">ERP snapshot: <strong>${(recon.files || []).map(escAttr).join(', ')}</strong> · ${fmtDate(recon.at)} by ${escAttr(recon.by || '')}${recon.column ? ' · quantity column: ' + escAttr(recon.column) : ''}</div>
+        <button class="btn btn-secondary btn-sm" onclick="reconExport()">Export report</button>
+      </div>
+      <div class="text-sm text-muted mb-8">The ERP numbers are fixed at upload; the app numbers are live, so rows turn to "Match" as you apply ERP values or record deliveries.</div>
+      ${reconUploadHtml('Upload newer ERP file(s) — replaces this comparison')}
+      ${(recon.problems || []).length ? `<div class="chat-err text-sm mb-8">${recon.problems.map(escAttr).join('<br>')}</div>` : ''}
+    </div></div>
+    <div class="pay-kpis">
+      <div class="pay-kpi"><div class="pk-val" style="color:var(--green)">${cnt('match')}</div><div class="pk-label">Match</div></div>
+      <div class="pay-kpi"><div class="pk-val" style="color:var(--amber)">${cnt('erphigher')}</div><div class="pk-label">ERP higher</div></div>
+      <div class="pay-kpi"><div class="pk-val" style="color:var(--red)">${cnt('apphigher')}</div><div class="pk-label">App higher</div></div>
+      <div class="pay-kpi"><div class="pk-val">${cnt('notinfile')}</div><div class="pk-label">Not in file</div></div>
+      <div class="pay-kpi"><div class="pk-val">${net > 0 ? '+' : ''}${net}</div><div class="pk-label">Net difference (packs)</div></div>
+    </div>
+    <div class="card mb-16"><div class="card-body no-pad overflow-x">
+      <div class="flex items-center gap-8" style="padding:12px 16px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:6px;margin:0;text-transform:none;letter-spacing:0;font-size:.85rem"><input type="checkbox" class="list-check" ${reconOnlyDiff ? 'checked' : ''} onchange="reconOnlyDiff=this.checked;renderRecon()"> Differences only (${diffRows})</label>
+        ${diffRows ? `<button class="select-toggle" id="togRec" onclick="selectAllToggle('chk-rec','batchRec','togRec')">Select All</button>` : ''}
+      </div>
+      <div style="padding:0 16px">${batchBar('batchRec')}</div>
+      ${shown.length ? `<table><thead><tr><th style="width:36px">${diffRows ? `<input type="checkbox" class="list-check" onchange="toggleAll('chk-rec',this);updateToggleLabel('chk-rec','togRec')">` : ''}</th><th>Material</th><th>Pack</th><th>App stock</th><th>ERP</th><th>Diff</th><th>Status</th><th>Last movement</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+        : `<div class="empty-state" style="padding:32px"><p>${diffRows === 0 ? 'No differences — the app matches the ERP file.' : 'Nothing to show.'}</p></div>`}
+    </div></div>
+    ${unm.length ? `<div class="card"><div class="card-body"><h3 class="mb-8">${unm.length} ERP line${unm.length === 1 ? '' : 's'} not matched to a material</h3>
+      <div class="form-help mb-8">Add them as new stock items if they are yours, or ignore them.</div>
+      <div class="overflow-x"><table class="erp-unm"><thead><tr><th>Product</th><th>Pack</th><th>Qty (packs)</th><th>In file</th><th></th></tr></thead><tbody>${unm.slice(0, 40).map((u, i) => `<tr id="recU${i}">
+        <td><input type="text" class="eu-name" value="${escAttr(u.n)}" style="min-width:150px"></td>
+        <td><input type="text" class="eu-pkg" value="${escAttr(u.p)}" placeholder="20kg" style="width:70px"></td>
+        <td><input type="number" class="eu-qty" value="${u.q}" min="0" style="width:70px"></td>
+        <td class="text-sm text-muted">${escAttr(u.raw || '')}</td>
+        <td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" onclick="reconAddUnmatched(${i})">Add to stock</button> <button class="remove-btn" title="Ignore" onclick="reconIgnoreUnmatched(${i})">✕</button></td></tr>`).join('')}</tbody></table></div></div></div>` : ''}`;
+}
+
+function reconStop() { if (reconCtl) reconCtl.abort(); }
+
+async function reconUpload(fileList) {
+  const files = [...fileList];
+  if (!files.length || !sampleAI || reconBusy) return;
+  const known = allMaterialKeys();
+  reconBusy = true; reconMsg = 'Preparing…'; reconCtl = new AbortController();
+  renderRecon();
+  const progress = t => { reconMsg = t; if ($('reconProgressText')) $('reconProgressText').textContent = t; };
+  let res;
+  try { res = await erpReadAll(files, known, progress, reconCtl.signal); }
+  catch (e) { reconBusy = false; renderRecon(); toast('Comparison cancelled', 'warn'); return; }
+  reconBusy = false;
+  const { agg, unmatched } = erpAggregate(res.all, known);
+  recon = {
+    at: new Date().toISOString(), by: currentUser, files: files.map(f => f.name),
+    column: [...new Set(res.columns)].join(', '),
+    erp: Object.entries(agg).map(([k, a]) => ({ k, packs: a.packs, lines: a.lines, raw: a.raw.join(' + ') })),
+    unmatched: unmatched.slice(0, 100), problems: res.problems
+  };
+  saveRecon();
+  logActivity(`compared stock with ERP file(s): ${recon.files.join(', ')}`);
+  reconOnlyDiff = true;
+  renderRecon();
+  toast(recon.erp.length ? `${recon.erp.length} materials compared` : 'No materials could be read from the file(s)', recon.erp.length ? undefined : 'warn');
+}
+
+function saveRecon() {
+  if (!db || !recon) return;
+  try {
+    const r = db.doc('recon/last').set(JSON.parse(JSON.stringify(recon)));
+    if (r && r.catch) r.catch(() => {});
+  } catch (e) {}
+}
+
+function reconApply(keys) {
+  let n = 0;
+  keys.forEach(k => {
+    const e = (recon?.erp || []).find(x => x.k === k);
+    if (!e) return;
+    stockData[k] = { quantity: e.packs, minStock: (stockData[k] || {}).minStock || 0 };
+    n++;
+  });
+  if (!n) return;
+  if (db) db.doc('stock/materials').set(stockData);
+  logActivity(`set ${n} stock quantit${n === 1 ? 'y' : 'ies'} to ERP values (reconciliation)`);
+  toast(`${n} stock quantit${n === 1 ? 'y' : 'ies'} set to ERP`);
+  renderRecon();
+}
+
+function batchReconApply() {
+  const keys = selIds('chk-rec');
+  if (!keys.length) return;
+  showWarning(`Use ERP quantities for ${keys.length} material${keys.length === 1 ? '' : 's'}`, 'Overwrite the app stock of the selected materials with the ERP numbers?', () => reconApply(keys));
+}
+
+function reconExport(onlySelected) {
+  const sel = onlySelected ? selIds('chk-rec') : null;
+  const rows = reconRowsData().filter(r => sel ? sel.includes(r.key) : (!reconOnlyDiff || r.status === 'erphigher' || r.status === 'apphigher'));
+  saveCsv('erp-reconciliation.csv', [['Material', 'Pack', 'App stock', 'ERP', 'Difference (ERP - app)', 'Status', 'Last delivery', 'Last received']]
+    .concat(rows.map(r => [r.name, r.pkg, r.app, r.erp === null ? '' : r.erp, r.diff === null ? '' : r.diff, RECON_STATUS[r.status][1], r.lastDel, r.lastRec])));
+}
+
+function reconAddUnmatched(i) {
+  const row = $('recU' + i);
+  if (!row) return;
+  const name = row.querySelector('.eu-name').value.trim().replace(/\|/g, '/');
+  const pkg = row.querySelector('.eu-pkg').value.trim().replace(/\|/g, '/');
+  const qty = parseInt(row.querySelector('.eu-qty').value) || 0;
+  if (!name || !pkg) { toast('Enter the product name and pack size (e.g. 20kg)', 'warn'); return; }
+  const key = name + '|' + pkg;
+  if (stockData[key]) { toast('That material already exists in stock', 'warn'); return; }
+  stockData[key] = { quantity: qty, minStock: 0 };
+  recon.erp.push({ k: key, packs: qty, lines: 1, raw: '' });
+  recon.unmatched.splice(i, 1);
+  if (db) db.doc('stock/materials').set(stockData);
+  saveRecon();
+  logActivity(`added "${name}" (${pkg}) to stock from ERP file`);
+  toast('Added to stock');
+  renderRecon();
+}
+
+function reconIgnoreUnmatched(i) {
+  recon.unmatched.splice(i, 1);
+  saveRecon();
+  renderRecon();
+}
+
+function toolErpReconciliation() {
+  chatStatus('Reading ERP reconciliation…');
+  if (!recon) return { available: false, note: 'No ERP file has been uploaded for reconciliation yet (Stock page > Reconcile with ERP).' };
+  const rows = reconRowsData();
+  const diffs = rows.filter(r => r.status === 'erphigher' || r.status === 'apphigher');
+  return {
+    available: true, files: recon.files, uploaded: recon.at, by: recon.by, unit: 'packs',
+    counts: { match: rows.filter(r => r.status === 'match').length, erp_higher: rows.filter(r => r.status === 'erphigher').length, app_higher: rows.filter(r => r.status === 'apphigher').length, not_in_file: rows.filter(r => r.status === 'notinfile').length },
+    differences: diffs.slice(0, 60).map(r => ({ material: r.name, pack: r.pkg, app: r.app, erp: r.erp, diff_erp_minus_app: r.diff, last_delivery: r.lastDel || null, last_received: r.lastRec || null })),
+    unmatched_erp_lines: (recon.unmatched || []).length
+  };
 }
 
 // ========== ORDERS ==========
@@ -3542,12 +3780,15 @@ const BATCH_CFG = {
     <button class="btn btn-primary btn-sm" onclick="batchCompleteReminders()">Mark Done</button>
     <button class="btn btn-secondary btn-sm" onclick="batchRescheduleReminders()">Reschedule</button>` },
   batchFile: { del: 'batchDeleteFiles', actions: `<button class="btn btn-secondary btn-sm" onclick="batchFileCategory()">Change Category</button>` },
+  batchRec: { del: null, actions: `
+    <button class="btn btn-primary btn-sm" onclick="batchReconApply()">Use ERP quantity</button>
+    <button class="btn btn-secondary btn-sm" onclick="reconExport(true)">Export CSV</button>` },
   batchNote: { del: 'batchDeleteNotes', actions: `<button class="btn btn-secondary btn-sm" onclick="batchCopyNotes()">Copy Text</button>` }
 };
 
 function batchBar(id) {
   const c = BATCH_CFG[id];
-  return `<div class="batch-bar" id="${id}"><span class="batch-count">0</span><div class="batch-actions">${c.actions}</div><button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="${c.del}()">Delete Selected</button></div>`;
+  return `<div class="batch-bar" id="${id}"><span class="batch-count">0</span><div class="batch-actions">${c.actions}</div>${c.del ? `<button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="${c.del}()">Delete Selected</button>` : ''}</div>`;
 }
 
 const selIds = cls => [...document.querySelectorAll('.' + cls + ':checked')].map(cb => cb.value);
@@ -3726,7 +3967,7 @@ async function batchCopyNotes() {
 // ========== BATCH SELECT & DELETE ==========
 function toggleAll(cls, headerCb) {
   document.querySelectorAll('.' + cls).forEach(cb => cb.checked = headerCb.checked);
-  const barId = { 'chk-proj':'batchProj','chk-ord':'batchOrd','chk-del':'batchDel','chk-rem':'batchRem','chk-file':'batchFile','chk-note':'batchNote' }[cls];
+  const barId = { 'chk-proj':'batchProj','chk-ord':'batchOrd','chk-del':'batchDel','chk-rem':'batchRem','chk-file':'batchFile','chk-note':'batchNote','chk-rec':'batchRec' }[cls];
   if (barId) updateBatchBar(cls, barId);
 }
 
@@ -4040,7 +4281,7 @@ Left menu: Dashboard (KPIs, alerts, analytics charts), Projects, Stock, Orders, 
 Projects list: New Project, table with checkboxes; selecting rows shows a bar with bulk actions (set status, export CSV, delete).
 New Project: "Attach Offer or Invoice" lets AI read a PDF/photo and fill client, location, deadline, notes, payment terms and the exact material quantities; each attached file has Preview, Edit and delete. Product systems can also be added manually from the catalog; materials are then calculated from consumption per m2.
 Project tabs: Overview (systems, progress), Phases (allocate m2 per system, dates, status), Materials (required units, in stock, delivered, remaining; "Generate Order for Missing"), Payment Terms (total, terms, installments with Paid/Pending/Overdue, mark paid), Deliveries (record a delivery: deducts stock, delivery note CSV, photos, email notification), Files (upload, preview), Production (batches planned > mixing > curing > ready), Notes.
-Stock: quantities and minimum levels per material (Update Stock). Orders: supplier orders pending > ordered > received (receiving adds to stock); AUTO-... orders are created by the auto-reorder check for active-project shortages. Reminders: assign to team members with date/time. Email notifications go to the team through Gmail. Data is shared by the whole team in one database; the header shows who is online.
+Stock: quantities and minimum levels per material (Update Stock; it can also read ERP stock files with AI). Reconcile with ERP (Stock page): upload ERP stock file(s), see differences vs app stock, apply ERP values per material or in bulk. Orders: supplier orders pending > ordered > received (receiving adds to stock); AUTO-... orders are created by the auto-reorder check for active-project shortages. Reminders: assign to team members with date/time. Email notifications go to the team through Gmail. Data is shared by the whole team in one database; the header shows who is online.
 Catalog (17 product systems): ${sysNames}.
 Not in the app today (candidates when asked what is missing): unit prices, costs and margins per material or project; supplier database and supplier prices; a customer database (client is free text); issuing offers/invoices from the app; user roles and permissions; calendar sync; returns and credit notes; stock by batch number or warehouse location; multi-currency (EUR only); reports/export to accounting.
 
@@ -4208,6 +4449,7 @@ function chatToolDefs() {
       inputSchema: { type: 'object', properties: { status: str('pending | ordered | received'), since: str('YYYY-MM-DD'), material: str('Material name words') } }, execute: toolListOrders },
     { name: 'stock_levels', description: 'Warehouse stock per material with minimum level; can filter by material name or only low/out-of-stock items.',
       inputSchema: { type: 'object', properties: { material: str('Material name words'), only_low: { type: 'boolean' } } }, execute: toolStockLevels },
+    { name: 'erp_reconciliation', description: 'Result of the last ERP stock file comparison: counts of matching/different materials and the list of differences (ERP minus app, in packs) with last delivery/received dates.', execute: toolErpReconciliation },
     { name: 'payments_summary', description: 'Payment totals across all projects: total, paid, outstanding and overdue installments per project.', execute: toolPayments }
   ];
 }
@@ -4267,6 +4509,11 @@ async function init() {
       snap.docs.forEach(doc => { if (doc.exists) reminders[doc.id] = doc.data(); });
       snap.docChanges().forEach(ch => { if (ch.type === 'removed') delete reminders[ch.doc.id]; });
       renderCurrentPage();
+    });
+    // Subscribe to ERP reconciliation snapshot
+    db.doc('recon/last').onSnapshot(snap => {
+      if (snap.exists) recon = snap.data();
+      if (reconOpen && !reconBusy) renderRecon();
     });
     // Subscribe to activity
     db.doc('activity/recent').onSnapshot(snap => {
