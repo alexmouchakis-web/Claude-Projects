@@ -306,6 +306,18 @@ tr:hover td{background:var(--surface-alt)}
 .list-check{width:18px;height:18px;accent-color:var(--blue);cursor:pointer;flex-shrink:0}
 .select-toggle{background:none;color:var(--blue);font-size:.8rem;font-weight:500;padding:4px 10px;border-radius:6px;display:inline-flex;align-items:center;gap:4px}
 .select-toggle:hover{background:var(--blue-light)}
+.attach-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:14px 16px;text-align:center;cursor:pointer;transition:all .15s;margin-bottom:16px;position:relative}
+.attach-zone:hover{border-color:var(--blue);background:var(--blue-light)}
+.attach-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+.attach-zone .az-label{font-size:.85rem;font-weight:500;color:var(--blue)}
+.attach-zone .az-sub{font-size:.75rem;color:var(--ink-3);margin-top:2px}
+.attached-file{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface-alt);border-radius:var(--radius);margin-bottom:12px;font-size:.85rem}
+.attached-file .af-icon{width:32px;height:32px;border-radius:6px;background:var(--blue-light);color:var(--blue);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.75rem;flex-shrink:0}
+.attached-file .af-info{flex:1;min-width:0}
+.attached-file .af-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.attached-file .af-status{font-size:.75rem;color:var(--ink-3)}
+.scan-progress{display:flex;align-items:center;gap:10px;padding:14px;background:var(--surface-alt);border-radius:var(--radius);margin-bottom:12px}
+.scan-progress .spinner{width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .6s linear infinite}
 </style>
 
 <div class="app">
@@ -996,7 +1008,9 @@ function renderProjects() {
   </tr>`).join('')}</tbody></table>`;
 }
 
-function openNewProject(editId) {
+function openNewProject(editId, keepAttached) {
+  if (!keepAttached) npAttachedDocs = [];
+  window._npEditId = editId || '';
   const p = editId ? projects[editId] : null;
   const systemOptions = Object.keys(CATALOG).map(s => `<option value="${s}">${s} (${CATALOG[s].category})</option>`).join('');
   let systemsHtml = '';
@@ -1015,7 +1029,16 @@ function openNewProject(editId) {
       </div>`;
     });
   }
+  const attachHtml = sampleAI ? `
+    <div id="npAttachZone" class="attach-zone">
+      <input type="file" id="npAttachFile" accept=".pdf,image/jpeg,image/png,image/webp" onchange="scanNewProjectFile()">
+      <div class="az-label">📎 Attach Offer or Invoice</div>
+      <div class="az-sub">Upload a PDF or photo — AI will auto-fill project details & materials</div>
+    </div>
+    <div id="npScanProgress" class="scan-progress" hidden><div class="spinner"></div><span id="npScanText">Preparing...</span></div>
+    <div id="npAttachedFiles"></div>` : '';
   openModal(p ? 'Edit Project' : 'New Project', `
+    ${attachHtml}
     <div class="form-grid">
       <div class="form-row"><label>Project Name</label><input type="text" id="projName" value="${escAttr(p ? p.name : '')}" placeholder="e.g., Hotel Samos"></div>
       <div class="form-row"><label>Client</label><input type="text" id="projClient" value="${escAttr(p ? p.client : '')}" placeholder="e.g., Samos Hotels SA"></div>
@@ -1040,6 +1063,7 @@ function openNewProject(editId) {
     <div class="form-help mt-8">Add the product systems needed for this project. The app will auto-calculate all materials.</div>
   `, `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
      <button class="btn btn-primary" onclick="saveProject('${editId || ''}')">${p ? 'Save Changes' : 'Create Project'}</button>`);
+  if (npAttachedDocs.length > 0) renderAttachedFiles();
 }
 
 function addSystemRow() {
@@ -2685,6 +2709,221 @@ function confirmImportMaterials() {
   closeModal();
   toast(`${items.length} materials imported successfully`);
   renderProjectDetail();
+}
+
+// ========== NEW PROJECT OFFER/INVOICE SCAN ==========
+let npAttachedDocs = [];
+
+async function scanNewProjectFile() {
+  const fileInput = $('npAttachFile');
+  const file = fileInput?.files?.[0];
+  if (!file) return;
+  if (!sampleAI) { toast('AI scanning not available', 'error'); return; }
+  const zone = $('npAttachZone');
+  const prog = $('npScanProgress');
+  if (zone) zone.hidden = true;
+  if (prog) prog.hidden = false;
+  $('npScanText').textContent = 'Preparing document...';
+  try {
+    let images = [];
+    if (file.type === 'application/pdf') {
+      $('npScanText').textContent = 'Rendering PDF pages...';
+      images = await renderPdfToImages(file);
+    } else {
+      images = [file];
+    }
+    const limits = await sampleAI.limits().catch(() => null);
+    const canSendImages = !!limits?.images;
+    const systemNames = Object.keys(CATALOG);
+    const knownProducts = [];
+    for (const sys of Object.values(CATALOG)) {
+      for (const products of Object.values(sys.applications)) {
+        products.forEach(p => { if (!knownProducts.includes(p.name)) knownProducts.push(p.name); });
+      }
+    }
+    const prompt = `You are analyzing a document from a microcement company (Cement Plus).
+Extract project details AND material line items.
+
+Known product systems: ${systemNames.join(', ')}
+Known products: ${knownProducts.join(', ')}
+
+Return ONLY a JSON object with these fields:
+{
+  "clientName": "customer/client name or empty string",
+  "projectName": "project name/description or empty string",
+  "location": "destination/address or empty string",
+  "deadline": "deadline date in YYYY-MM-DD format or empty string",
+  "notes": "any relevant notes from the document or empty string",
+  "systems": [
+    {
+      "systemName": "matched system name from known systems above, or 'Imported' if unsure",
+      "application": "matched application type or 'General'",
+      "area": estimated area in m² as number (or 1 if not stated),
+      "materials": [
+        {"name":"product name","pkg":"packaging e.g. 20kg","quantity":5,"unit":"kg"}
+      ]
+    }
+  ]
+}
+Group materials by system when possible. Match product/system names to the known lists above.
+If you cannot determine a field, use empty string. Never omit a field.`;
+
+    $('npScanText').textContent = 'Scanning document with AI...';
+    let result;
+    if (canSendImages && images.length > 0) {
+      const maxImg = limits.images.maxCount || 5;
+      result = await sampleAI.json(prompt, { images: images.slice(0, maxImg), modelTier: 'default', cache: false });
+    } else if (file.type === 'application/pdf') {
+      $('npScanText').textContent = 'Extracting text...';
+      const text = await extractPdfText(file);
+      if (!text) { toast('Cannot read this PDF', 'error'); resetNpScan(); return; }
+      result = await sampleAI.json(prompt + '\n\nDocument text:\n' + text.slice(0, 30000), { modelTier: 'default', cache: false });
+    } else {
+      toast('Image support not available — try a PDF instead', 'error'); resetNpScan(); return;
+    }
+    if (!result || typeof result !== 'object') { toast('Could not extract data from document', 'warn'); resetNpScan(); return; }
+    applyScannedData(result, file.name);
+  } catch (e) {
+    const msg = e.code === 'not_granted' ? 'AI scanning permission denied' :
+                e.code === 'rate_limited' ? 'Rate limited — try again in a moment' :
+                e.code === 'image_rejected' ? 'Image could not be processed — try a different file' :
+                e.code === 'invalid_json' ? 'Could not parse document — try a clearer scan' :
+                'Scan failed: ' + (e.message || 'unknown error');
+    toast(msg, 'error'); resetNpScan();
+  }
+}
+
+function resetNpScan() {
+  const zone = $('npAttachZone');
+  const prog = $('npScanProgress');
+  if (zone) zone.hidden = false;
+  if (prog) prog.hidden = true;
+  const fi = $('npAttachFile');
+  if (fi) fi.value = '';
+}
+
+function applyScannedData(data, fileName) {
+  if (data.projectName && $('projName') && !$('projName').value.trim()) $('projName').value = data.projectName;
+  if (data.clientName && $('projClient') && !$('projClient').value.trim()) $('projClient').value = data.clientName;
+  if (data.location && $('projLocation') && !$('projLocation').value.trim()) $('projLocation').value = data.location;
+  if (data.deadline && $('projDeadline') && !$('projDeadline').value) $('projDeadline').value = data.deadline;
+  if (data.notes && $('projNotes') && !$('projNotes').value.trim()) $('projNotes').value = data.notes;
+
+  if (Array.isArray(data.systems)) {
+    data.systems.forEach(sys => {
+      const sysName = sys.systemName && CATALOG[sys.systemName] ? sys.systemName : null;
+      if (sysName) {
+        const cat = CATALOG[sysName];
+        const apps = Object.keys(cat.applications).map(a => `<option value="${a}" ${a === sys.application ? 'selected' : ''}>${a}</option>`).join('');
+        const el = document.createElement('div');
+        el.className = 'system-card';
+        el.innerHTML = `<div class="system-card-header"><strong>${sysName}</strong><button class="remove-btn" onclick="this.closest('.system-card').remove()">✕ Remove</button></div>
+          <div class="form-grid">
+            <div><label>Application</label><select class="sys-app">${apps}</select></div>
+            <div><label>Area (m²)</label><input type="number" class="sys-area" value="${sys.area || 1}" min="1"></div>
+          </div>
+          <div class="form-row mt-8"><label>Notes</label><input type="text" class="sys-notes" value="${escAttr(sys.notes || '')}" placeholder="e.g., Main hall floors"></div>
+          <input type="hidden" class="sys-name" value="${escAttr(sysName)}">`;
+        $('systemsList').appendChild(el);
+      }
+    });
+  }
+
+  const docId = uid();
+  npAttachedDocs.push({ id: docId, fileName, data });
+  renderAttachedFiles();
+  resetNpScan();
+  toast('Document scanned — fields auto-filled');
+}
+
+function renderAttachedFiles() {
+  const container = $('npAttachedFiles');
+  if (!container) return;
+  container.innerHTML = npAttachedDocs.map(doc => `
+    <div class="attached-file" id="af-${doc.id}">
+      <div class="af-icon">PDF</div>
+      <div class="af-info">
+        <div class="af-name">${escAttr(doc.fileName)}</div>
+        <div class="af-status">Scanned — ${doc.data.systems ? doc.data.systems.reduce((n, s) => n + (s.materials?.length || 0), 0) : 0} materials extracted</div>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="editAttachedDoc('${doc.id}')" style="padding:4px 10px;font-size:.75rem">Edit</button>
+      <button class="remove-btn" onclick="deleteAttachedDoc('${doc.id}')">✕</button>
+    </div>`).join('');
+}
+
+function deleteAttachedDoc(docId) {
+  const doc = npAttachedDocs.find(d => d.id === docId);
+  if (!doc) return;
+  npAttachedDocs = npAttachedDocs.filter(d => d.id !== docId);
+  renderAttachedFiles();
+  toast('Attached document removed');
+}
+
+function editAttachedDoc(docId) {
+  const doc = npAttachedDocs.find(d => d.id === docId);
+  if (!doc) return;
+  const d = doc.data;
+  const materialsHtml = (d.systems || []).flatMap((sys, si) =>
+    (sys.materials || []).map((m, mi) => `
+      <tr>
+        <td><input type="text" class="ed-name" data-si="${si}" data-mi="${mi}" value="${escAttr(m.name)}" style="min-width:140px"></td>
+        <td><input type="text" class="ed-pkg" data-si="${si}" data-mi="${mi}" value="${escAttr(m.pkg || '')}" style="width:70px"></td>
+        <td><input type="number" class="ed-qty" data-si="${si}" data-mi="${mi}" value="${parseInt(m.quantity) || 1}" min="1" style="width:60px"></td>
+        <td><input type="text" class="ed-unit" data-si="${si}" data-mi="${mi}" value="${escAttr(m.unit || 'kg')}" style="width:50px"></td>
+        <td><button class="remove-btn" onclick="this.closest('tr').remove()">✕</button></td>
+      </tr>`)
+  ).join('');
+  openModal('Edit Scanned Data — ' + doc.fileName, `
+    <div class="form-grid">
+      <div class="form-row"><label>Client Name</label><input type="text" id="edClient" value="${escAttr(d.clientName || '')}"></div>
+      <div class="form-row"><label>Project Name</label><input type="text" id="edProjName" value="${escAttr(d.projectName || '')}"></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-row"><label>Location</label><input type="text" id="edLocation" value="${escAttr(d.location || '')}"></div>
+      <div class="form-row"><label>Deadline</label><input type="date" id="edDeadline" value="${d.deadline || ''}"></div>
+    </div>
+    <div class="form-row"><label>Notes</label><textarea id="edNotes" rows="2">${escAttr(d.notes || '')}</textarea></div>
+    <hr style="border:none;border-top:1px solid var(--border-light);margin:16px 0">
+    <h3 class="mb-8">Extracted Materials</h3>
+    <div class="overflow-x"><table><thead><tr><th>Product</th><th>Pkg</th><th>Qty</th><th>Unit</th><th style="width:30px"></th></tr></thead>
+    <tbody id="edMaterialsBody">${materialsHtml}</tbody></table></div>
+  `, `<button class="btn btn-secondary" onclick="closeModal();openNewProject(window._npEditId||'',true);renderAttachedFiles()">Cancel</button>
+     <button class="btn btn-primary" onclick="saveAttachedDocEdits('${docId}')">Save Changes</button>`);
+  window._npEditId = '';
+}
+
+function saveAttachedDocEdits(docId) {
+  const doc = npAttachedDocs.find(d => d.id === docId);
+  if (!doc) return;
+  doc.data.clientName = $('edClient')?.value?.trim() || '';
+  doc.data.projectName = $('edProjName')?.value?.trim() || '';
+  doc.data.location = $('edLocation')?.value?.trim() || '';
+  doc.data.deadline = $('edDeadline')?.value || '';
+  doc.data.notes = $('edNotes')?.value?.trim() || '';
+  const rows = document.querySelectorAll('#edMaterialsBody tr');
+  const matBySys = {};
+  rows.forEach(row => {
+    const si = row.querySelector('.ed-name')?.dataset?.si;
+    const name = row.querySelector('.ed-name')?.value?.trim();
+    const pkg = row.querySelector('.ed-pkg')?.value?.trim() || '';
+    const qty = parseInt(row.querySelector('.ed-qty')?.value) || 1;
+    const unit = row.querySelector('.ed-unit')?.value?.trim() || 'kg';
+    if (!name) return;
+    if (!matBySys[si]) matBySys[si] = [];
+    matBySys[si].push({ name, pkg, quantity: qty, unit });
+  });
+  if (doc.data.systems) {
+    doc.data.systems.forEach((sys, i) => { sys.materials = matBySys[i] || []; });
+  }
+  closeModal();
+  openNewProject(window._npEditId || '', true);
+  if (doc.data.clientName && $('projClient')) $('projClient').value = doc.data.clientName;
+  if (doc.data.projectName && $('projName')) $('projName').value = doc.data.projectName;
+  if (doc.data.location && $('projLocation')) $('projLocation').value = doc.data.location;
+  if (doc.data.deadline && $('projDeadline')) $('projDeadline').value = doc.data.deadline;
+  if (doc.data.notes && $('projNotes')) $('projNotes').value = doc.data.notes;
+  renderAttachedFiles();
+  toast('Scanned data updated');
 }
 
 // ========== BATCH SELECT & DELETE ==========
