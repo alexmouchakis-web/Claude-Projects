@@ -395,6 +395,11 @@ body.chat-open #chatPanel{transform:none;visibility:visible}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
       <span>Projects</span>
     </a></li>
+    <li><a href="#production" class="nav-link" data-page="production">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20h20"/><path d="M4 20V9l6 4V9l6 4V5h4v15"/></svg>
+      <span>Production</span>
+      <span class="nav-badge" id="prodBadge" hidden>0</span>
+    </a></li>
     <li><a href="#stock" class="nav-link" data-page="stock">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0022 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
       <span>Stock</span>
@@ -414,9 +419,6 @@ body.chat-open #chatPanel{transform:none;visibility:visible}
       <span>Timeline</span>
     </a></li>
   </ul>
-  <div class="nav-footer">
-    <div class="online" id="onlineUsers"><span class="dot"></span> <span id="onlineCount">1 online</span></div>
-  </div>
 </nav>
 
 <main>
@@ -439,7 +441,7 @@ body.chat-open #chatPanel{transform:none;visibility:visible}
       <div class="card-body"><div id="dashActivity"></div></div>
     </div>
     <div class="card mt-16">
-      <div class="card-header"><h2>Monthly Analytics</h2><button class="email-btn" onclick="notifyLowStock()" title="Email stock alerts to team"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> Email Stock Alerts</button></div>
+      <div class="card-header"><h2>Monthly Analytics</h2></div>
       <div class="card-body"><div class="an-grid" id="dashAnalytics"></div></div>
     </div>
   </div>
@@ -483,6 +485,12 @@ body.chat-open #chatPanel{transform:none;visibility:visible}
     <div class="tab-panel" id="tab-files"></div>
     <div class="tab-panel" id="tab-production"></div>
     <div class="tab-panel" id="tab-notes"></div>
+  </div>
+
+  <!-- PRODUCTION -->
+  <div class="page" id="page-production">
+    <div class="page-header"><h1>Production</h1><button class="btn btn-primary" onclick="openProdOrder()">New Production Order</button></div>
+    <div id="prodList"></div>
   </div>
 
   <!-- STOCK -->
@@ -874,8 +882,6 @@ function getAllMaterials(systems) {
 let db = null;
 let downloads = null;
 let assets = null;
-let room = null;
-let mcp = null;
 let sampleAI = null;
 let projects = {};
 let stockData = {};
@@ -887,6 +893,8 @@ let currentProject = null;
 let currentUser = TEAM[0].name;
 
 // ========== HELPERS ==========
+// the database delivers frozen objects; the app edits its copies in place
+const thaw = o => typeof structuredClone === 'function' ? structuredClone(o) : JSON.parse(JSON.stringify(o));
 const $ = id => document.getElementById(id);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -936,6 +944,7 @@ function navigate(page, projectId) {
   if (page === 'dashboard') renderDashboard();
   else if (page === 'projects') renderProjects();
   else if (page === 'project-detail' && projectId) { currentProject = projectId; renderProjectDetail(); }
+  else if (page === 'production') renderProductionPage();
   else if (page === 'stock') renderStock();
   else if (page === 'orders') renderOrders();
   else if (page === 'reminders') renderReminders();
@@ -1009,7 +1018,7 @@ function renderDashboard() {
   if (alerts.length === 0) {
     $('dashAlerts').innerHTML = '<div class="text-muted text-sm">All clear — no alerts right now.</div>';
   } else {
-    $('dashAlerts').innerHTML = alerts.slice(0, 8).map(a => `<div class="alert-item alert-${a.level}">
+    $('dashAlerts').innerHTML = alerts.slice(0, 8).map(a => `<div class="alert-item alert-${a.level}${a.go ? ' clickable' : ''}"${a.go ? ` role="button" tabindex="0" onclick="${a.go}"` : ''}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <span>${a.message}</span>
     </div>`).join('');
@@ -1020,7 +1029,6 @@ function renderDashboard() {
     : activities.slice(0, 10).map(a => `<div style="padding:6px 0;border-bottom:1px solid var(--border-light);font-size:.85rem"><strong>${a.user}</strong> ${a.text} <span class="text-muted">— ${fmtDate(a.time)}</span></div>`).join('');
 
   renderAnalytics();
-  checkAutoReorder();
   updateBadges();
 }
 
@@ -1028,42 +1036,44 @@ function renderDashboard() {
 function generateAlerts() {
   const alerts = [];
   const now = new Date();
+  const proj = id => `navigate('project-detail','${id}')`;
   Object.entries(stockData).forEach(([key, val]) => {
-    if (val.quantity <= 0) alerts.push({ level: 'red', message: `Out of stock: ${key.replace(/\|/g, ' ')}` });
-    else if (val.minStock && val.quantity <= val.minStock) alerts.push({ level: 'amber', message: `Low stock: ${key.replace(/\|/g, ' ')} (${val.quantity} remaining, min: ${val.minStock})` });
+    if (val.quantity <= 0) alerts.push({ level: 'red', message: `Out of stock: ${key.replace(/\|/g, ' ')}`, go: "navigate('stock')" });
+    else if (val.minStock && val.quantity <= val.minStock) alerts.push({ level: 'amber', message: `Low stock: ${key.replace(/\|/g, ' ')} (${val.quantity} remaining, min: ${val.minStock})`, go: "navigate('stock')" });
   });
   Object.values(projects).filter(p => p.status === 'active').forEach(p => {
     if (p.deadline) {
       const days = daysDiff(p.deadline, now);
-      if (days < 0) alerts.push({ level: 'red', message: `Project "${p.name}" is ${Math.abs(days)} days past deadline` });
-      else if (days <= 7) alerts.push({ level: 'amber', message: `Project "${p.name}" deadline in ${days} days` });
+      if (days < 0) alerts.push({ level: 'red', message: `Project "${p.name}" is ${Math.abs(days)} days past deadline`, go: proj(p.id) });
+      else if (days <= 7) alerts.push({ level: 'amber', message: `Project "${p.name}" deadline in ${days} days`, go: proj(p.id) });
     }
     (p.phases || []).filter(ph => ph.status !== 'completed').forEach(ph => {
       if (ph.targetDate) {
         const days = daysDiff(ph.targetDate, now);
-        if (days < 0) alerts.push({ level: 'red', message: `"${p.name}" — ${ph.name} is overdue by ${Math.abs(days)} days` });
-        else if (days <= 5) alerts.push({ level: 'amber', message: `"${p.name}" — ${ph.name} due in ${days} days` });
-      }
-    });
-    const mats = getAllMaterials(p.systems || []);
-    mats.forEach(m => {
-      const sKey = m.name + '|' + m.pkg;
-      const inStock = (stockData[sKey] || {}).quantity || 0;
-      if (inStock < m.totalUnits) {
-        const hasPending = Object.values(orders).some(o => o.status === 'pending' && (o.items || []).some(i => i.material === sKey));
-        if (!hasPending) alerts.push({ level: 'amber', message: `"${p.name}" needs ${m.totalUnits} ${m.name} (${m.pkg}) but only ${inStock} in stock and no pending orders` });
+        const go = proj(p.id) + ";goTab('phases')";
+        if (days < 0) alerts.push({ level: 'red', message: `"${p.name}" — ${ph.name} is overdue by ${Math.abs(days)} days`, go });
+        else if (days <= 5) alerts.push({ level: 'amber', message: `"${p.name}" — ${ph.name} due in ${days} days`, go });
       }
     });
   });
+  const toOrder = plannerRows().filter(r => r.suggest > 0);
+  if (toOrder.length) {
+    const late = toOrder.filter(r => r.urgency === 'late').length;
+    alerts.push({ level: late ? 'red' : 'amber', message: `${toOrder.length} material${toOrder.length === 1 ? '' : 's'} to order${late ? ` (${late} late)` : ''} — open the Reorder Planner`, go: "navigate('orders');openPlanner()" });
+  }
   Object.values(orders).filter(o => o.status === 'pending' && o.expectedDate).forEach(o => {
     const days = daysDiff(o.expectedDate, now);
-    if (days < 0) alerts.push({ level: 'red', message: `Order "${o.ref || o.id}" is ${Math.abs(days)} days overdue` });
+    if (days < 0) alerts.push({ level: 'red', message: `Order "${o.ref || o.id}" is ${Math.abs(days)} days overdue`, go: "navigate('orders')" });
+  });
+  Object.values(productionOrders).filter(poIsOpen).forEach(o => {
+    if (poOverdue(o)) alerts.push({ level: 'red', message: `Production order ${o.ref} (${o.projectName}) is overdue`, go: "navigate('production')" });
+    else if (o.status === 'issued' && o.issuedAt && daysDiff(now, o.issuedAt) >= 2) alerts.push({ level: 'amber', message: `Production order ${o.ref} has been waiting ${daysDiff(now, o.issuedAt)} days to start`, go: "navigate('production')" });
   });
   Object.values(reminders).filter(r => !r.done).forEach(r => {
     if (r.date) {
       const days = daysDiff(r.date, now);
-      if (days <= 0) alerts.push({ level: 'blue', message: `Reminder: ${r.message}` });
-      else if (days <= 1) alerts.push({ level: 'blue', message: `Reminder tomorrow: ${r.message}` });
+      if (days <= 0) alerts.push({ level: 'blue', message: `Reminder: ${r.message}`, go: "navigate('reminders')" });
+      else if (days <= 1) alerts.push({ level: 'blue', message: `Reminder tomorrow: ${r.message}`, go: "navigate('reminders')" });
     }
   });
   return alerts;
@@ -1074,6 +1084,7 @@ function updateBadges() {
   const stockBadge = $('stockBadge');
   if (lowStock > 0) { stockBadge.textContent = lowStock; stockBadge.hidden = false; }
   else stockBadge.hidden = true;
+  updateProdBadge();
   const dueReminders = Object.values(reminders).filter(r => !r.done && r.date && daysDiff(r.date, new Date()) <= 1).length;
   const remBadge = $('reminderBadge');
   if (dueReminders > 0) { remBadge.textContent = dueReminders; remBadge.hidden = false; }
@@ -1400,7 +1411,7 @@ function renderOverview(p) {
     const hasOverrides = s.materialOverrides || s.extraProducts;
     const fromOffer = Array.isArray(s.offerItems);
     return `<div class="system-card">
-    <div class="system-card-header"><strong>${s.systemName}</strong><div class="flex items-center gap-8">${fromOffer ? '<span class="chip chip-green" style="font-size:.65rem">FROM OFFER</span>' : hasOverrides ? '<span class="chip chip-amber" style="font-size:.65rem">CUSTOM</span>' : ''}${(!fromOffer || s.areaKnown || s.area > 1) ? `<span class="chip chip-blue">${s.area} m²</span>` : ''}<button class="catalog-edit-btn" onclick="openEditProjectMaterials(${idx})">Edit Materials</button></div></div>
+    <div class="system-card-header"><strong>${s.systemName}</strong><div class="flex items-center gap-8">${fromOffer ? '<span class="chip chip-green" style="font-size:.65rem">FROM OFFER</span>' : hasOverrides ? '<span class="chip chip-amber" style="font-size:.65rem">CUSTOM</span>' : ''}${(!fromOffer || s.areaKnown || s.area > 1) ? `<span class="chip chip-blue">${s.area} m²</span>` : ''}</div></div>
     <div class="system-card-meta"><span>${s.application}</span>${s.notes ? '<span>' + s.notes + '</span>' : ''}</div>
   </div>`;
   }).join('');
@@ -1412,7 +1423,7 @@ function renderOverview(p) {
       <div class="delivery-stat tile-link" role="button" tabindex="0" onclick="goTab('phases')" style="background:var(--green-light)"><div class="ds-val" style="color:var(--green)">${pct}%</div><div class="ds-label">Phases Done</div></div>
       <div class="delivery-stat tile-link" role="button" tabindex="0" onclick="goTab('deliveries')" style="background:var(--amber-light)"><div class="ds-val" style="color:var(--amber)">${deliveryPct}%</div><div class="ds-label">Delivered</div></div>
     </div>
-    <div class="card mb-16" id="ovSystems"><div class="card-header"><h2>Product Systems</h2>${sampleAI ? '<button class="btn btn-secondary btn-sm" onclick="openImportOffer()" style="margin-left:auto">Import from Offer / Invoice</button>' : ''}</div><div class="card-body"><div class="systems-list">${sysHtml || '<div class="text-muted">No systems added yet.</div>'}</div></div></div>
+    <div class="card mb-16" id="ovSystems"><div class="card-header"><h2>Product Systems</h2></div><div class="card-body"><div class="systems-list">${sysHtml || '<div class="text-muted">No systems added yet.</div>'}</div></div></div>
     ${p.notes ? `<div class="card"><div class="card-header"><h2>Project Notes</h2></div><div class="card-body"><p>${p.notes}</p></div></div>` : ''}`;
 }
 
@@ -1442,6 +1453,7 @@ function renderPhases(p) {
               <option value="in_progress" ${ph.status === 'in_progress' ? 'selected' : ''}>In Progress</option>
               <option value="completed" ${ph.status === 'completed' ? 'selected' : ''}>Completed</option>
             </select>
+            <button class="btn btn-secondary btn-sm" onclick="openProdOrder('${p.id}','${ph.id}')">Issue to production</button>
             <button class="btn btn-secondary btn-sm" onclick="openEditPhase('${ph.id}')">Edit</button>
             <button class="remove-btn" onclick="deletePhase('${ph.id}')">✕</button>
           </div>
@@ -1514,7 +1526,8 @@ function openAddPhase(editId) {
   }).join('');
   openModal(ph ? 'Edit Phase' : 'Add Phase', `
     <div class="form-grid"><div class="form-row"><label>Phase Name</label><input type="text" id="phaseName" value="${escAttr(ph ? ph.name : 'Phase ' + ((p.phases || []).length + 1))}" placeholder="e.g., Phase 1"></div>
-    <div class="form-row"><label>Target Date</label><input type="date" id="phaseDate" value="${ph ? ph.targetDate || '' : ''}"></div></div>
+    <div class="form-row"><label>Target Date (finish)</label><input type="date" id="phaseDate" value="${ph ? ph.targetDate || '' : ''}"></div></div>
+    <div class="form-grid"><div class="form-row"><label>Start date (optional)</label><input type="date" id="phaseStart" value="${ph ? ph.startDate || '' : ''}"></div><div class="form-help" style="align-self:end;padding-bottom:10px">Used by the Timeline. Without it the bar is estimated.</div></div>
     <hr style="border:none;border-top:1px solid var(--border-light);margin:16px 0">
     <div class="flex justify-between items-center mb-8"><h3>Quantities to produce in this phase</h3>
       ${mats.length ? `<button type="button" class="btn btn-secondary btn-sm" onclick="phaseFillRemaining()">Fill with all remaining</button>` : ''}</div>
@@ -1591,9 +1604,9 @@ function doSavePhase(p, editId, name, quantities, allocations) {
   if (!p.phases) p.phases = [];
   if (editId) {
     const idx = p.phases.findIndex(x => x.id === editId);
-    if (idx >= 0) Object.assign(p.phases[idx], { name, targetDate: $('phaseDate').value, quantities, allocations });
+    if (idx >= 0) Object.assign(p.phases[idx], { name, targetDate: $('phaseDate').value, startDate: $('phaseStart').value, quantities, allocations });
   } else {
-    p.phases.push({ id: 'ph_' + uid(), name, targetDate: $('phaseDate').value, status: 'pending', quantities, allocations });
+    p.phases.push({ id: 'ph_' + uid(), name, targetDate: $('phaseDate').value, startDate: $('phaseStart').value, status: 'pending', quantities, allocations });
   }
   p.updatedAt = new Date().toISOString();
   saveProjectDoc(p);
@@ -1612,7 +1625,6 @@ function updatePhaseStatus(phId, status) {
     if (db) db.doc('projects/' + p.id).set(p);
     logActivity(`set ${ph.name} to "${status}" in "${p.name}"`);
     renderProjectDetail();
-    if (mcp && (status === 'in_progress' || status === 'completed')) notifyPhaseChange(p, ph, status);
   }
 }
 
@@ -1646,43 +1658,10 @@ function renderMaterials(p) {
   }).join('');
   $('tab-materials').innerHTML = `
     <div class="flex justify-between items-center mb-16"><h3>Material Requirements</h3>
-      <button class="btn btn-secondary btn-sm" onclick="generateOrderFromProject()">Generate Order for Missing</button></div>
-    <div class="overflow-x"><table><thead><tr><th>Material</th><th>Pkg</th><th>Total Qty</th><th>Units Needed</th><th>In Stock</th><th>Delivered</th><th>Remaining</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      <button class="btn btn-secondary btn-sm" onclick="navigate('orders');openPlanner()">Open Reorder Planner</button></div>
+    <div class="overflow-x"><table><thead><tr><th>Material</th><th>Pkg</th><th>Total Qty</th><th>Packs Needed</th><th>In Stock</th><th>Delivered</th><th>Remaining</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
-function generateOrderFromProject() {
-  const p = projects[currentProject];
-  const mats = getAllMaterials(p.systems || []);
-  const projDels = Object.values(deliveries).filter(d => d.projectId === p.id);
-  const missing = [];
-  mats.forEach(m => {
-    const sKey = m.name + '|' + m.pkg;
-    const stock = (stockData[sKey] || {}).quantity || 0;
-    const delivered = projDels.reduce((s, d) => s + (d.items || []).filter(i => i.material === sKey).reduce((ss, i) => ss + (i.quantity || 0), 0), 0);
-    const remaining = m.totalUnits - delivered;
-    const toOrder = remaining - stock;
-    if (toOrder > 0) missing.push({ material: sKey, name: m.name, pkg: m.pkg, quantity: toOrder });
-  });
-  if (missing.length === 0) { toast('All materials are in stock!'); return; }
-  const orderId = 'ord_' + uid();
-  const order = {
-    id: orderId,
-    ref: 'ORD-' + new Date().getFullYear() + '-' + String(Object.keys(orders).length + 1).padStart(3, '0'),
-    projectId: p.id,
-    projectName: p.name,
-    status: 'pending',
-    items: missing,
-    createdAt: new Date().toISOString(),
-    createdBy: currentUser,
-    expectedDate: '',
-    notes: 'Auto-generated from project "' + p.name + '"'
-  };
-  orders[orderId] = order;
-  if (db) db.doc('orders/' + orderId).set(order);
-  logActivity(`generated order ${order.ref} for "${p.name}" (${missing.length} items)`);
-  toast(`Order ${order.ref} created with ${missing.length} items`);
-  renderProjectDetail();
-}
 
 // ========== DELIVERIES ==========
 function renderDeliveries(p) {
@@ -1691,13 +1670,11 @@ function renderDeliveries(p) {
   if (projDels.length === 0) {
     html += '<div class="empty-state"><p>No deliveries recorded yet.</p></div>';
   } else {
-    html += `<div class="flex items-center gap-8 mb-8"><button class="select-toggle" id="togDel" onclick="selectAllToggle('chk-del','batchDel','togDel')">Select All</button></div>`;
-    html += batchBar('batchDel');
-    html += '<div class="overflow-x"><table><thead><tr><th style="width:36px"><input type="checkbox" class="list-check" onchange="toggleAll(\'chk-del\',this);updateToggleLabel(\'chk-del\',\'togDel\')"></th><th>Date</th><th>Ref</th><th>Phase</th><th>Items</th><th>By</th><th>Actions</th></tr></thead><tbody>';
+    html += '<div class="overflow-x"><table><thead><tr><th>Date</th><th>Ref</th><th>Phase</th><th>Items</th><th>By</th><th>Actions</th></tr></thead><tbody>';
     projDels.forEach(d => {
       const ph = d.phaseId ? (p.phases || []).find(x => x.id === d.phaseId) : null;
       const itemCount = (d.items || []).reduce((s, i) => s + (i.quantity || 0), 0);
-      html += `<tr><td><input type="checkbox" class="list-check chk-del" value="${d.id}" onchange="updateBatchBar('chk-del','batchDel');updateToggleLabel('chk-del','togDel')"></td><td>${fmtDate(d.date)}</td><td>${d.ref || '—'}</td><td>${ph ? ph.name : '—'}</td><td>${itemCount} units (${(d.items || []).length} types)</td><td>${d.deliveredBy || '—'}</td>
+      html += `<tr><td>${fmtDate(d.date)}</td><td>${d.ref || '—'}</td><td>${ph ? ph.name : '—'}</td><td>${itemCount} packs (${(d.items || []).length} types)</td><td>${d.deliveredBy || '—'}</td>
         <td><button class="btn btn-secondary btn-sm" onclick="viewDelivery('${d.id}')">View</button> <button class="btn btn-secondary btn-sm" onclick="downloadDeliveryNote('${d.id}')">Download</button> <button class="remove-btn" onclick="deleteDelivery('${d.id}')" title="Delete delivery">✕</button></td></tr>`;
     });
     html += '</tbody></table></div>';
@@ -1794,7 +1771,6 @@ async function doSaveDelivery(items) {
   });
   if (db) db.doc('stock/materials').set(stockData);
   logActivity(`recorded delivery ${del.ref} for "${projects[currentProject]?.name}" (${items.length} items)`);
-  if (mcp) notifyDelivery(del);
   closeModal();
   toast('Delivery recorded and stock updated');
   renderProjectDetail();
@@ -1857,14 +1833,11 @@ function renderFiles(p) {
   if (fileList.length === 0) {
     html += '<div class="empty-state"><p>No files attached. Upload delivery notes, invoices, or offers here.</p></div>';
   } else {
-    html += `<div class="flex items-center gap-8 mb-8"><button class="select-toggle" id="togFile" onclick="selectAllToggle('chk-file','batchFile','togFile')">Select All</button></div>`;
-    html += batchBar('batchFile');
     fileList.forEach(f => {
       const ext = (f.name || '').split('.').pop().toUpperCase();
       const colors = { PDF: 'var(--red)', DOC: 'var(--blue)', XLS: 'var(--green)', JPG: 'var(--amber)', PNG: 'var(--amber)' };
       const bg = { PDF: 'var(--red-light)', DOC: 'var(--blue-light)', XLS: 'var(--green-light)', JPG: 'var(--amber-light)', PNG: 'var(--amber-light)' };
       html += `<div class="file-item">
-        <input type="checkbox" class="list-check chk-file" value="${f.id}" onchange="updateBatchBar('chk-file','batchFile');updateToggleLabel('chk-file','togFile')">
         <div class="file-icon" style="background:${bg[ext] || 'var(--surface-alt)'};color:${colors[ext] || 'var(--ink-3)'}">${ext || '?'}</div>
         <div class="file-info"><div class="file-name">${f.name}</div><div class="file-meta">${f.category || 'Document'} • ${fmtDate(f.uploadedAt)} • ${f.uploadedBy || ''}</div></div>
         ${f.url ? `<button class="btn btn-secondary btn-sm" onclick="previewFile('${f.id}')">Preview</button><a href="${f.url}" target="_blank" class="btn btn-secondary btn-sm">Open</a>` : ''}
@@ -1912,7 +1885,7 @@ function renderNotes(p) {
     <div class="flex justify-between items-center mb-16"><h3>Team Notes</h3></div>
     <div class="form-row"><textarea id="newNote" rows="2" placeholder="Add a note for the team..."></textarea></div>
     <button class="btn btn-primary btn-sm mb-16" onclick="addNote()">Add Note</button>
-    ${notes.length === 0 ? '<div class="text-muted">No notes yet.</div>' : '<div class="flex items-center gap-8 mb-8"><button class="select-toggle" id="togNote" onclick="selectAllToggle(\'chk-note\',\'batchNote\',\'togNote\')">Select All</button></div>' + batchBar('batchNote') + '' + notes.slice().reverse().map((n, ri) => { const idx = notes.length - 1 - ri; return `<div style="padding:12px 0;border-bottom:1px solid var(--border-light)" class="flex items-center gap-8"><input type="checkbox" class="list-check chk-note" value="${idx}" onchange="updateBatchBar('chk-note','batchNote');updateToggleLabel('chk-note','togNote')" style="margin-top:2px"><div style="flex:1"><div class="flex justify-between items-center"><div><strong>${n.author}</strong> <span class="text-sm text-muted">${fmtDate(n.time)}</span></div><div class="flex gap-8"><button class="catalog-edit-btn" onclick="editNote(${idx})">Edit</button><button class="remove-btn" onclick="deleteNote(${idx})">✕</button></div></div><p style="margin-top:4px">${n.text}</p></div></div>`; }).join('')}`;
+    ${notes.length === 0 ? '<div class="text-muted">No notes yet.</div>' : notes.slice().reverse().map((n, ri) => { const idx = notes.length - 1 - ri; return `<div style="padding:12px 0;border-bottom:1px solid var(--border-light)"><div class="flex justify-between items-center"><div><strong>${escAttr(n.author)}</strong> <span class="text-sm text-muted">${fmtDate(n.time)}</span></div><div class="flex gap-8"><button class="catalog-edit-btn" onclick="editNote(${idx})">Edit</button><button class="remove-btn" onclick="deleteNote(${idx})">✕</button></div></div><p style="margin-top:4px">${escAttr(n.text)}</p></div>`; }).join('')}`;
 }
 
 function addNote() {
@@ -1992,17 +1965,7 @@ function openStockEdit() {
   });
   const sorted = [...allMats].sort();
   const rows = sorted.map(key => stockRowHtml(key, stockData[key] || { quantity: 0, minStock: 0 })).join('');
-  const erpHtml = sampleAI ? `
-    <div class="attach-zone" id="erpZone">
-      <input type="file" id="erpFiles" multiple accept=".xls,.xlsx,.xlsm,.csv,.tsv,.txt,.pdf,image/jpeg,image/png,image/webp" onchange="importErpFiles(this.files)">
-      <div class="az-label">📎 Upload ERP file(s)</div>
-      <div class="az-sub">One or more Excel, CSV or PDF files with stock quantities — AI matches them to your materials</div>
-    </div>
-    <div id="erpProgress" class="scan-progress" hidden><div class="spinner"></div><span id="erpProgressText" style="flex:1">Reading…</span><button class="btn btn-secondary btn-sm" onclick="erpStop()">Stop</button></div>
-    <div class="flex items-center gap-8 mb-8"><label style="margin:0;white-space:nowrap">When importing</label>
-      <select id="erpMode" style="width:auto"><option value="replace">Replace quantities (ERP is correct)</option><option value="add">Add to current quantities</option></select></div>
-    <div id="erpResult"></div>
-    <hr style="border:none;border-top:1px solid var(--border-light);margin:12px 0">` : '';
+  const erpHtml = sampleAI ? `<div class="flex items-center gap-8 mb-16"><button class="btn btn-secondary btn-sm" onclick="closeModal();navigate('stock');openReconcile()">Compare with ERP files…</button><span class="text-sm text-muted">Upload ERP stock files and review every difference before changing anything.</span></div>` : '';
 
   openModal('Update Stock', `${erpHtml}<div class="form-help mb-16">Update current warehouse quantities and minimum stock levels.</div><div id="stockRows">${rows}</div>`,
     `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveStock()">Save Stock</button>`);
@@ -2032,8 +1995,6 @@ function saveStock() {
 }
 
 // ========== STOCK IMPORT FROM ERP FILES ==========
-let erpCtl = null;
-let erpUnmatched = [];
 
 function loadScriptOnce(src, isLoaded) {
   if (isLoaded()) return Promise.resolve();
@@ -2112,7 +2073,8 @@ async function erpReadFile(file, known, progress, signal) {
   let text = '';
   const isImage = file.type.startsWith('image/');
   if (!isImage) text = await erpFileToText(file);
-  if (!isImage && text.replace(/\s/g, '').length >= 40) {
+  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+  if (!isImage && (!isPdf ? text.trim().length > 0 : text.replace(/\s/g, '').length >= 40)) {
     let chunks = erpChunks(text);
     let cut = 0;
     if (chunks.length > 8) { cut = chunks.length - 8; chunks = chunks.slice(0, 8); }
@@ -2149,7 +2111,6 @@ function stockRowHtml(key, val, note) {
     </div>`;
 }
 
-function erpStop() { if (erpCtl) erpCtl.abort(); }
 
 async function erpReadAll(files, known, setProgress, signal) {
   const all = [], columns = [], problems = [];
@@ -2186,73 +2147,8 @@ function erpAggregate(all, known) {
   return { agg, unmatched };
 }
 
-async function importErpFiles(fileList) {
-  const files = [...fileList];
-  const inputEl = $('erpFiles');
-  if (!files.length || !sampleAI) return;
-  const known = [...document.querySelectorAll('.stock-qty')].map(i => i.dataset.key);
-  const mode = $('erpMode').value;
-  const setProgress = t => { $('erpProgressText').textContent = t; };
-  $('erpZone').hidden = true; $('erpProgress').hidden = false; $('erpResult').innerHTML = '';
-  erpCtl = new AbortController();
-  let res;
-  try { res = await erpReadAll(files, known, setProgress, erpCtl.signal); }
-  catch (e) {
-    $('erpZone').hidden = false; $('erpProgress').hidden = true; inputEl.value = '';
-    toast('Import cancelled', 'warn');
-    return;
-  }
-  $('erpZone').hidden = false; $('erpProgress').hidden = true; inputEl.value = '';
-  const { agg, unmatched } = erpAggregate(res.all, known);
-  erpUnmatched = unmatched;
 
-  let updated = 0;
-  Object.entries(agg).forEach(([key, a]) => {
-    const inp = document.querySelector(`.stock-qty[data-key="${CSS.escape(key)}"]`);
-    if (!inp) return;
-    const was = parseInt(inp.value) || 0;
-    const next = mode === 'add' ? was + a.packs : a.packs;
-    inp.value = next;
-    const row = inp.closest('.stock-row');
-    row.classList.add('stock-changed');
-    row.querySelector('.stock-note')?.remove();
-    row.firstElementChild.insertAdjacentHTML('beforeend', `<div class="stock-note">ERP: ${a.packs}${a.raw.length ? ` (${escAttr(a.raw.join(' + '))})` : ''} · was ${was}${a.lines > 1 ? ` · ${a.lines} lines summed` : ''}</div>`);
-    updated++;
-  });
-  erpRenderResult(files.length, updated, res.columns, res.problems, mode);
-  $('erpResult').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-}
 
-function erpRenderResult(nFiles, updated, columns, problems, mode) {
-  const cols = [...new Set(columns)].join(', ');
-  let html = `<div class="erp-summary"><strong>${updated} material${updated === 1 ? '' : 's'} ${mode === 'add' ? 'increased' : 'set'} from ${nFiles} file${nFiles === 1 ? '' : 's'}.</strong>
-    Highlighted rows below were changed — check them, then press <strong>Save Stock</strong>.${cols ? `<div class="text-sm text-muted mt-4">Quantity column read: ${escAttr(cols)}</div>` : ''}`;
-  if (problems.length) html += `<div class="chat-err text-sm mt-4">${problems.map(escAttr).join('<br>')}</div>`;
-  if (erpUnmatched.length) {
-    html += `<div class="mt-8"><strong>${erpUnmatched.length} line${erpUnmatched.length === 1 ? '' : 's'} not matched to a material</strong> <span class="text-sm text-muted">— add as new stock items if they are yours:</span>
-      <div class="overflow-x"><table class="erp-unm"><thead><tr><th>Product</th><th>Pack</th><th>Qty (packs)</th><th></th></tr></thead><tbody>${erpUnmatched.slice(0, 40).map((u, i) => `<tr id="erpU${i}">
-        <td><input type="text" class="eu-name" value="${escAttr(u.n)}" style="min-width:150px"></td>
-        <td><input type="text" class="eu-pkg" value="${escAttr(u.p)}" placeholder="20kg" style="width:70px"></td>
-        <td><input type="number" class="eu-qty" value="${u.q}" min="0" style="width:70px"></td>
-        <td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" onclick="erpAddUnmatched(${i})">Add</button> <button class="remove-btn" title="Ignore" onclick="this.closest('tr').remove()">✕</button></td></tr>`).join('')}</tbody></table></div>
-      ${erpUnmatched.length > 40 ? `<div class="text-sm text-muted">Showing first 40.</div>` : ''}</div>`;
-  }
-  $('erpResult').innerHTML = html + '</div>';
-}
-
-function erpAddUnmatched(i) {
-  const row = $('erpU' + i);
-  if (!row) return;
-  const name = row.querySelector('.eu-name').value.trim().replace(/\|/g, '/');
-  const pkg = row.querySelector('.eu-pkg').value.trim().replace(/\|/g, '/');
-  const qty = parseInt(row.querySelector('.eu-qty').value) || 0;
-  if (!name || !pkg) { toast('Enter the product name and pack size (e.g. 20kg)', 'warn'); return; }
-  const key = name + '|' + pkg;
-  if (document.querySelector(`.stock-qty[data-key="${CSS.escape(key)}"]`)) { toast('That material already exists — it is in the list below', 'warn'); return; }
-  $('stockRows').insertAdjacentHTML('afterbegin', stockRowHtml(key, { quantity: qty, minStock: 0 }, 'New from ERP file'));
-  row.remove();
-  toast('Added — press Save Stock to keep it');
-}
 
 // ========== REORDER PLANNER ==========
 let plannerSettings = { lead: 14, includePlanning: false, leads: {} };
@@ -2264,10 +2160,10 @@ const plannerQty = {};
 
 const addDaysIso = (iso, n) => new Date(new Date(iso + 'T00:00:00Z').getTime() + n * 86400000).toISOString().slice(0, 10);
 
-function nextOrderRef(prefix) {
+function nextOrderRef(prefix, pool) {
   const y = new Date().getFullYear();
   const re = new RegExp('^' + prefix + '-' + y + '-(\\d+)$');
-  const max = Object.values(orders).reduce((m, o) => { const x = re.exec(o.ref || ''); return x ? Math.max(m, +x[1]) : m; }, 0);
+  const max = Object.values(pool || orders).reduce((m, o) => { const x = re.exec(o.ref || ''); return x ? Math.max(m, +x[1]) : m; }, 0);
   return `${prefix}-${y}-${String(max + 1).padStart(3, '0')}`;
 }
 
@@ -2712,7 +2608,7 @@ function renderOrders() {
       <td><strong>${o.ref || o.id}</strong></td>
       <td>${o.projectName || '—'}</td>
       <td><span class="chip ${statusChip(o.status)}">${o.status}</span></td>
-      <td>${itemCount} units</td>
+      <td>${itemCount} packs</td>
       <td>${fmtDate(o.createdAt)}</td>
       <td>${fmtDate(o.expectedDate)}</td>
       <td>
@@ -2992,7 +2888,7 @@ function saveEditReminder(id) {
 function showAllAlerts() {
   const alerts = generateAlerts();
   if (alerts.length === 0) { toast('All clear — no alerts right now.'); return; }
-  const html = alerts.map(a => `<div class="alert-item alert-${a.level}" style="margin-bottom:6px">
+  const html = alerts.map(a => `<div class="alert-item alert-${a.level}${a.go ? ' clickable' : ''}" style="margin-bottom:6px"${a.go ? ` role="button" tabindex="0" onclick="closeModal();${a.go}"` : ''}>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
     <span>${a.message}</span>
   </div>`).join('');
@@ -3108,122 +3004,348 @@ const style = document.createElement('style');
 style.textContent = '@media(max-width:900px){.dash-grid{grid-template-columns:1fr!important}}';
 document.head.appendChild(style);
 
-// ========== PRODUCTION TRACKER ==========
+// ========== PRODUCTION ORDERS ==========
+// Procedure: the office issues a production order (what to produce, how much, by when) ->
+// the production unit starts it -> completes it (produced quantities, optional stock update).
+let productionOrders = {};
+let prodView = 'open';
+let prodProject = '';
+let poEditId = '';
+const PO_STATUS = {
+  issued: ['chip-amber', 'Issued — waiting'],
+  in_production: ['chip-blue', 'In production'],
+  completed: ['chip-green', 'Completed'],
+  cancelled: ['chip-gray', 'Cancelled']
+};
+
+function dbSet(path, obj) {
+  if (!db) return;
+  try {
+    const r = db.doc(path).set(JSON.parse(JSON.stringify(obj)));
+    if (r && r.catch) r.catch(e => toast('Could not sync: ' + (e.message || e.code || 'error'), 'error'));
+  } catch (e) { toast('Could not sync: ' + e.message, 'error'); }
+}
+
+const poIsOpen = o => o.status === 'issued' || o.status === 'in_production';
+const poOverdue = o => poIsOpen(o) && o.dueDate && o.dueDate < today();
+const poPacks = o => (o.items || []).reduce((s, i) => s + (Number(i.ordered) || 0), 0);
+
+function poIssuedQty(projectId, key, excludeId, phaseId) {
+  return Object.values(productionOrders)
+    .filter(o => o.projectId === projectId && o.status !== 'cancelled' && o.id !== excludeId && (phaseId === undefined || (o.phaseId || '') === phaseId))
+    .reduce((s, o) => s + (o.items || []).filter(i => i.material === key).reduce((x, i) => x + (Number(i.ordered) || 0), 0), 0);
+}
+
+function poLog(o, text) {
+  if (!o.history) o.history = [];
+  o.history.push({ at: new Date().toISOString(), by: currentUser, text });
+}
+
+function poCardHtml(o, showProject) {
+  const [cls, label] = PO_STATUS[o.status] || ['chip-gray', o.status];
+  const items = (o.items || []).map(i => `${escAttr(i.name)} (${escAttr(i.pkg)}) × ${i.status === 'completed' ? i.produced : i.ordered}`).join(' · ');
+  const btn = (fn, text, kind = 'secondary') => `<button class="btn btn-${kind} btn-sm" onclick="${fn}('${o.id}')">${text}</button>`;
+  let actions = '';
+  if (o.status === 'issued') actions = btn('poStart', 'Start production', 'primary') + btn('openProdOrderEdit', 'Edit') + btn('poCancel', 'Cancel order');
+  else if (o.status === 'in_production') actions = btn('poComplete', 'Complete', 'primary') + btn('poView', 'View') + btn('poCancel', 'Cancel order');
+  else actions = btn('poView', 'View') + `<button class="remove-btn" title="Delete" onclick="poDelete('${o.id}')">✕</button>`;
+  return `<div class="prod-card">
+    <div class="flex justify-between items-center" style="flex-wrap:wrap;gap:8px">
+      <div class="flex items-center gap-8" style="flex-wrap:wrap"><strong>${escAttr(o.ref)}</strong>
+        ${showProject ? `<a class="text-sm" style="cursor:pointer;color:var(--blue)" onclick="navigate('project-detail','${o.projectId}')">${escAttr(o.projectName || '')}</a>` : ''}
+        ${o.phaseName ? `<span class="text-sm text-muted">— ${escAttr(o.phaseName)}</span>` : ''}
+        <span class="chip ${cls}">${label}</span>
+        ${o.priority === 'urgent' ? '<span class="chip chip-red">Urgent</span>' : ''}
+        ${poOverdue(o) ? '<span class="chip chip-red">Overdue</span>' : ''}</div>
+      <div class="text-sm text-muted">${o.dueDate ? 'Due ' + fmtDate(o.dueDate) : 'No due date'}</div>
+    </div>
+    <div class="text-sm mt-8">${items || '—'}</div>
+    ${o.notes ? `<div class="text-sm text-muted mt-8">Instructions: ${escAttr(o.notes)}</div>` : ''}
+    <div class="flex justify-between items-center mt-8" style="flex-wrap:wrap;gap:8px">
+      <div class="text-sm text-muted">${o.status === 'in_production' ? 'Started ' + fmtDate(o.startedAt) + ' by ' + escAttr(o.startedBy || '—') : o.status === 'completed' ? 'Completed ' + fmtDate(o.completedAt) + ' by ' + escAttr(o.completedBy || '—') : 'Issued ' + fmtDate(o.issuedAt) + ' by ' + escAttr(o.issuedBy || '—')}</div>
+      <div class="flex gap-8" style="flex-wrap:wrap">${actions}</div>
+    </div>
+  </div>`;
+}
+
+function poSorted(list) {
+  return list.slice().sort((a, b) => (b.priority === 'urgent') - (a.priority === 'urgent') || (a.dueDate || '9').localeCompare(b.dueDate || '9') || (a.issuedAt || '').localeCompare(b.issuedAt || ''));
+}
+
 function renderProduction(p) {
-  const batches = p.production || [];
-  const statusLabels = {planned:'Planned',mixing:'Mixing',cured:'Curing',ready:'Ready'};
-  const statusChips = {planned:'chip-gray',mixing:'chip-blue',cured:'chip-amber',ready:'chip-green'};
-  const statusOrder = ['planned','mixing','cured','ready'];
-  let html = `<div class="flex justify-between items-center mb-16"><h3>Production Batches</h3><button class="btn btn-primary btn-sm" onclick="openAddBatch()">New Batch</button></div>`;
-  if (batches.length === 0) {
-    html += '<div class="empty-state"><p>No production batches yet. Create a batch when materials are being mixed.</p></div>';
-  } else {
-    batches.slice().reverse().forEach(b => {
-      const bph = b.phaseId ? (p.phases||[]).find(x=>x.id===b.phaseId) : null;
-      html += `<div class="prod-card">
-        <div class="flex justify-between items-center">
-          <div class="flex items-center gap-8"><strong>${b.systemName||'Batch'}</strong>${bph?` <span class="text-sm text-muted">— ${bph.name}</span>`:''} <span class="chip ${statusChips[b.status]||'chip-gray'}">${statusLabels[b.status]||b.status}</span></div>
-          <div class="text-sm text-muted">${fmtDate(b.startedAt||b.createdAt)}</div>
-        </div>
-        ${b.materials&&b.materials.length?`<div class="overflow-x mt-8"><table><thead><tr><th>Material</th><th>Planned</th><th>Actual</th><th>Unit</th></tr></thead><tbody>${b.materials.map(m=>`<tr><td>${m.name}</td><td>${m.planned}</td><td>${m.actual!=null?m.actual:'—'}</td><td>${m.unit||'kg'}</td></tr>`).join('')}</tbody></table></div>`:''}
-        <div class="flex justify-between items-center mt-8">
-          <div class="prod-steps">${statusOrder.map(s=>`<button class="${b.status===s?'on':''}" onclick="updateBatchStatus('${b.id}','${s}')">${statusLabels[s]}</button>`).join('')}</div>
-          <div class="flex items-center gap-8"><span class="text-sm text-muted">By: ${b.mixedBy||'—'}</span><button class="remove-btn" onclick="deleteBatch('${b.id}')">✕</button></div>
-        </div>
-        ${b.notes?`<div class="text-sm text-muted mt-8">${b.notes}</div>`:''}
-      </div>`;
-    });
+  const list = Object.values(productionOrders).filter(o => o.projectId === p.id);
+  const open = poSorted(list.filter(poIsOpen));
+  const done = list.filter(o => !poIsOpen(o)).sort((a, b) => (b.issuedAt || '').localeCompare(a.issuedAt || ''));
+  let html = `<div class="flex justify-between items-center mb-16"><h3>Production Orders</h3><button class="btn btn-primary btn-sm" onclick="openProdOrder('${p.id}')">New Production Order</button></div>`;
+  if (!list.length) html += '<div class="empty-state"><p>No production orders yet. Issue one to hand the materials of a phase (or the whole project) to the production unit.</p></div>';
+  else {
+    html += open.length ? open.map(o => poCardHtml(o, false)).join('') : '<div class="text-sm text-muted mb-8">Nothing open right now.</div>';
+    if (done.length) html += `<h3 class="mt-16 mb-8" style="color:var(--ink-3)">Completed / cancelled</h3>` + done.map(o => poCardHtml(o, false)).join('');
   }
   $('tab-production').innerHTML = html;
 }
 
-function openAddBatch() {
-  const p = projects[currentProject];
-  if (!p) return;
-  const phaseOpts = (p.phases||[]).map(ph=>`<option value="${ph.id}">${ph.name}</option>`).join('');
-  const sysOpts = (p.systems||[]).map((s,i)=>`<option value="${i}">${s.systemName} (${s.application})</option>`).join('');
-  openModal('New Production Batch', `
-    <div class="form-grid">
-      <div class="form-row"><label>System</label><select id="batchSys" onchange="updateBatchMaterials()">${sysOpts}</select></div>
-      <div class="form-row"><label>Phase</label><select id="batchPhase"><option value="">No specific phase</option>${phaseOpts}</select></div>
+function renderProductionPage() {
+  const el = $('prodList');
+  if (!el) return;
+  const all = Object.values(productionOrders).filter(o => !prodProject || o.projectId === prodProject);
+  const issued = all.filter(o => o.status === 'issued'), running = all.filter(o => o.status === 'in_production');
+  const overdue = all.filter(poOverdue);
+  const done = all.filter(o => o.status === 'completed' || o.status === 'cancelled').sort((a, b) => (b.completedAt || b.issuedAt || '').localeCompare(a.completedAt || a.issuedAt || ''));
+  const projOpts = Object.values(projects).sort((a, b) => a.name.localeCompare(b.name)).map(p => `<option value="${p.id}" ${prodProject === p.id ? 'selected' : ''}>${escAttr(p.name)}</option>`).join('');
+  const tile = (v, n, label, color) => `<div class="pay-kpi tile-link ${prodView === v ? 'active' : ''}" role="button" tabindex="0" onclick="prodView='${v}';renderProductionPage()"><div class="pk-val" style="color:${color}">${n}</div><div class="pk-label">${label}</div></div>`;
+  const section = (title, list, empty) => `<h3 class="mt-16 mb-8">${title} (${list.length})</h3>` + (list.length ? poSorted(list).map(o => poCardHtml(o, true)).join('') : `<div class="text-sm text-muted">${empty}</div>`);
+  let body = '';
+  if (prodView === 'open') body = section('Waiting to start', issued, 'No orders waiting.') + section('In production', running, 'Nothing in production.');
+  else if (prodView === 'issued') body = section('Waiting to start', issued, 'No orders waiting.');
+  else if (prodView === 'in_production') body = section('In production', running, 'Nothing in production.');
+  else if (prodView === 'overdue') body = section('Overdue', overdue, 'Nothing overdue.');
+  else body = section('Completed / cancelled', done.slice(0, 40), 'Nothing completed yet.');
+  el.innerHTML = `
+    <div class="pay-kpis">
+      ${tile('issued', issued.length, 'Waiting to start', 'var(--amber)')}
+      ${tile('in_production', running.length, 'In production', 'var(--blue)')}
+      ${tile('overdue', overdue.length, 'Overdue', 'var(--red)')}
+      ${tile('done', all.filter(o => o.status === 'completed').length, 'Completed', 'var(--green)')}
     </div>
-    <div class="form-grid">
-      <div class="form-row"><label>Mixed By</label><select id="batchBy">${TEAM.map(t=>`<option value="${t.name}">${t.name}</option>`).join('')}</select></div>
-      <div class="form-row"><label>Date</label><input type="date" id="batchDate" value="${today()}"></div>
+    <div class="flex items-center gap-8" style="flex-wrap:wrap">
+      <select id="prodProjectSel" style="width:auto" onchange="prodProject=this.value;renderProductionPage()"><option value="">All projects</option>${projOpts}</select>
+      ${prodView !== 'open' ? `<button class="btn btn-secondary btn-sm" onclick="prodView='open';renderProductionPage()">Show open orders</button>` : ''}
     </div>
-    <hr style="border:none;border-top:1px solid var(--border-light);margin:16px 0">
-    <h3 class="mb-8">Materials in Batch</h3>
-    <div id="batchMaterials"></div>
-    <div class="form-row mt-16"><label>Notes</label><textarea id="batchNotes" rows="2"></textarea></div>
-  `, `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-     <button class="btn btn-primary" onclick="saveBatch()">Create Batch</button>`);
-  updateBatchMaterials();
+    ${body}`;
 }
 
-function updateBatchMaterials() {
-  const p = projects[currentProject];
-  const sysIdx = parseInt($('batchSys').value);
-  const sys = p.systems[sysIdx];
-  if (!sys) return;
-  const products = getEffectiveProducts(sys);
-  $('batchMaterials').innerHTML = products.map((prod, idx) => {
-    const calc = calcUnits(prod.consumption, sys.area, prod.pkg);
-    return `<div class="form-grid" style="grid-template-columns:2fr 1fr 1fr;align-items:end;margin-bottom:6px">
-      <div class="text-sm"><strong>${prod.name}</strong> <span class="text-muted">(${prod.pkg})</span></div>
-      <div><label>Planned</label><input type="number" class="batch-planned" data-idx="${idx}" data-name="${prod.name}" data-unit="${prod.unit}" value="${calc.total}" step="0.01" min="0"></div>
-      <div><label>Actual</label><input type="number" class="batch-actual" data-idx="${idx}" value="" step="0.01" min="0" placeholder="After mixing"></div>
-    </div>`;
+function updateProdBadge() {
+  const b = $('prodBadge');
+  if (!b) return;
+  const n = Object.values(productionOrders).filter(o => o.status === 'issued').length;
+  b.textContent = n; b.hidden = n === 0;
+}
+
+// ---- issue / edit ----
+function poRowsHtml(p, excludeId, phaseId, existing) {
+  const mats = getAllMaterials(p.systems || []);
+  const ph = phaseId ? (p.phases || []).find(x => x.id === phaseId) : null;
+  const phQty = ph ? phaseQtyMap(p, ph) : null;
+  return mats.map(m => {
+    const key = m.name + '|' + m.pkg;
+    const issuedAll = poIssuedQty(p.id, key, excludeId);
+    let q = existing && existing[key] != null ? existing[key] : '';
+    if (existing == null && phQty) q = Math.max(0, (phQty[key] || 0) - poIssuedQty(p.id, key, excludeId, phaseId)) || '';
+    return `<tr><td><strong>${escAttr(m.name)}</strong></td><td>${escAttr(m.pkg)}</td><td>${m.totalUnits}</td>${phQty ? `<td>${phQty[key] || 0}</td>` : ''}<td>${issuedAll}</td>
+      <td><input type="number" class="po-qty" data-key="${escAttr(key)}" data-total="${m.totalUnits}" data-issued="${issuedAll}" min="0" step="1" value="${q}" placeholder="0" style="width:80px;font-weight:600" oninput="poQtyChange()"></td></tr>`;
   }).join('');
 }
 
-function saveBatch() {
-  const p = projects[currentProject];
-  const sysIdx = parseInt($('batchSys').value);
-  const sys = p.systems[sysIdx];
-  const materials = [];
-  document.querySelectorAll('#batchMaterials .batch-planned').forEach(inp => {
-    const planned = parseFloat(inp.value) || 0;
-    const idx = inp.dataset.idx;
-    const actEl = document.querySelector('#batchMaterials .batch-actual[data-idx="' + idx + '"]');
-    const actual = actEl ? (parseFloat(actEl.value) || null) : null;
-    if (planned > 0) materials.push({ name: inp.dataset.name, unit: inp.dataset.unit, planned, actual });
+function poItemsTable(p, excludeId, phaseId, existing) {
+  const ph = phaseId ? (p.phases || []).find(x => x.id === phaseId) : null;
+  const rows = poRowsHtml(p, excludeId, phaseId, existing);
+  if (!rows) return '<div class="empty-state"><p>This project has no materials yet. Add product systems first.</p></div>';
+  return `<div class="overflow-x"><table><thead><tr><th>Material</th><th>Pack</th><th>Project total</th>${ph ? '<th>This phase</th>' : ''}<th>Already issued</th><th>Produce now (packs)</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function openProdOrder(projectId, phaseId, editId) {
+  const o = editId ? productionOrders[editId] : null;
+  const pid = o ? o.projectId : (projectId || (projects[currentProject] && document.querySelector('.page.active')?.id === 'page-project-detail' ? currentProject : ''));
+  const projArr = Object.values(projects).sort((a, b) => a.name.localeCompare(b.name));
+  if (!projArr.length) { toast('Create a project first', 'warn'); return; }
+  poEditId = editId || '';
+  const startPid = pid || projArr[0].id;
+  const p = projects[startPid];
+  const existing = o ? Object.fromEntries((o.items || []).map(i => [i.material, i.ordered])) : null;
+  const phId = o ? (o.phaseId || '') : (phaseId || '');
+  openModal(o ? 'Edit Production Order ' + o.ref : 'New Production Order', `
+    <div class="form-grid">
+      <div class="form-row"><label>Project</label><select id="poProject" onchange="poProjectChange()" ${o ? 'disabled' : ''}>${projArr.map(x => `<option value="${x.id}" ${x.id === startPid ? 'selected' : ''}>${escAttr(x.name)}</option>`).join('')}</select></div>
+      <div class="form-row"><label>Phase (optional)</label><select id="poPhase" onchange="poPhaseChange()"><option value="">Whole project / no phase</option>${(p.phases || []).map(ph => `<option value="${ph.id}" ${ph.id === phId ? 'selected' : ''}>${escAttr(ph.name)}${ph.targetDate ? ' — ' + fmtDate(ph.targetDate) : ''}</option>`).join('')}</select></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-row"><label>Due date</label><input type="date" id="poDue" value="${o ? o.dueDate || '' : ((p.phases || []).find(x => x.id === phId)?.targetDate || '')}"></div>
+      <div class="form-row"><label>Priority</label><select id="poPriority"><option value="normal" ${o && o.priority === 'normal' || !o ? 'selected' : ''}>Normal</option><option value="urgent" ${o && o.priority === 'urgent' ? 'selected' : ''}>Urgent</option></select></div>
+    </div>
+    <div class="form-row"><label>Instructions for the production unit</label><textarea id="poNotes" rows="2" placeholder="e.g., colour code, batch size, packaging">${escAttr(o ? o.notes : '')}</textarea></div>
+    <hr style="border:none;border-top:1px solid var(--border-light);margin:12px 0">
+    <div class="flex justify-between items-center mb-8"><h3>What to produce</h3><button type="button" class="btn btn-secondary btn-sm" onclick="poFillRemaining()">Fill with all remaining</button></div>
+    <div id="poItems">${poItemsTable(p, editId, phId, existing)}</div>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePO('${editId || ''}')">${o ? 'Save' : 'Issue to production'}</button>`);
+}
+
+function openProdOrderEdit(id) { openProdOrder(null, null, id); }
+
+function poProjectChange() {
+  const p = projects[$('poProject').value];
+  $('poPhase').innerHTML = `<option value="">Whole project / no phase</option>` + (p.phases || []).map(ph => `<option value="${ph.id}">${escAttr(ph.name)}${ph.targetDate ? ' — ' + fmtDate(ph.targetDate) : ''}</option>`).join('');
+  $('poDue').value = '';
+  $('poItems').innerHTML = poItemsTable(p, poEditId, '', null);
+}
+
+function poPhaseChange() {
+  const p = projects[$('poProject').value];
+  const phId = $('poPhase').value;
+  const ph = (p.phases || []).find(x => x.id === phId);
+  if (ph && ph.targetDate) $('poDue').value = ph.targetDate;
+  $('poItems').innerHTML = poItemsTable(p, poEditId, phId, null);
+}
+
+function poQtyChange() {
+  document.querySelectorAll('.po-qty').forEach(inp => {
+    const over = (parseInt(inp.value) || 0) + (+inp.dataset.issued || 0) > (+inp.dataset.total || 0);
+    inp.style.borderColor = over ? 'var(--red)' : '';
   });
-  if (materials.length === 0) { toast('No materials in batch', 'warn'); return; }
-  if (!p.production) p.production = [];
-  p.production.push({
-    id: 'bat_' + uid(), systemName: sys.systemName, systemIdx: sysIdx,
-    phaseId: $('batchPhase').value, mixedBy: $('batchBy').value,
-    startedAt: $('batchDate').value, status: 'planned', materials,
-    notes: $('batchNotes').value.trim(), createdAt: new Date().toISOString()
+}
+
+function poFillRemaining() {
+  document.querySelectorAll('.po-qty').forEach(inp => { inp.value = Math.max(0, (+inp.dataset.total || 0) - (+inp.dataset.issued || 0)) || ''; });
+  poQtyChange();
+}
+
+function savePO(editId) {
+  const p = projects[$('poProject').value];
+  if (!p) return;
+  const items = [], warnings = [];
+  document.querySelectorAll('.po-qty').forEach(inp => {
+    const q = parseInt(inp.value) || 0;
+    if (q <= 0) return;
+    const [name, pkg] = inp.dataset.key.split('|');
+    items.push({ material: inp.dataset.key, name, pkg, ordered: q, produced: 0 });
+    if (q + (+inp.dataset.issued || 0) > (+inp.dataset.total || 0)) warnings.push(`${escAttr(name)}: ${q + (+inp.dataset.issued || 0)} packs issued in total, project needs ${inp.dataset.total}`);
   });
-  p.updatedAt = new Date().toISOString();
-  if (db) db.doc('projects/' + p.id).set(p);
-  logActivity(`created production batch for ${sys.systemName} in "${p.name}"`);
+  if (!items.length) { toast('Enter a quantity for at least one material', 'warn'); return; }
+  const go = () => doSavePO(editId, p, items);
+  if (warnings.length) showWarning('More Than The Project Needs', warnings.join('<br>') + '<br><br>Issue anyway?', go);
+  else go();
+}
+
+function doSavePO(editId, p, items) {
+  const phId = $('poPhase').value;
+  const ph = (p.phases || []).find(x => x.id === phId);
+  const base = { projectId: p.id, projectName: p.name, phaseId: phId, phaseName: ph ? ph.name : '', dueDate: $('poDue').value || '', priority: $('poPriority').value, notes: $('poNotes').value.trim(), items };
+  let o;
+  if (editId) {
+    o = productionOrders[editId];
+    Object.assign(o, base);
+    poLog(o, 'Edited');
+  } else {
+    const id = 'po_' + uid();
+    o = { id, ref: nextOrderRef('PO', productionOrders), status: 'issued', issuedAt: new Date().toISOString(), issuedBy: currentUser, ...base };
+    poLog(o, 'Issued to production');
+    productionOrders[id] = o;
+  }
+  dbSet('production/' + o.id, o);
+  logActivity(`${editId ? 'edited' : 'issued'} production order ${o.ref} (${items.length} materials) for "${p.name}"`);
   closeModal();
-  toast('Production batch created');
-  renderProjectDetail();
+  toast(editId ? 'Production order updated' : `Production order ${o.ref} issued`);
+  refreshProductionViews();
 }
 
-function updateBatchStatus(batchId, newStatus) {
-  const p = projects[currentProject];
-  const batch = (p.production||[]).find(b=>b.id===batchId);
-  if (!batch) return;
-  batch.status = newStatus;
-  if (newStatus === 'ready') batch.completedAt = new Date().toISOString();
-  if (newStatus === 'mixing') batch.startedAt = batch.startedAt || new Date().toISOString();
-  p.updatedAt = new Date().toISOString();
-  if (db) db.doc('projects/' + p.id).set(p);
-  logActivity(`batch ${batch.systemName} → "${newStatus}" in "${p.name}"`);
-  renderProjectDetail();
+function refreshProductionViews() {
+  updateProdBadge();
+  const active = document.querySelector('.page.active')?.id;
+  if (active === 'page-production') renderProductionPage();
+  else if (active === 'page-project-detail') renderProjectDetail();
+  else if (active === 'page-dashboard') renderDashboard();
 }
 
-function deleteBatch(batchId) {
-  const p = projects[currentProject];
-  p.production = (p.production||[]).filter(b=>b.id!==batchId);
-  p.updatedAt = new Date().toISOString();
-  if (db) db.doc('projects/' + p.id).set(p);
-  toast('Batch removed');
-  renderProjectDetail();
+// ---- production unit actions ----
+function poSetStatus(o, status, text) {
+  o.status = status;
+  poLog(o, text);
+  dbSet('production/' + o.id, o);
+  refreshProductionViews();
+}
+
+function poStart(id) {
+  const o = productionOrders[id];
+  if (!o || o.status !== 'issued') return;
+  o.startedAt = new Date().toISOString(); o.startedBy = currentUser;
+  logActivity(`started production order ${o.ref}`);
+  toast(`${o.ref} is now in production`);
+  poSetStatus(o, 'in_production', 'Production started');
+}
+
+function poComplete(id) {
+  const o = productionOrders[id];
+  if (!o) return;
+  openModal('Complete ' + o.ref, `
+    <div class="form-help mb-8">Enter what was actually produced. It is pre-filled with the ordered quantity.</div>
+    <div class="overflow-x"><table><thead><tr><th>Material</th><th>Pack</th><th>Ordered</th><th>Produced</th></tr></thead><tbody>${(o.items || []).map((i, k) => `<tr><td>${escAttr(i.name)}</td><td>${escAttr(i.pkg)}</td><td>${i.ordered}</td><td><input type="number" class="po-done" data-i="${k}" min="0" step="1" value="${i.ordered}" style="width:80px;font-weight:600"></td></tr>`).join('')}</tbody></table></div>
+    <div class="form-row mt-16"><label>Production notes (optional)</label><textarea id="poDoneNotes" rows="2">${escAttr(o.productionNotes || '')}</textarea></div>
+    <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.85rem"><input type="checkbox" id="poAddStock" class="list-check" checked> Add the produced quantities to warehouse stock</label>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="doPoComplete('${id}')">Mark completed</button>`);
+}
+
+function doPoComplete(id) {
+  const o = productionOrders[id];
+  if (!o) return;
+  document.querySelectorAll('.po-done').forEach(inp => { o.items[+inp.dataset.i].produced = Math.max(0, parseInt(inp.value) || 0); });
+  o.productionNotes = $('poDoneNotes').value.trim();
+  o.completedAt = new Date().toISOString(); o.completedBy = currentUser;
+  const addStock = $('poAddStock').checked;
+  if (addStock) {
+    o.items.forEach(i => {
+      if (!i.produced) return;
+      const cur = stockData[i.material] || { quantity: 0, minStock: 0 };
+      stockData[i.material] = { quantity: (cur.quantity || 0) + i.produced, minStock: cur.minStock || 0 };
+    });
+    dbSet('stock/materials', stockData);
+    o.stockAdded = true;
+  }
+  o.items.forEach(i => { i.status = 'completed'; });
+  logActivity(`completed production order ${o.ref}${addStock ? ' (stock updated)' : ''}`);
+  closeModal();
+  toast(`${o.ref} completed${addStock ? ' — stock updated' : ''}`);
+  poSetStatus(o, 'completed', 'Production completed' + (addStock ? ', quantities added to stock' : ''));
+}
+
+function poCancel(id) {
+  const o = productionOrders[id];
+  if (!o) return;
+  showWarning('Cancel Production Order', `Cancel ${escAttr(o.ref)}? The production unit will no longer see it.`, () => {
+    logActivity(`cancelled production order ${o.ref}`);
+    poSetStatus(o, 'cancelled', 'Cancelled');
+  });
+}
+
+function poDelete(id) {
+  const o = productionOrders[id];
+  if (!o) return;
+  showWarning('Delete Production Order', `Delete ${escAttr(o.ref)} permanently? Stock is not changed.`, () => {
+    delete productionOrders[id];
+    if (db) { try { const r = db.doc('production/' + id).delete(); if (r && r.catch) r.catch(() => {}); } catch (e) {} }
+    toast('Production order deleted');
+    refreshProductionViews();
+  });
+}
+
+function poView(id) {
+  const o = productionOrders[id];
+  if (!o) return;
+  const [cls, label] = PO_STATUS[o.status];
+  openModal('Production Order ' + o.ref, `
+    <div class="form-grid mb-16"><div><label>Project</label><p>${escAttr(o.projectName)}</p></div><div><label>Phase</label><p>${escAttr(o.phaseName || '—')}</p></div></div>
+    <div class="form-grid mb-16"><div><label>Status</label><p><span class="chip ${cls}">${label}</span> ${o.priority === 'urgent' ? '<span class="chip chip-red">Urgent</span>' : ''}</p></div><div><label>Due</label><p>${o.dueDate ? fmtDate(o.dueDate) : '—'}</p></div></div>
+    <table><thead><tr><th>Material</th><th>Pack</th><th>Ordered</th><th>Produced</th></tr></thead><tbody>${(o.items || []).map(i => `<tr><td>${escAttr(i.name)}</td><td>${escAttr(i.pkg)}</td><td>${i.ordered}</td><td>${o.status === 'completed' ? i.produced : '—'}</td></tr>`).join('')}</tbody></table>
+    ${o.notes ? `<div class="mt-16"><label>Instructions</label><p>${escAttr(o.notes)}</p></div>` : ''}
+    ${o.productionNotes ? `<div class="mt-16"><label>Production notes</label><p>${escAttr(o.productionNotes)}</p></div>` : ''}
+    <div class="mt-16"><label>History</label>${(o.history || []).map(h => `<div class="text-sm">${fmtDate(h.at)} — ${escAttr(h.text)} <span class="text-muted">(${escAttr(h.by)})</span></div>`).join('') || '—'}</div>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Close</button><button class="btn btn-primary" onclick="poDownload('${id}')">Download</button>`);
+}
+
+async function poDownload(id) {
+  const o = productionOrders[id];
+  if (!o) return;
+  const rows = [['CEMENT PLUS - PRODUCTION ORDER'], ['Reference', o.ref], ['Project', o.projectName], ['Phase', o.phaseName || ''], ['Due date', o.dueDate || ''], ['Priority', o.priority], ['Status', PO_STATUS[o.status][1]], ['Instructions', o.notes || ''], [], ['Material', 'Pack', 'Ordered (packs)', 'Produced (packs)']]
+    .concat((o.items || []).map(i => [i.name, i.pkg, i.ordered, o.status === 'completed' ? i.produced : '']));
+  await saveCsv(`${o.ref}.csv`, rows);
+}
+
+function toolProductionOrders(a) {
+  chatStatus('Reading production orders…');
+  const status = String(a.status || ''), proj = String(a.project || '');
+  const rows = Object.values(productionOrders).filter(o => (!status || o.status === status) && (!proj || chatMatch(o.projectName, proj)))
+    .sort((x, y) => (y.issuedAt || '').localeCompare(x.issuedAt || '')).slice(0, 50)
+    .map(o => ({ ref: o.ref, project: o.projectName, phase: o.phaseName || null, status: o.status, priority: o.priority, due: o.dueDate || null, overdue: !!poOverdue(o), issued: (o.issuedAt || '').slice(0, 10), items: (o.items || []).map(i => `${i.name} (${i.pkg}) ordered ${i.ordered}${o.status === 'completed' ? ' produced ' + i.produced : ''}`).join('; ') }));
+  return { count: rows.length, production_orders: rows };
 }
 
 // ========== GANTT TIMELINE ==========
@@ -3265,10 +3387,17 @@ function renderTimeline() {
     const projSpan = p.deadline ? daysDiff(new Date(p.deadline), created) : totalDays * 0.6;
     phases.forEach((ph, i) => {
       let startDay, endDay;
-      if (ph.targetDate) {
+      const est = !ph.startDate;
+      if (ph.startDate && ph.targetDate) {
+        startDay = daysDiff(new Date(ph.startDate), earliest);
+        endDay = daysDiff(new Date(ph.targetDate), earliest);
+      } else if (ph.targetDate) {
         endDay = daysDiff(new Date(ph.targetDate), earliest);
         const dur = Math.max(7, projSpan / phCount);
         startDay = endDay - dur;
+      } else if (ph.startDate) {
+        startDay = daysDiff(new Date(ph.startDate), earliest);
+        endDay = startDay + Math.max(7, projSpan / phCount);
       } else {
         const dur = projSpan / phCount;
         startDay = daysDiff(created, earliest) + dur * i;
@@ -3277,43 +3406,10 @@ function renderTimeline() {
       startDay = Math.max(0, startDay);
       const barL = startDay * dayW;
       const barW = Math.max(30, (endDay - startDay) * dayW);
-      rows += `<div class="gantt-row"><div class="gantt-label" style="padding-left:20px;font-size:.78rem;color:var(--ink-2)">${ph.name}</div><div class="gantt-bars" style="width:${chartW}px"><div class="gantt-bar ${ph.status}" onclick="navigate('project-detail','${p.id}');goTab('phases')" style="cursor:pointer;left:${barL}px;width:${barW}px" title="${ph.name} — ${(ph.status||'pending').replace('_',' ')}">${ph.name}</div></div></div>`;
+      rows += `<div class="gantt-row"><div class="gantt-label" style="padding-left:20px;font-size:.78rem;color:var(--ink-2)">${ph.name}</div><div class="gantt-bars" style="width:${chartW}px"><div class="gantt-bar ${ph.status}" onclick="navigate('project-detail','${p.id}');goTab('phases')" style="cursor:pointer;left:${barL}px;width:${barW}px" title="${ph.name} — ${(ph.status||'pending').replace('_',' ')}${est ? ' (estimated dates — set a start date on the phase)' : ''}" ${est ? 'data-est="1"' : ''}>${ph.name}${est ? ' ~' : ''}</div></div></div>`;
     });
   });
-  $('timelineContent').innerHTML = `<div class="gantt-wrap"><div class="gantt-head"><div class="gantt-label">Project / Phase</div><div class="gantt-months" style="width:${chartW}px">${months}</div></div><div style="position:relative">${rows}<div style="position:absolute;top:0;bottom:0;left:${180+todayX}px;width:2px;background:var(--blue);opacity:.4;z-index:1;pointer-events:none" title="Today"></div></div></div><div class="flex items-center gap-8 mt-8 text-sm text-muted"><span style="display:inline-block;width:12px;height:3px;background:var(--blue);border-radius:2px"></span> Today <span style="display:inline-block;width:12px;height:3px;background:var(--red);border-radius:2px;margin-left:12px"></span> Deadline</div>`;
-}
-
-// ========== AUTO-REORDER ENGINE ==========
-const dataLoaded = { projects: false, stock: false, orders: false, deliveries: false };
-let autoReorderChecked = false;
-function appDataReady() { return !db || Object.values(dataLoaded).every(Boolean); }
-function markLoaded(name) {
-  dataLoaded[name] = true;
-  if (!autoReorderChecked && appDataReady()) { autoReorderChecked = true; checkAutoReorder(); }
-}
-
-function checkAutoReorder() {
-  if (!appDataReady()) return;
-  const toReorder = plannerRows()
-    .filter(r => r.suggest > 0 && (r.urgency === 'late' || r.urgency === 'soon' || r.stock <= r.min) && r.draftOrders === 0)
-    .map(r => ({ material: r.key, name: r.name, pkg: r.pkg, quantity: r.suggest }));
-  if (toReorder.length === 0) return;
-  const todayStr = today();
-  const alreadyToday = Object.values(orders).some(o => o.autoGenerated && o.createdAt && o.createdAt.startsWith(todayStr));
-  if (alreadyToday) return;
-  const orderId = 'ord_' + uid();
-  const order = {
-    id: orderId,
-    ref: nextOrderRef('AUTO'),
-    projectId: '', projectName: 'Auto-reorder', status: 'pending',
-    items: toReorder, createdAt: new Date().toISOString(), createdBy: 'System',
-    autoGenerated: true, expectedDate: '',
-    notes: 'Auto-generated from the reorder planner: stock below minimum or order-by date reached (' + toReorder.length + ' items)'
-  };
-  orders[orderId] = order;
-  if (db) db.doc('orders/' + orderId).set(order);
-  logActivity(`auto-reorder ${order.ref} created (${toReorder.length} items)`);
-  toast(`Auto-reorder ${order.ref}: ${toReorder.length} items`, 'warn');
+  $('timelineContent').innerHTML = `<div class="gantt-wrap"><div class="gantt-head"><div class="gantt-label">Project / Phase</div><div class="gantt-months" style="width:${chartW}px">${months}</div></div><div style="position:relative">${rows}<div style="position:absolute;top:0;bottom:0;left:${180+todayX}px;width:2px;background:var(--blue);opacity:.4;z-index:1;pointer-events:none" title="Today"></div></div></div><div class="flex items-center gap-8 mt-8 text-sm text-muted"><span style="display:inline-block;width:12px;height:3px;background:var(--blue);border-radius:2px"></span> Today <span style="display:inline-block;width:12px;height:3px;background:var(--red);border-radius:2px;margin-left:12px"></span> Deadline <span style="margin-left:12px">~ = estimated (no start date set)</span></div>`;
 }
 
 // ========== DELIVERY PHOTOS ==========
@@ -3331,51 +3427,9 @@ function previewDeliveryPhotos() {
 }
 
 // ========== EMAIL NOTIFICATIONS ==========
-async function sendTeamEmail(subject, body) {
-  if (!mcp) { toast('Email not available — connect Gmail in claude.ai Settings', 'warn'); return false; }
-  try {
-    await mcp.callTool('Gmail', 'send_message', {
-      to: TEAM.map(t => t.email),
-      subject: '[Cement Plus Daily] ' + subject,
-      body: body + '\n\n—\nCement Plus Daily'
-    });
-    toast('Email sent to team');
-    return true;
-  } catch (e) {
-    if (e.code === 'not_granted' || e.code === 'server_not_connected' || e.code === 'not_in_manifest') {
-      toast('Gmail not connected — add Gmail in claude.ai Settings → Connectors', 'warn');
-    } else {
-      toast('Email failed: ' + (e.message || 'Unknown error'), 'error');
-    }
-    return false;
-  }
-}
 
-function notifyDelivery(del) {
-  const p = projects[del.projectId];
-  const items = (del.items||[]).map(i => '  - ' + i.name + ' (' + i.pkg + '): ' + i.quantity + ' units').join('\n');
-  sendTeamEmail(
-    'Delivery ' + (del.ref||'') + ' — ' + (p?.name||'Project'),
-    'New delivery recorded.\n\nProject: ' + (p?.name||'—') + '\nReference: ' + (del.ref||'—') + '\nDate: ' + del.date + '\nDelivered by: ' + (del.deliveredBy||'—') + '\n\nItems:\n' + items
-  );
-}
 
-function notifyPhaseChange(project, phase, status) {
-  sendTeamEmail(
-    phase.name + ' -> ' + status.replace('_', ' ') + ' — ' + project.name,
-    'Phase status updated.\n\nProject: ' + project.name + '\nPhase: ' + phase.name + '\nNew status: ' + status.replace('_', ' ')
-  );
-}
 
-function notifyLowStock() {
-  const low = Object.entries(stockData).filter(([k,v]) => v.quantity > 0 && v.quantity <= (v.minStock||0));
-  const out = Object.entries(stockData).filter(([k,v]) => v.quantity <= 0);
-  if (low.length === 0 && out.length === 0) { toast('No stock alerts to send'); return; }
-  let body = 'Stock Alert\n';
-  if (out.length) body += '\nOUT OF STOCK:\n' + out.map(([k]) => '  - ' + k.replace('|', ' ')).join('\n');
-  if (low.length) body += '\nLOW STOCK:\n' + low.map(([k,v]) => '  - ' + k.replace('|', ' ') + ': ' + v.quantity + ' remaining (min: ' + v.minStock + ')').join('\n');
-  sendTeamEmail('Stock Alert — ' + (out.length + low.length) + ' items need attention', body);
-}
 
 // ========== DASHBOARD ANALYTICS ==========
 function renderAnalytics() {
@@ -3392,7 +3446,7 @@ function renderAnalytics() {
   const labels = months.map(m => m.label);
   $('dashAnalytics').innerHTML = `
     <div class="an-card"><h3>Deliveries / Month</h3><canvas id="chartDel"></canvas></div>
-    <div class="an-card"><h3>Materials Consumed (units)</h3><canvas id="chartMat"></canvas></div>
+    <div class="an-card"><h3>Materials Consumed (packs)</h3><canvas id="chartMat"></canvas></div>
     <div class="an-card"><h3>Orders Placed</h3><canvas id="chartOrd"></canvas></div>
     <div class="an-card"><h3>Active Projects</h3><canvas id="chartProj"></canvas></div>`;
   requestAnimationFrame(() => {
@@ -3440,101 +3494,8 @@ function drawBarChart(id, labels, data, token) {
 }
 
 // ========== OFFER/INVOICE IMPORT ==========
-function openImportOffer() {
-  const p = projects[currentProject];
-  if (!p) return;
-  if (!sampleAI) { toast('AI scanning not available in this view', 'error'); return; }
-  openModal('Import from Offer / Invoice', `
-    <div class="form-grid">
-      <div class="form-row"><label>Document Type</label><select id="importDocType"><option value="offer">Offer</option><option value="invoice">Invoice</option></select></div>
-      <div class="form-row"><label>Upload PDF or Image</label>
-        <input type="file" id="importFile" accept=".pdf,image/jpeg,image/png,image/webp,image/gif" style="padding:8px">
-        <div class="form-help mt-4">Upload a PDF or photo of the offer/invoice. AI will scan and extract all materials.</div>
-      </div>
-    </div>
-    <div id="importStatus" hidden>
-      <div style="display:flex;align-items:center;gap:12px;padding:20px;background:var(--surface-alt);border-radius:var(--radius);margin-top:16px">
-        <div class="spinner"></div><div id="importStatusText">Preparing document...</div>
-      </div>
-    </div>
-    <div id="importPreview" hidden></div>
-  `, `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-     <button class="btn btn-primary" id="importScanBtn" onclick="processOfferUpload()">Scan Document</button>
-     <button class="btn btn-primary" id="importConfirmBtn" onclick="confirmImportMaterials()" hidden>Add to Project</button>`);
-}
 
-async function processOfferUpload() {
-  const fileInput = $('importFile');
-  const file = fileInput?.files?.[0];
-  if (!file) { toast('Please select a file', 'warn'); return; }
-  $('importStatus').hidden = false;
-  $('importScanBtn').disabled = true;
-  $('importStatusText').textContent = 'Preparing document...';
-  try {
-    let images = [];
-    if (file.type === 'application/pdf') {
-      $('importStatusText').textContent = 'Rendering PDF pages...';
-      images = await renderPdfToImages(file);
-    } else {
-      images = [file];
-    }
-    const limits = await sampleAI.limits().catch(() => null);
-    const canSendImages = !!limits?.images;
-    const knownProducts = [];
-    for (const sys of Object.values(CATALOG)) {
-      for (const products of Object.values(sys.applications)) {
-        products.forEach(p => { if (!knownProducts.includes(p.name)) knownProducts.push(p.name); });
-      }
-    }
-    const docType = $('importDocType').value;
-    const prompt = `You are analyzing a Cement Plus (microcement company) ${docType} document.
-Extract ALL material/product line items from this document.
 
-Known Cement Plus products: ${knownProducts.join(', ')}
-
-For EACH line item, extract:
-- name: product name (match to known products above when possible, keep original if no match)
-- pkg: packaging size as written (e.g. "20kg", "10lt", "5+1lt", "50m²", "25kg")
-- quantity: NUMBER OF PACKAGES ordered (integer)
-- unit: measurement unit (kg, lt, m²)
-
-Reply with ONLY a JSON array. Example:
-[{"name":"NANOSTUCCO 500 (POWDER)","pkg":"20kg","quantity":5,"unit":"kg"}]
-If no materials found, reply [].
-Do NOT include labor, transport, or discounts.`;
-
-    $('importStatusText').textContent = 'Scanning document with AI...';
-    let result;
-    if (canSendImages && images.length > 0) {
-      const maxImg = limits.images.maxCount || 5;
-      result = await sampleAI.json(prompt, { images: images.slice(0, maxImg), modelTier: 'default', cache: false });
-    } else if (file.type === 'application/pdf') {
-      $('importStatusText').textContent = 'Extracting text...';
-      const text = await extractPdfText(file);
-      if (!text) { toast('Cannot read this PDF', 'error'); resetImportUI(); return; }
-      result = await sampleAI.json(prompt + '\n\nDocument text:\n' + text.slice(0, 30000), { modelTier: 'default', cache: false });
-    } else {
-      toast('Image support not available — try a PDF instead', 'error'); resetImportUI(); return;
-    }
-    if (!Array.isArray(result) || result.length === 0) {
-      toast('No materials found in document', 'warn'); resetImportUI(); return;
-    }
-    showImportPreview(result);
-  } catch (e) {
-    const msg = e.code === 'not_granted' ? 'AI scanning permission denied' :
-                e.code === 'rate_limited' ? 'Rate limited — try again in a moment' :
-                e.code === 'image_rejected' ? 'Image could not be processed — try a different file' :
-                e.code === 'invalid_json' ? 'Could not parse materials — try a clearer scan' :
-                'Scan failed: ' + (e.message || 'unknown error');
-    toast(msg, 'error'); resetImportUI();
-  }
-}
-
-function resetImportUI() {
-  $('importStatus').hidden = true;
-  const btn = $('importScanBtn');
-  if (btn) btn.disabled = false;
-}
 
 async function renderPdfToImages(file) {
   if (!window.pdfjsLib) {
@@ -3583,91 +3544,8 @@ async function extractPdfText(file) {
   return text;
 }
 
-function showImportPreview(items) {
-  $('importStatus').hidden = true;
-  if ($('importScanBtn')) $('importScanBtn').hidden = true;
-  if ($('importConfirmBtn')) $('importConfirmBtn').hidden = false;
-  const p = projects[currentProject];
-  const sysOpts = (p.systems || []).map((s, i) =>
-    `<option value="${i}">${escAttr(s.systemName)} (${s.area} m²)</option>`
-  ).join('');
-  const docType = $('importDocType')?.value || 'offer';
-  let html = `<div class="card mt-16"><div class="card-header"><h3>Extracted Materials (${items.length} items)</h3></div><div class="card-body">
-    <div class="form-help mb-16">Review and edit the extracted materials. Adjust names, quantities, or remove items as needed.</div>
-    <div class="form-row mb-16"><label>Add to System</label><select id="importTargetSystem">
-      <option value="new">+ Create new system ("${docType === 'invoice' ? 'Invoice' : 'Offer'} Import")</option>${sysOpts}
-    </select></div>
-    <div class="overflow-x"><table><thead><tr><th style="width:30px"></th><th>Product</th><th>Packaging</th><th>Qty (pkgs)</th><th>Unit</th><th style="width:30px"></th></tr></thead>
-    <tbody id="importItemsBody">`;
-  items.forEach((item, i) => {
-    html += `<tr class="import-row" data-idx="${i}">
-      <td><input type="checkbox" class="import-check" checked></td>
-      <td><input type="text" class="import-name" value="${escAttr(item.name || '')}" style="min-width:160px"></td>
-      <td><input type="text" class="import-pkg" value="${escAttr(item.pkg || '')}" style="width:80px"></td>
-      <td><input type="number" class="import-qty" value="${parseInt(item.quantity) || 1}" min="1" style="width:70px"></td>
-      <td><input type="text" class="import-unit" value="${escAttr(item.unit || 'kg')}" style="width:50px"></td>
-      <td><button class="remove-btn" onclick="this.closest('tr').remove()">✕</button></td></tr>`;
-  });
-  html += `</tbody></table></div><button class="btn btn-secondary btn-sm mt-8" onclick="addImportRow()">+ Add Row</button></div></div>`;
-  $('importPreview').innerHTML = html;
-  $('importPreview').hidden = false;
-}
 
-function addImportRow() {
-  const tbody = $('importItemsBody');
-  const tr = document.createElement('tr');
-  tr.className = 'import-row';
-  tr.innerHTML = `<td><input type="checkbox" class="import-check" checked></td>
-    <td><input type="text" class="import-name" value="" style="min-width:160px" placeholder="Product name"></td>
-    <td><input type="text" class="import-pkg" value="" style="width:80px" placeholder="e.g. 20kg"></td>
-    <td><input type="number" class="import-qty" value="1" min="1" style="width:70px"></td>
-    <td><input type="text" class="import-unit" value="kg" style="width:50px"></td>
-    <td><button class="remove-btn" onclick="this.closest('tr').remove()">✕</button></td>`;
-  tbody.appendChild(tr);
-}
 
-function confirmImportMaterials() {
-  const p = projects[currentProject];
-  if (!p) return;
-  const rows = document.querySelectorAll('#importItemsBody .import-row');
-  const items = [];
-  rows.forEach(row => {
-    if (!row.querySelector('.import-check')?.checked) return;
-    const name = row.querySelector('.import-name')?.value?.trim();
-    const pkg = row.querySelector('.import-pkg')?.value?.trim() || '1kg';
-    const qty = parseInt(row.querySelector('.import-qty')?.value) || 1;
-    const unit = row.querySelector('.import-unit')?.value?.trim() || 'kg';
-    if (!name) return;
-    items.push({ name, pkg, qty, unit });
-  });
-  if (items.length === 0) { toast('No materials selected', 'warn'); return; }
-  const targetVal = $('importTargetSystem')?.value;
-  let sys;
-  if (targetVal === 'new') {
-    const docType = $('importDocType')?.value || 'offer';
-    sys = { id: uid(), systemName: (docType === 'invoice' ? 'Invoice' : 'Offer') + ' Import', application: 'Imported materials', area: 1, notes: 'Imported on ' + fmtDate(today()), offerItems: [] };
-    if (!p.systems) p.systems = [];
-    p.systems.push(sys);
-  } else {
-    sys = p.systems[parseInt(targetVal)];
-    if (!sys) { toast('System not found', 'error'); return; }
-  }
-  if (Array.isArray(sys.offerItems)) {
-    items.forEach(item => sys.offerItems.push({ name: item.name, pkg: item.pkg, quantity: item.qty, unit: item.unit }));
-  } else {
-    if (!sys.extraProducts) sys.extraProducts = [];
-    items.forEach(item => {
-      const totalQty = item.qty * pkgSize(item.pkg);
-      sys.extraProducts.push({ name: item.name, pkg: item.pkg, consumption: totalQty / sys.area, unit: item.unit });
-    });
-  }
-  p.updatedAt = new Date().toISOString();
-  if (db) db.doc('projects/' + p.id).set(p);
-  logActivity(`imported ${items.length} materials from offer/invoice into "${p.name}"`);
-  closeModal();
-  toast(`${items.length} materials imported successfully`);
-  renderProjectDetail();
-}
 
 // ========== NEW PROJECT OFFER/INVOICE SCAN ==========
 let npAttachedDocs = [];
@@ -4083,18 +3961,15 @@ const BATCH_CFG = {
     <button class="btn btn-secondary btn-sm" onclick="batchMarkOrdered()">Mark Ordered</button>
     <button class="btn btn-primary btn-sm" onclick="batchReceiveOrders()">Receive</button>
     <button class="btn btn-secondary btn-sm" onclick="batchExportOrders()">Export CSV</button>` },
-  batchDel: { del: 'batchDeleteDeliveries', actions: `<button class="btn btn-secondary btn-sm" onclick="batchExportDeliveries()">Download CSV</button>` },
   batchRem: { del: 'batchDeleteReminders', actions: `
     <button class="btn btn-primary btn-sm" onclick="batchCompleteReminders()">Mark Done</button>
     <button class="btn btn-secondary btn-sm" onclick="batchRescheduleReminders()">Reschedule</button>` },
-  batchFile: { del: 'batchDeleteFiles', actions: `<button class="btn btn-secondary btn-sm" onclick="batchFileCategory()">Change Category</button>` },
   batchPlan: { del: null, actions: `
     <button class="btn btn-primary btn-sm" onclick="batchPlannerOrder()">Create order</button>
     <button class="btn btn-secondary btn-sm" onclick="batchPlannerExport()">Export CSV</button>` },
   batchRec: { del: null, actions: `
     <button class="btn btn-primary btn-sm" onclick="batchReconApply()">Use ERP quantity</button>
     <button class="btn btn-secondary btn-sm" onclick="reconExport(true)">Export CSV</button>` },
-  batchNote: { del: 'batchDeleteNotes', actions: `<button class="btn btn-secondary btn-sm" onclick="batchCopyNotes()">Copy Text</button>` }
 };
 
 function batchBar(id) {
@@ -4191,17 +4066,6 @@ function batchExportOrders() {
 }
 
 // Deliveries
-function batchExportDeliveries() {
-  const ids = selIds('chk-del');
-  if (ids.length === 0) return;
-  const rows = [['Reference', 'Date', 'Project', 'Phase', 'Material', 'Packaging', 'Quantity', 'Delivered By']];
-  ids.map(id => deliveries[id]).filter(Boolean).forEach(d => {
-    const p = projects[d.projectId];
-    const ph = d.phaseId ? (p?.phases || []).find(x => x.id === d.phaseId) : null;
-    (d.items || []).forEach(i => rows.push([d.ref, d.date, p?.name, ph?.name, i.name, i.pkg, i.quantity, d.deliveredBy]));
-  });
-  saveCsv('deliveries.csv', rows);
-}
 
 // Reminders
 function batchCompleteReminders() {
@@ -4243,42 +4107,14 @@ function doBatchReschedule(ids) {
 }
 
 // Files
-function batchFileCategory() {
-  const ids = selIds('chk-file');
-  if (ids.length === 0) return;
-  const cats = ['Offer', 'Invoice', 'Delivery Note', 'Photo', 'Document'];
-  openModal(`Change Category — ${ids.length} file${ids.length > 1 ? 's' : ''}`, `
-    <div class="form-row"><label>Category</label><select id="batchFileCat">${cats.map(c => `<option>${c}</option>`).join('')}</select></div>`,
-    `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="doBatchFileCategory(${JSON.stringify(ids).replace(/"/g, '&quot;')})">Apply</button>`);
-}
 
-function doBatchFileCategory(ids) {
-  const p = projects[currentProject];
-  if (!p) return;
-  const cat = $('batchFileCat').value;
-  (p.files || []).forEach(f => { if (ids.includes(f.id)) f.category = cat; });
-  p.updatedAt = new Date().toISOString();
-  saveProjectDoc(p);
-  closeModal();
-  toast(`${ids.length} files set to ${cat}`);
-  renderFiles(p);
-  renderPayments(p);
-}
 
 // Notes
-async function batchCopyNotes() {
-  const p = projects[currentProject];
-  const idxs = selIds('chk-note').map(Number).sort((a, b) => a - b);
-  if (!p || idxs.length === 0) return;
-  const text = idxs.map(i => p.projectNotes[i]).filter(Boolean).map(n => `${n.author} (${fmtDate(n.time)}): ${n.text}`).join('\n\n');
-  try { await navigator.clipboard.writeText(text); toast(`${idxs.length} notes copied`); }
-  catch (e) { toast('Copy not available in this view', 'warn'); }
-}
 
 // ========== BATCH SELECT & DELETE ==========
 function toggleAll(cls, headerCb) {
   document.querySelectorAll('.' + cls).forEach(cb => cb.checked = headerCb.checked);
-  const barId = { 'chk-proj':'batchProj','chk-ord':'batchOrd','chk-del':'batchDel','chk-rem':'batchRem','chk-file':'batchFile','chk-note':'batchNote','chk-rec':'batchRec','chk-plan':'batchPlan' }[cls];
+  const barId = { 'chk-proj':'batchProj','chk-ord':'batchOrd','chk-rem':'batchRem','chk-rec':'batchRec','chk-plan':'batchPlan' }[cls];
   if (barId) updateBatchBar(cls, barId);
 }
 
@@ -4339,15 +4175,6 @@ function batchDeleteOrders() {
   });
 }
 
-function batchDeleteDeliveries() {
-  const ids = [...document.querySelectorAll('.chk-del:checked')].map(cb => cb.value);
-  if (ids.length === 0) return;
-  showWarning('Delete ' + ids.length + ' Deliveries', 'Delete ' + ids.length + ' deliveries? Stock will NOT be auto-restored.', () => {
-    ids.forEach(id => { const d = deliveries[id]; delete deliveries[id]; if (db) db.doc('deliveries/' + id).delete(); if (d) logActivity('deleted delivery ' + (d.ref || id)); });
-    toast(ids.length + ' deliveries deleted');
-    renderProjectDetail();
-  });
-}
 
 function batchDeleteReminders() {
   const ids = [...document.querySelectorAll('.chk-rem:checked')].map(cb => cb.value);
@@ -4360,31 +4187,7 @@ function batchDeleteReminders() {
   });
 }
 
-function batchDeleteFiles() {
-  const ids = [...document.querySelectorAll('.chk-file:checked')].map(cb => cb.value);
-  if (ids.length === 0) return;
-  const p = projects[currentProject];
-  if (!p) return;
-  showWarning('Delete ' + ids.length + ' Files', 'Remove ' + ids.length + ' selected files from this project?', () => {
-    p.files = (p.files || []).filter(f => !ids.includes(f.id));
-    if (db) db.doc('projects/' + p.id).set(p);
-    toast(ids.length + ' files removed');
-    renderFiles(p);
-  });
-}
 
-function batchDeleteNotes() {
-  const idxs = [...document.querySelectorAll('.chk-note:checked')].map(cb => parseInt(cb.value)).sort((a, b) => b - a);
-  if (idxs.length === 0) return;
-  const p = projects[currentProject];
-  if (!p || !p.projectNotes) return;
-  showWarning('Delete ' + idxs.length + ' Notes', 'Permanently delete ' + idxs.length + ' selected notes?', () => {
-    idxs.forEach(idx => p.projectNotes.splice(idx, 1));
-    if (db) db.doc('projects/' + p.id).set(p);
-    toast(idxs.length + ' notes deleted');
-    renderNotes(p);
-  });
-}
 
 // ========== AI CHAT ==========
 const CHAT_KEY = 'cpChat';
@@ -4591,8 +4394,9 @@ ABOUT THE APP
 Left menu: Dashboard (KPIs, alerts, analytics charts), Projects, Stock, Orders, Reminders, Timeline (Gantt of project phases).
 Projects list: New Project, table with checkboxes; selecting rows shows a bar with bulk actions (set status, export CSV, delete).
 New Project: "Attach Offer or Invoice" lets AI read a PDF/photo and fill client, location, deadline, notes, payment terms and the exact material quantities; each attached file has Preview, Edit and delete. Product systems can also be added manually from the catalog; materials are then calculated from consumption per m2.
-Project tabs: Overview (systems, progress), Phases (allocate m2 per system, dates, status), Materials (required units, in stock, delivered, remaining; "Generate Order for Missing"), Payment Terms (total, terms, installments with Paid/Pending/Overdue, mark paid), Deliveries (record a delivery: deducts stock, delivery note CSV, photos, email notification), Files (upload, preview), Production (batches planned > mixing > curing > ready), Notes.
-Stock: quantities and minimum levels per material (Update Stock; it can also read ERP stock files with AI). Reconcile with ERP (Stock page): upload ERP stock file(s), see differences vs app stock, apply ERP values per material or in bulk. Orders: supplier orders pending > ordered > received (receiving adds to stock); Reorder Planner (Orders page): per material suggested order = remaining demand of active projects + minimum stock - stock - already ordered, with needed-by date (earliest phase target date or project deadline), lead time and order-by date, plus one-click order creation; AUTO-... orders are created by the auto-reorder check for active-project shortages. Reminders: assign to team members with date/time. Email notifications go to the team through Gmail. Data is shared by the whole team in one database; the header shows who is online.
+Project tabs: Overview (systems, progress), Phases (a delivery/production stage: choose pack quantities per material for the phase, optional m2 helper, start and target dates, status; "Issue to production" creates a production order), Materials (required packs, in stock, delivered, remaining), Payment Terms (total, terms, installments with Paid/Pending/Overdue, mark paid), Deliveries (record a delivery: deducts stock, delivery note CSV, photos), Files (upload, preview), Production (the project's production orders), Notes.
+Production (left menu, also a tab per project): the procedure for giving work to the production unit. The office issues a production order (project, optional phase, materials and packs to produce, due date, priority, instructions); the production unit starts it (Issued > In production) and completes it by entering produced quantities (optionally added to warehouse stock). Phases are different: they split a project's delivery in stages.
+Stock: quantities and minimum levels per material (Update Stock). Reconcile with ERP (Stock page): upload ERP stock file(s), see differences vs app stock, apply ERP values per material or in bulk. Orders: supplier orders pending > ordered > received (receiving adds to stock); Reorder Planner (Orders page): per material suggested order = remaining demand of active projects + minimum stock - stock - already ordered, with needed-by date (earliest phase target date or project deadline), lead time and order-by date, plus one-click order creation; older AUTO-... orders were created by a removed auto-reorder, now the dashboard shows an alert pointing to the planner. Reminders: assign to team members with date/time. Emails are switched off for now. Data is shared by the whole team in one database.
 Catalog (17 product systems): ${sysNames}.
 Not in the app today (candidates when asked what is missing): unit prices, costs and margins per material or project; supplier database and supplier prices; a customer database (client is free text); issuing offers/invoices from the app; user roles and permissions; calendar sync; returns and credit notes; stock by batch number or warehouse location; multi-currency (EUR only); reports/export to accounting.
 
@@ -4717,7 +4521,7 @@ function toolProjectDetails(a) {
     payment: { ...projectPayment(p), terms: p.payment?.terms || '', installments: (p.payment?.installments || []).map(i => ({ label: i.label, amount: i.amount, due: i.dueDate, paid: !!i.paid })) },
     phases: (p.phases || []).map(ph => ({ name: ph.name, status: ph.status, target_date: ph.targetDate })),
     deliveries: dels.slice(-15).map(d => ({ date: d.date, ref: d.ref, items: (d.items || []).map(i => `${i.name} (${i.pkg}) x${i.quantity}`).join('; ') })),
-    production_batches: (p.production || []).length, notes_count: (p.projectNotes || []).length
+    production_orders: Object.values(productionOrders).filter(o => o.projectId === p.id).map(o => ({ ref: o.ref, status: o.status, phase: o.phaseName || null, due: o.dueDate || null })), notes_count: (p.projectNotes || []).length
   };
 }
 
@@ -4760,6 +4564,8 @@ function chatToolDefs() {
       inputSchema: { type: 'object', properties: { status: str('pending | ordered | received'), since: str('YYYY-MM-DD'), material: str('Material name words') } }, execute: toolListOrders },
     { name: 'stock_levels', description: 'Warehouse stock per material with minimum level; can filter by material name or only low/out-of-stock items.',
       inputSchema: { type: 'object', properties: { material: str('Material name words'), only_low: { type: 'boolean' } } }, execute: toolStockLevels },
+    { name: 'production_orders', description: 'Production orders given to the production unit: status (issued, in_production, completed, cancelled), project, phase, due date, items ordered/produced. Filter by status or project.',
+      inputSchema: { type: 'object', properties: { status: { type: 'string', description: 'issued | in_production | completed | cancelled' }, project: { type: 'string', description: 'Project name words' } } }, execute: toolProductionOrders },
     { name: 'reorder_plan', description: 'Reorder planner result: materials to order now/soon/later with stock, minimum, remaining demand of active projects, already ordered quantity, draft orders, needed-by and order-by dates and suggested packs.', execute: toolReorderPlan },
     { name: 'erp_reconciliation', description: 'Result of the last ERP stock file comparison: counts of matching/different materials and the list of differences (ERP minus app, in packs) with last delivery/received dates.', execute: toolErpReconciliation },
     { name: 'payments_summary', description: 'Payment totals across all projects: total, paid, outstanding and overdue installments per project.', execute: toolPayments }
@@ -4786,8 +4592,6 @@ async function init() {
       db = await window.claude.use('db');
       downloads = await window.claude.use('downloads');
       assets = await window.claude.use('assets');
-      room = await window.claude.use('room');
-      mcp = await window.claude.use('mcp');
       sampleAI = await window.claude.use('sample');
     } catch (e) {}
   }
@@ -4795,65 +4599,59 @@ async function init() {
   if (db) {
     // Subscribe to projects
     db.collection('projects').onSnapshot(snap => {
-      snap.docs.forEach(doc => { if (doc.exists) projects[doc.id] = doc.data(); });
+      snap.docs.forEach(doc => { if (doc.exists) projects[doc.id] = thaw(doc.data()); });
       snap.docChanges().forEach(ch => { if (ch.type === 'removed') delete projects[ch.doc.id]; });
-      markLoaded('projects');
       renderCurrentPage();
     });
     // Subscribe to stock
     db.doc('stock/materials').onSnapshot(snap => {
-      if (snap.exists) stockData = snap.data();
-      markLoaded('stock');
+      if (snap.exists) stockData = thaw(snap.data());
       renderCurrentPage();
     });
     // Subscribe to orders
     db.collection('orders').onSnapshot(snap => {
-      snap.docs.forEach(doc => { if (doc.exists) orders[doc.id] = doc.data(); });
+      snap.docs.forEach(doc => { if (doc.exists) orders[doc.id] = thaw(doc.data()); });
       snap.docChanges().forEach(ch => { if (ch.type === 'removed') delete orders[ch.doc.id]; });
-      markLoaded('orders');
       renderCurrentPage();
     });
     // Subscribe to deliveries
     db.collection('deliveries').onSnapshot(snap => {
-      snap.docs.forEach(doc => { if (doc.exists) deliveries[doc.id] = doc.data(); });
+      snap.docs.forEach(doc => { if (doc.exists) deliveries[doc.id] = thaw(doc.data()); });
       snap.docChanges().forEach(ch => { if (ch.type === 'removed') delete deliveries[ch.doc.id]; });
-      markLoaded('deliveries');
       renderCurrentPage();
     });
     // Subscribe to reminders
     db.collection('reminders').onSnapshot(snap => {
-      snap.docs.forEach(doc => { if (doc.exists) reminders[doc.id] = doc.data(); });
+      snap.docs.forEach(doc => { if (doc.exists) reminders[doc.id] = thaw(doc.data()); });
       snap.docChanges().forEach(ch => { if (ch.type === 'removed') delete reminders[ch.doc.id]; });
+      renderCurrentPage();
+    });
+    // Subscribe to production orders
+    db.collection('production').onSnapshot(snap => {
+      snap.docs.forEach(doc => { if (doc.exists) productionOrders[doc.id] = thaw(doc.data()); });
+      snap.docChanges().forEach(ch => { if (ch.type === 'removed') delete productionOrders[ch.doc.id]; });
+      updateProdBadge();
       renderCurrentPage();
     });
     // Subscribe to planner settings
     db.doc('settings/planner').onSnapshot(snap => {
-      if (snap.exists) plannerSettings = { lead: 14, includePlanning: false, leads: {}, ...snap.data() };
+      if (snap.exists) plannerSettings = { lead: 14, includePlanning: false, leads: {}, ...thaw(snap.data()) };
       if (!plannerSettings.leads) plannerSettings.leads = {};
       if (plannerOpen) renderPlanner();
     });
     // Subscribe to ERP reconciliation snapshot
     db.doc('recon/last').onSnapshot(snap => {
-      if (snap.exists) recon = snap.data();
+      if (snap.exists) recon = thaw(snap.data());
       if (reconOpen && !reconBusy) renderRecon();
     });
     // Subscribe to activity
     db.doc('activity/recent').onSnapshot(snap => {
-      if (snap.exists) activities = snap.data().items || [];
+      if (snap.exists) activities = thaw(snap.data().items || []);
       renderCurrentPage();
     });
   } else {
     // No DB - show with empty state
     renderDashboard();
-  }
-
-  // Room presence
-  if (room) {
-    room.presence({ name: currentUser, status: 'online' });
-    room.onPeers(peers => {
-      const online = Object.values(peers).filter(p => p.name);
-      $('onlineCount').textContent = online.length + ' online';
-    });
   }
 
   renderDashboard();
@@ -4867,6 +4665,7 @@ function renderCurrentPage() {
   if (pageId === 'dashboard') renderDashboard();
   else if (pageId === 'projects') renderProjects();
   else if (pageId === 'project-detail') renderProjectDetail();
+  else if (pageId === 'production') renderProductionPage();
   else if (pageId === 'stock') renderStock();
   else if (pageId === 'orders') renderOrders();
   else if (pageId === 'reminders') renderReminders();
