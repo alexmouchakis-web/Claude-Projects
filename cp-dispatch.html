@@ -312,6 +312,7 @@ tr:hover td{background:var(--surface-alt)}
 .tile-link:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.12)}
 .tile-link:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .pay-kpi.active{outline:2px solid var(--blue)}
+.phase-area-row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;padding:10px 12px;background:var(--surface-alt);border-radius:var(--radius);margin-bottom:8px}
 .batch-select{width:auto;padding:5px 30px 5px 10px;font-size:.8rem;background-position:right 10px center;cursor:pointer}
 .batch-bar.visible{display:flex}
 .batch-bar .batch-count{font-weight:600;color:var(--red)}
@@ -1427,6 +1428,10 @@ function renderOverview(p) {
     ${p.notes ? `<div class="card"><div class="card-header"><h2>Project Notes</h2></div><div class="card-body"><p>${p.notes}</p></div></div>` : ''}`;
 }
 
+function phAreas(p, ph) {
+  return Object.entries(ph.allocations || {}).filter(([, v]) => v > 0).map(([id, v]) => { const sys = (p.systems || []).find(x => x.id === id); return sys ? `${v} m² ${sys.systemName}` : ''; }).filter(Boolean).join(', ');
+}
+
 function renderPhases(p) {
   const phases = p.phases || [];
   const projTotals = {};
@@ -1458,7 +1463,7 @@ function renderPhases(p) {
             <button class="remove-btn" onclick="deletePhase('${ph.id}')">✕</button>
           </div>
         </div>
-        <div class="text-sm text-muted mb-8">${ph.targetDate ? 'Target: ' + fmtDate(ph.targetDate) : 'No target date'} • ${mats.length} material${mats.length === 1 ? '' : 's'} • ${totalMats} packs</div>
+        <div class="text-sm text-muted mb-8">${ph.targetDate ? 'Target: ' + fmtDate(ph.targetDate) : 'No target date'} • ${mats.length} material${mats.length === 1 ? '' : 's'} • ${totalMats} packs${phAreas(p, ph) ? ' • ' + escAttr(phAreas(p, ph)) : ''}</div>
         ${mats.length > 0 ? `<div class="overflow-x"><table><thead><tr><th>Material</th><th>Pkg</th><th>Qty</th><th>Packs</th><th>Of project</th><th>In Stock</th><th>Status</th></tr></thead><tbody>${mats.map(m => {
           const sKey = m.name + '|' + m.pkg;
           const stock = (stockData[sKey] || {}).quantity || 0;
@@ -1519,23 +1524,32 @@ function openAddPhase(editId) {
       <td><input type="number" class="phq" data-key="${escAttr(key)}" data-total="${m.totalUnits}" data-other="${o}" min="0" step="1" value="${q}" placeholder="0" style="width:80px;font-weight:600" oninput="phqChange(this)"></td>
       <td class="phq-left"></td></tr>`;
   }).join('');
-  const areaSys = (p.systems || []).filter(s => !Array.isArray(s.offerItems) && CATALOG[s.systemName] && s.area > 0);
+  const areaSys = (p.systems || []).filter(s => s.area > 0 && (!Array.isArray(s.offerItems) ? !!CATALOG[s.systemName] : (s.areaKnown || s.area > 1)));
+  const otherArea = sysId => (p.phases || []).filter(x => x.id !== editId).reduce((sum, x) => sum + ((x.allocations || {})[sysId] || 0), 0);
   const areaRows = areaSys.map(s => {
     const alloc = ph ? (ph.allocations || {})[s.id] || '' : '';
-    return `<div class="form-grid"><div><label>${escAttr(s.systemName)} (${escAttr(s.application)})</label><div class="text-sm text-muted">Total: ${s.area} m²</div></div><div><label>m² in this phase</label><input type="number" class="phase-alloc" data-sysid="${s.id}" value="${alloc}" min="0" max="${s.area}" step="any" placeholder="0" oninput="phaseFromArea()"></div></div>`;
+    const oa = otherArea(s.id);
+    return `<div class="phase-area-row"><div style="flex:1;min-width:200px"><strong>${escAttr(s.systemName)}</strong> <span class="text-muted text-sm">${escAttr(s.application)}</span>
+        <div class="text-sm text-muted">Project ${s.area} m² · other phases ${oa} m² · left after this phase: <strong class="pa-left">${Math.max(0, s.area - oa)}</strong> m²</div></div>
+      <div style="display:flex;gap:6px;align-items:end"><div><label>m² in this phase</label><input type="number" class="phase-alloc" data-sysid="${s.id}" data-area="${s.area}" data-other="${oa}" value="${alloc}" min="0" step="any" placeholder="0" style="width:110px" oninput="phaseFromArea()"></div>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="phaseAreaRemaining('${s.id}')">Remaining</button></div></div>`;
   }).join('');
+  const areaHtml = `<div class="flex justify-between items-center mb-8"><h3>Add by surface (m²)</h3></div>
+    ${areaSys.length ? `<div class="form-help mb-8">Enter the m² of a system in this phase and <strong>all its materials are calculated automatically</strong> from its consumption rates (offer systems are scaled in proportion). Changing the m² recalculates the quantities below.</div>${areaRows}`
+      : `<div class="form-help mb-8">No system with a known surface in this project. Enter pack quantities below, or add a product system with its m² to the project.</div>`}
+    <div class="mt-8"><button type="button" class="btn btn-secondary btn-sm" onclick="closeModal();editCurrentProject()">Need another system? Edit project</button></div>`;
   openModal(ph ? 'Edit Phase' : 'Add Phase', `
     <div class="form-grid"><div class="form-row"><label>Phase Name</label><input type="text" id="phaseName" value="${escAttr(ph ? ph.name : 'Phase ' + ((p.phases || []).length + 1))}" placeholder="e.g., Phase 1"></div>
     <div class="form-row"><label>Target Date (finish)</label><input type="date" id="phaseDate" value="${ph ? ph.targetDate || '' : ''}"></div></div>
     <div class="form-grid"><div class="form-row"><label>Start date (optional)</label><input type="date" id="phaseStart" value="${ph ? ph.startDate || '' : ''}"></div><div class="form-help" style="align-self:end;padding-bottom:10px">Used by the Timeline. Without it the bar is estimated.</div></div>
     <hr style="border:none;border-top:1px solid var(--border-light);margin:16px 0">
-    <div class="flex justify-between items-center mb-8"><h3>Quantities to produce in this phase</h3>
+    ${areaHtml}
+    <hr style="border:none;border-top:1px solid var(--border-light);margin:16px 0">
+    <div class="flex justify-between items-center mb-8"><h3>Materials for this phase (packs)</h3>
       ${mats.length ? `<button type="button" class="btn btn-secondary btn-sm" onclick="phaseFillRemaining()">Fill with all remaining</button>` : ''}</div>
-    <div class="form-help mb-8">Enter how many packs of each material go into this phase. "Left" is what remains for later phases.</div>
+    <div class="form-help mb-8">Filled automatically from the m² above, or type pack quantities directly. "Left" is what remains for later phases.</div>
     ${mats.length ? `<div class="overflow-x"><table><thead><tr><th>Material</th><th>Pack</th><th>Project total</th><th>Other phases</th><th>This phase</th><th>Left</th></tr></thead><tbody>${rows}</tbody></table></div>`
       : '<div class="empty-state"><p>Add product systems to the project first.</p></div>'}
-    ${areaSys.length ? `<details class="mt-16"><summary style="cursor:pointer;font-weight:600;font-size:.85rem">Or fill from m² (catalog systems)</summary>
-      <div class="form-help mb-8 mt-8">Enter the m² for this phase and the quantities above are calculated from the consumption rates. You can still adjust any quantity by hand.</div>${areaRows}</details>` : ''}
   `, `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
      <button class="btn btn-primary" onclick="savePhase('${editId || ''}')">${ph ? 'Save' : 'Add Phase'}</button>`);
   document.querySelectorAll('.phq').forEach(phqRefresh);
@@ -1548,12 +1562,12 @@ function phqRefresh(inp) {
   cell.style.color = left < 0 ? 'var(--red)' : '';
   cell.style.fontWeight = left < 0 ? '700' : '';
 }
-function phqChange(inp) { inp.dataset.manual = '1'; phqRefresh(inp); }
+function phqChange(inp) { delete inp.dataset.auto; phqRefresh(inp); }
 
 function phaseFillRemaining() {
   document.querySelectorAll('.phq').forEach(inp => {
     inp.value = Math.max(0, (+inp.dataset.total || 0) - (+inp.dataset.other || 0));
-    inp.dataset.manual = '1';
+    delete inp.dataset.auto;
     phqRefresh(inp);
   });
 }
@@ -1564,16 +1578,50 @@ function phaseFromArea() {
   document.querySelectorAll('.phase-alloc').forEach(inp => {
     const m2 = parseFloat(inp.value) || 0;
     const sys = (p.systems || []).find(s => s.id === inp.dataset.sysid);
+    const left = inp.closest('.phase-area-row').querySelector('.pa-left');
+    const rest = (+inp.dataset.area || 0) - (+inp.dataset.other || 0) - m2;
+    left.textContent = Math.round(rest * 100) / 100;
+    left.style.color = rest < 0 ? 'var(--red)' : '';
     if (!sys || m2 <= 0) return;
-    getEffectiveProducts(sys).forEach(prod => {
-      const k = prod.name + '|' + prod.pkg;
-      calc[k] = (calc[k] || 0) + calcUnits(prod.consumption, m2, prod.pkg).units;
-    });
+    if (Array.isArray(sys.offerItems)) {
+      sys.offerItems.forEach(it => {
+        const k = it.name + '|' + (it.pkg || '');
+        calc[k] = (calc[k] || 0) + Math.ceil((Number(it.quantity) || 0) * m2 / sys.area - 1e-9);
+      });
+    } else {
+      getEffectiveProducts(sys).forEach(prod => {
+        const k = prod.name + '|' + prod.pkg;
+        calc[k] = (calc[k] || 0) + calcUnits(prod.consumption, m2, prod.pkg).units;
+      });
+    }
   });
   document.querySelectorAll('.phq').forEach(inp => {
-    if (inp.dataset.manual === '1' || !(inp.dataset.key in calc)) return;
-    inp.value = calc[inp.dataset.key];
+    const k = inp.dataset.key;
+    if (k in calc) { inp.value = calc[k]; inp.dataset.auto = '1'; }
+    else if (inp.dataset.auto === '1') { inp.value = ''; delete inp.dataset.auto; }
     phqRefresh(inp);
+  });
+}
+
+function phaseAreaRemaining(sysId) {
+  const inp = document.querySelector(`.phase-alloc[data-sysid="${sysId}"]`);
+  if (!inp) return;
+  inp.value = Math.max(0, Math.round(((+inp.dataset.area || 0) - (+inp.dataset.other || 0)) * 100) / 100) || '';
+  phaseFromArea();
+  // finishing the system's area: use the exact leftover packs so per-phase rounding never overshoots the project total
+  const p = projects[currentProject];
+  const sys = (p.systems || []).find(x => x.id === sysId);
+  if (!sys) return;
+  const keys = (Array.isArray(sys.offerItems) ? sys.offerItems.map(it => ({ name: it.name, pkg: it.pkg || '' })) : getEffectiveProducts(sys)).map(x => x.name + '|' + x.pkg);
+  const sharedWithOther = k => [...document.querySelectorAll('.phase-alloc')].some(o => o.dataset.sysid !== sysId && (parseFloat(o.value) || 0) > 0 && (() => {
+    const os = (p.systems || []).find(x => x.id === o.dataset.sysid);
+    return os && (Array.isArray(os.offerItems) ? os.offerItems.map(it => it.name + '|' + (it.pkg || '')) : getEffectiveProducts(os).map(x => x.name + '|' + x.pkg)).includes(k);
+  })());
+  document.querySelectorAll('.phq').forEach(q => {
+    if (!keys.includes(q.dataset.key) || sharedWithOther(q.dataset.key)) return;
+    q.value = Math.max(0, (+q.dataset.total || 0) - (+q.dataset.other || 0)) || '';
+    q.dataset.auto = '1';
+    phqRefresh(q);
   });
 }
 
@@ -1592,7 +1640,12 @@ function savePhase(editId) {
     if (q + other > total) warnings.push(`${escAttr(inp.dataset.key.split('|')[0])}: ${q + other} packs planned across phases but the project needs ${total}`);
   });
   const allocations = {};
-  document.querySelectorAll('.phase-alloc').forEach(inp => { const v = parseFloat(inp.value) || 0; if (v > 0) allocations[inp.dataset.sysid] = v; });
+  document.querySelectorAll('.phase-alloc').forEach(inp => {
+    const v = parseFloat(inp.value) || 0;
+    if (v <= 0) return;
+    allocations[inp.dataset.sysid] = v;
+    if (v + (+inp.dataset.other || 0) > (+inp.dataset.area || 0)) warnings.push(`${escAttr(inp.closest('.phase-area-row').querySelector('strong').textContent)}: ${Math.round((v + (+inp.dataset.other || 0)) * 100) / 100} m² planned across phases but the system covers ${inp.dataset.area} m²`);
+  });
   if (warnings.length) {
     showWarning('More Planned Than Needed', warnings.join('<br>') + '<br><br>Save anyway?', () => doSavePhase(p, editId, name, quantities, allocations));
     return;
