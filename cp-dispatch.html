@@ -313,6 +313,8 @@ tr:hover td{background:var(--surface-alt)}
 .tile-link:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .pay-kpi.active{outline:2px solid var(--blue)}
 .phase-area-row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;padding:10px 12px;background:var(--surface-alt);border-radius:var(--radius);margin-bottom:8px}
+.phase-bars{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px}
+@media(max-width:700px){.phase-bars{grid-template-columns:1fr}}
 .batch-select{width:auto;padding:5px 30px 5px 10px;font-size:.8rem;background-position:right 10px center;cursor:pointer}
 .batch-bar.visible{display:flex}
 .batch-bar .batch-count{font-weight:600;color:var(--red)}
@@ -1428,6 +1430,26 @@ function renderOverview(p) {
     ${p.notes ? `<div class="card"><div class="card-header"><h2>Project Notes</h2></div><div class="card-body"><p>${p.notes}</p></div></div>` : ''}`;
 }
 
+function phaseProgress(p, ph) {
+  const planned = phaseQtyMap(p, ph);
+  const inProd = {}, produced = {}, delivered = {};
+  Object.values(productionOrders).filter(o => o.projectId === p.id && o.phaseId === ph.id && o.status !== 'cancelled').forEach(o => (o.items || []).forEach(i => {
+    if (o.status === 'completed') produced[i.material] = (produced[i.material] || 0) + (Number(i.produced) || 0);
+    else inProd[i.material] = (inProd[i.material] || 0) + (Number(i.ordered) || 0);
+  }));
+  Object.values(deliveries).filter(d => d.projectId === p.id && d.phaseId === ph.id).forEach(d => (d.items || []).forEach(i => { delivered[i.material] = (delivered[i.material] || 0) + (Number(i.quantity) || 0); }));
+  const keys = new Set([...Object.keys(planned), ...Object.keys(inProd), ...Object.keys(produced), ...Object.keys(delivered)]);
+  const rows = [...keys].map(key => {
+    const [name, pkg] = key.split('|');
+    const r = { key, name, pkg, planned: planned[key] || 0, inProd: inProd[key] || 0, produced: produced[key] || 0, delivered: delivered[key] || 0 };
+    r.notIssued = Math.max(0, r.planned - r.produced - r.inProd);
+    r.toDeliver = Math.max(0, r.planned - r.delivered);
+    return r;
+  }).sort((a, b) => b.planned - a.planned || a.name.localeCompare(b.name));
+  const sum = f => rows.reduce((t, r) => t + f(r), 0);
+  return { rows, planned: sum(r => r.planned), produced: sum(r => Math.min(r.produced, r.planned)), delivered: sum(r => Math.min(r.delivered, r.planned)), inProd: sum(r => r.inProd) };
+}
+
 function phAreas(p, ph) {
   return Object.entries(ph.allocations || {}).filter(([, v]) => v > 0).map(([id, v]) => { const sys = (p.systems || []).find(x => x.id === id); return sys ? `${v} m² ${sys.systemName}` : ''; }).filter(Boolean).join(', ');
 }
@@ -1441,7 +1463,20 @@ function renderPhases(p) {
   phases.forEach(ph => Object.entries(phaseQtyMap(p, ph)).forEach(([k, q]) => { planned[k] = (planned[k] || 0) + q; }));
   const totalUnits = allMats.reduce((s, m) => s + m.totalUnits, 0);
   const plannedUnits = allMats.reduce((s, m) => s + Math.min(m.totalUnits, planned[m.name + '|' + m.pkg] || 0), 0);
+  const progs = phases.map(ph => phaseProgress(p, ph));
+  const pt = progs.reduce((t, g) => ({ planned: t.planned + g.planned, produced: t.produced + g.produced, delivered: t.delivered + g.delivered }), { planned: 0, produced: 0, delivered: 0 });
+  const outside = {
+    produced: Object.values(productionOrders).filter(o => o.projectId === p.id && o.status === 'completed' && !o.phaseId).reduce((t, o) => t + (o.items || []).reduce((x, i) => x + (Number(i.produced) || 0), 0), 0),
+    delivered: Object.values(deliveries).filter(d => d.projectId === p.id && !d.phaseId).reduce((t, d) => t + (d.items || []).reduce((x, i) => x + (Number(i.quantity) || 0), 0), 0)
+  };
+  const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
   let html = `<div class="flex justify-between items-center mb-16"><div><h3>${phases.length} Phase${phases.length !== 1 ? 's' : ''}</h3>${totalUnits ? `<div class="text-sm text-muted">Planned in phases: ${plannedUnits} of ${totalUnits} packs${plannedUnits < totalUnits ? ` — ${totalUnits - plannedUnits} not yet assigned` : ''}</div>` : ''}</div><button class="btn btn-primary btn-sm" onclick="openAddPhase()">Add Phase</button></div>`;
+  if (phases.length && pt.planned) html += `<div class="pay-kpis">
+    <div class="pay-kpi"><div class="pk-val">${pt.planned}</div><div class="pk-label">Planned in phases (packs)</div></div>
+    <div class="pay-kpi tile-link" role="button" tabindex="0" onclick="goTab('production')"><div class="pk-val" style="color:var(--blue)">${pt.produced} <span class="text-sm text-muted">${pct(pt.produced, pt.planned)}%</span></div><div class="pk-label">Produced</div></div>
+    <div class="pay-kpi tile-link" role="button" tabindex="0" onclick="goTab('deliveries')"><div class="pk-val" style="color:var(--green)">${pt.delivered} <span class="text-sm text-muted">${pct(pt.delivered, pt.planned)}%</span></div><div class="pk-label">Delivered</div></div>
+    ${outside.produced || outside.delivered ? `<div class="pay-kpi"><div class="pk-val">${outside.produced} / ${outside.delivered}</div><div class="pk-label">Produced / delivered outside phases</div></div>` : ''}
+  </div>`;
   if (phases.length === 0) {
     html += '<div class="empty-state"><p>No phases defined. Add phases to split your project into manageable batches.</p></div>';
   } else {
@@ -1449,6 +1484,7 @@ function renderPhases(p) {
       const statusClass = ph.status === 'completed' ? 'done' : ph.status === 'in_progress' ? 'active' : 'pending';
       const mats = getPhaseMaterials(p.systems || [], ph);
       const totalMats = mats.reduce((s, m) => s + m.totalUnits, 0);
+      const g = progs[i];
       html += `<div class="card mb-8"><div class="card-body">
         <div class="flex justify-between items-center mb-8">
           <div class="flex items-center gap-8"><div class="phase-num ${statusClass}">${i + 1}</div><strong>${ph.name}</strong><span class="chip ${statusClass === 'done' ? 'chip-green' : statusClass === 'active' ? 'chip-blue' : 'chip-gray'}">${ph.status.replace('_', ' ')}</span></div>
@@ -1459,17 +1495,19 @@ function renderPhases(p) {
               <option value="completed" ${ph.status === 'completed' ? 'selected' : ''}>Completed</option>
             </select>
             <button class="btn btn-secondary btn-sm" onclick="openProdOrder('${p.id}','${ph.id}')">Issue to production</button>
+            <button class="btn btn-secondary btn-sm" onclick="openNewDelivery('${ph.id}')">Record delivery</button>
             <button class="btn btn-secondary btn-sm" onclick="openEditPhase('${ph.id}')">Edit</button>
             <button class="remove-btn" onclick="deletePhase('${ph.id}')">✕</button>
           </div>
         </div>
         <div class="text-sm text-muted mb-8">${ph.targetDate ? 'Target: ' + fmtDate(ph.targetDate) : 'No target date'} • ${mats.length} material${mats.length === 1 ? '' : 's'} • ${totalMats} packs${phAreas(p, ph) ? ' • ' + escAttr(phAreas(p, ph)) : ''}</div>
-        ${mats.length > 0 ? `<div class="overflow-x"><table><thead><tr><th>Material</th><th>Pkg</th><th>Qty</th><th>Packs</th><th>Of project</th><th>In Stock</th><th>Status</th></tr></thead><tbody>${mats.map(m => {
-          const sKey = m.name + '|' + m.pkg;
-          const stock = (stockData[sKey] || {}).quantity || 0;
-          const diff = stock - m.totalUnits;
-          const cls = diff >= 0 ? 'stock-ok' : 'stock-out';
-          return `<tr><td>${m.name}</td><td>${m.pkg}</td><td>${m.totalQty} ${m.unit}</td><td>${m.totalUnits}</td><td>${projTotals[sKey] || '—'}</td><td>${stock}</td><td class="${cls}">${diff >= 0 ? 'OK' : 'Need ' + Math.abs(diff)}</td></tr>`;
+        ${g.rows.length > 0 ? `<div class="phase-bars">
+          <div><div class="text-sm text-muted">Produced ${g.produced} / ${g.planned} packs (${pct(g.produced, g.planned)}%)</div><div class="progress-bar"><div class="progress-fill blue" style="width:${pct(g.produced, g.planned)}%"></div></div></div>
+          <div><div class="text-sm text-muted">Delivered ${g.delivered} / ${g.planned} packs (${pct(g.delivered, g.planned)}%)</div><div class="progress-bar"><div class="progress-fill green" style="width:${pct(g.delivered, g.planned)}%"></div></div></div>
+        </div>
+        <div class="overflow-x"><table><thead><tr><th>Material</th><th>Pack</th><th>Planned</th><th>Not yet issued</th><th>In production</th><th>Produced</th><th>Delivered</th><th>Left to deliver</th><th>Status</th></tr></thead><tbody>${g.rows.map(r => {
+          const [cls, label] = r.planned > 0 && r.delivered >= r.planned ? ['chip-green', 'Delivered'] : r.planned > 0 && r.produced >= r.planned ? ['chip-blue', 'Ready to deliver'] : r.inProd > 0 ? ['chip-amber', 'In production'] : r.produced > 0 ? ['chip-blue', 'Partly produced'] : r.planned > 0 ? ['chip-gray', 'Not started'] : ['chip-gray', 'Not in plan'];
+          return `<tr><td>${escAttr(r.name)}</td><td>${escAttr(r.pkg)}</td><td><strong>${r.planned}</strong></td><td>${r.notIssued || '—'}</td><td>${r.inProd || '—'}</td><td>${r.produced || '—'}</td><td>${r.delivered || '—'}</td><td>${r.toDeliver || '—'}</td><td style="white-space:nowrap"><span class="chip ${cls}">${label}</span></td></tr>`;
         }).join('')}</tbody></table></div>` : '<div class="text-sm text-muted">No quantities set for this phase yet — press Edit.</div>'}
       </div></div>`;
     });
@@ -1735,7 +1773,7 @@ function renderDeliveries(p) {
   $('tab-deliveries').innerHTML = html;
 }
 
-function openNewDelivery() {
+function openNewDelivery(phaseId) {
   const p = projects[currentProject];
   const mats = getAllMaterials(p.systems || []);
   const phaseOptions = (p.phases || []).map(ph => `<option value="${ph.id}">${ph.name}</option>`).join('');
@@ -1752,7 +1790,7 @@ function openNewDelivery() {
   openModal('Record Delivery', `
     <div class="form-grid">
       <div class="form-row"><label>Delivery Date</label><input type="date" id="delDate" value="${today()}"></div>
-      <div class="form-row"><label>Delivery Ref</label><input type="text" id="delRef" value="DN-${new Date().getFullYear()}-${String(Object.keys(deliveries).length + 1).padStart(3, '0')}" placeholder="e.g., DN-2026-001"></div>
+      <div class="form-row"><label>Delivery Ref</label><input type="text" id="delRef" value="${nextOrderRef('DN', deliveries)}" placeholder="e.g., DN-2026-001"></div>
     </div>
     <div class="form-grid">
       <div class="form-row"><label>Phase</label><select id="delPhase"><option value="">No specific phase</option>${phaseOptions}</select></div>
@@ -1768,6 +1806,17 @@ function openNewDelivery() {
     </div>
   `, `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
      <button class="btn btn-primary" onclick="saveDelivery()">Save Delivery</button>`);
+  if (phaseId) {
+    const ph = (p.phases || []).find(x => x.id === phaseId);
+    if (ph) {
+      $('delPhase').value = phaseId;
+      const g = phaseProgress(p, ph);
+      document.querySelectorAll('.del-qty').forEach(inp => {
+        const r = g.rows.find(x => x.key === inp.dataset.mat);
+        inp.value = Math.min(r ? r.toDeliver : 0, +inp.max || 0);
+      });
+    }
+  }
 }
 
 function saveDelivery() {
@@ -4572,7 +4621,7 @@ function toolProjectDetails(a) {
     systems: (p.systems || []).map(s => ({ system: s.systemName, application: s.application, area_m2: s.area, from_offer: Array.isArray(s.offerItems) })),
     materials: getAllMaterials(p.systems || []).slice(0, 60).map(m => { const k = m.name + '|' + m.pkg; return { name: m.name, pkg: m.pkg, units_needed: m.totalUnits, delivered_units: delivered[k] || 0, in_stock: (stockData[k] || {}).quantity || 0 }; }),
     payment: { ...projectPayment(p), terms: p.payment?.terms || '', installments: (p.payment?.installments || []).map(i => ({ label: i.label, amount: i.amount, due: i.dueDate, paid: !!i.paid })) },
-    phases: (p.phases || []).map(ph => ({ name: ph.name, status: ph.status, target_date: ph.targetDate })),
+    phases: (p.phases || []).map(ph => { const g = phaseProgress(p, ph); return { name: ph.name, status: ph.status, target_date: ph.targetDate, planned_packs: g.planned, produced_packs: g.produced, delivered_packs: g.delivered, materials: g.rows.slice(0, 20).map(r => ({ material: r.name, pack: r.pkg, planned: r.planned, in_production: r.inProd, produced: r.produced, delivered: r.delivered })) }; }),
     deliveries: dels.slice(-15).map(d => ({ date: d.date, ref: d.ref, items: (d.items || []).map(i => `${i.name} (${i.pkg}) x${i.quantity}`).join('; ') })),
     production_orders: Object.values(productionOrders).filter(o => o.projectId === p.id).map(o => ({ ref: o.ref, status: o.status, phase: o.phaseName || null, due: o.dueDate || null })), notes_count: (p.projectNotes || []).length
   };
