@@ -313,6 +313,20 @@ tr:hover td{background:var(--surface-alt)}
 .tile-link:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .pay-kpi.active{outline:2px solid var(--blue)}
 .phase-area-row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;padding:10px 12px;background:var(--surface-alt);border-radius:var(--radius);margin-bottom:8px}
+.surf-row{border-top:1px solid var(--border-light);padding:10px 0 4px}
+.surf-pick{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+.surf-pick > div{flex:1 1 170px;min-width:0}
+.surf-pick > .sf-c-area{flex:0 0 110px}
+.surf-pick > [hidden]{display:none}
+.surf-pick label{font-size:.72rem}
+.sf-prev{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.sf-chip{font-size:.7rem;padding:2px 8px;border-radius:999px;background:var(--surface);border:1px solid var(--border-light);color:var(--ink-2);white-space:nowrap}
+.sf-chip b{color:var(--ink)}
+.np-preview{margin-top:16px;padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-alt)}
+.cat-table th,.cat-table td{white-space:nowrap}
+.cat-n{text-align:right;font-variant-numeric:tabular-nums}
+.phq-alt td{color:var(--ink-3)}
+.phq-alt input{opacity:.85}
 .phase-bars{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px}
 @media(max-width:700px){.phase-bars{grid-template-columns:1fr}}
 .floor-overlay{position:fixed;inset:0;z-index:190;background:var(--surface);overflow-y:auto;-webkit-overflow-scrolling:touch}
@@ -457,6 +471,10 @@ body.chat-open #chatPanel{transform:none;visibility:visible}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="16" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="12" y2="18"/><circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="4" cy="12" r="1.5" fill="currentColor"/><circle cx="4" cy="18" r="1.5" fill="currentColor"/></svg>
       <span>Timeline</span>
     </a></li>
+    <li><a href="#catalogue" class="nav-link" data-page="catalogue">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+      <span>Catalogue</span>
+    </a></li>
   </ul>
 </nav>
 
@@ -564,6 +582,12 @@ body.chat-open #chatPanel{transform:none;visibility:visible}
     <div class="page-header"><h1>Project Timeline</h1></div>
     <div class="card"><div class="card-body" id="timelineContent"></div></div>
   </div>
+
+  <!-- CATALOGUE -->
+  <div class="page" id="page-catalogue">
+    <div class="page-header"><h1>Catalogue</h1></div>
+    <div class="card"><div class="card-body" id="catalogueContent"></div></div>
+  </div>
 </main>
 </div>
 
@@ -597,265 +621,228 @@ body.chat-open #chatPanel{transform:none;visibility:visible}
 <div id="warningContainer"></div>
 
 <script>
-// ========== PRODUCT CATALOG ==========
-const CATALOG = {
-  "NANOSTUCCO 500": {
-    category: "microcement",
-    applications: {
-      "Wall & furniture (smooth)": [
-        { name: "NANOSTUCCO 500 (POWDER)", pkg: "20kg", consumption: 0.80, unit: "kg" },
-        { name: "COLORFRESH", pkg: "10lt", consumption: 0.10, unit: "lt" }
-      ],
-      "Floor & bathroom (smooth)": [
-        { name: "NANOSTUCCO 500 (POWDER)", pkg: "20kg", consumption: 0.80, unit: "kg" },
-        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
-        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
-      ],
-      "Ceramic tiles + fibermesh": [
-        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
-        { name: "D-BASE 60", pkg: "25kg", consumption: 4.00, unit: "kg" },
-        { name: "GLASSTEX 150", pkg: "50m²", consumption: 1.00, unit: "m²" },
-        { name: "NANOSTUCCO 500 (POWDER)", pkg: "20kg", consumption: 1.00, unit: "kg" },
-        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
-        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
-      ],
-      "Ceramic tiles + membrane": [
-        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
-        { name: "D-BASE 60", pkg: "25kg", consumption: 4.00, unit: "kg" },
-        { name: "UW MEMBRANE PLUS", pkg: "30m²", consumption: 1.00, unit: "m²" },
-        { name: "NANOSTUCCO JOINT", pkg: "10kg", consumption: 0.20, unit: "kg" },
-        { name: "NANOSTUCCO 500 (POWDER)", pkg: "20kg", consumption: 1.00, unit: "kg" },
-        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
-        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
-      ]
-    }
-  },
-  "NANOFIN 50 VELVET": {
-    category: "microcement",
-    applications: {
-      "Wall & furniture (smooth)": [
-        { name: "NANOFIN 50 VELVET (POWDER)", pkg: "20kg", consumption: 0.90, unit: "kg" },
-        { name: "COLORFRESH", pkg: "10lt", consumption: 0.10, unit: "lt" }
-      ],
-      "Floor & bathroom (smooth)": [
-        { name: "NANOFIN 50 VELVET (POWDER)", pkg: "20kg", consumption: 0.90, unit: "kg" },
-        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
-        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
-      ],
-      "Ceramic tiles + fibermesh": [
-        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
-        { name: "D-BASE 60", pkg: "25kg", consumption: 4.00, unit: "kg" },
-        { name: "GLASSTEX 150", pkg: "50m²", consumption: 1.00, unit: "m²" },
-        { name: "NANOFIN 50 VELVET (POWDER)", pkg: "20kg", consumption: 1.10, unit: "kg" },
-        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
-        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
-      ],
-      "Ceramic tiles + membrane": [
-        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
-        { name: "D-BASE 60", pkg: "25kg", consumption: 4.00, unit: "kg" },
-        { name: "UW MEMBRANE PLUS", pkg: "30m²", consumption: 1.00, unit: "m²" },
-        { name: "NANOSTUCCO JOINT", pkg: "10kg", consumption: 0.20, unit: "kg" },
-        { name: "NANOFIN 50 VELVET (POWDER)", pkg: "20kg", consumption: 1.10, unit: "kg" },
-        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
-        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
-      ]
-    }
-  },
-  "NATURA 50 VELVET": {
-    category: "micro-coating",
-    applications: {
-      "Wall & furniture (smooth)": [
-        { name: "NATURA 50 VELVET (POWDER)", pkg: "20kg", consumption: 0.90, unit: "kg" },
-        { name: "NATURA SEAL", pkg: "10lt", consumption: 0.10, unit: "lt" }
-      ],
-      "Floor & bathroom (smooth)": [
-        { name: "NATURA 50 VELVET (POWDER)", pkg: "20kg", consumption: 0.90, unit: "kg" },
-        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
-        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
-      ],
-      "Ceramic tiles + fibermesh": [
-        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
-        { name: "D-BASE 60", pkg: "25kg", consumption: 4.00, unit: "kg" },
-        { name: "GLASSTEX 150", pkg: "50m²", consumption: 1.00, unit: "m²" },
-        { name: "NATURA 50 VELVET (POWDER)", pkg: "20kg", consumption: 1.10, unit: "kg" },
-        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
-        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
-      ],
-      "Ceramic tiles + membrane": [
-        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
-        { name: "D-BASE 60", pkg: "25kg", consumption: 4.00, unit: "kg" },
-        { name: "UW MEMBRANE PLUS", pkg: "30m²", consumption: 1.00, unit: "m²" },
-        { name: "NANOSTUCCO JOINT", pkg: "10kg", consumption: 0.20, unit: "kg" },
-        { name: "NATURA 50 VELVET (POWDER)", pkg: "20kg", consumption: 1.10, unit: "kg" },
-        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
-        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
-      ]
-    }
-  },
-  "MARMOFIN 50": {
-    category: "marble microcement",
-    applications: {
-      "Smooth surfaces": [
-        { name: "MARMOFIN 50 BASE (POWDER)", pkg: "20kg", consumption: 0.80, unit: "kg" },
-        { name: "MARMOFIN 50 FINISH (POWDER)", pkg: "20kg", consumption: 0.30, unit: "kg" },
-        { name: "MARMOFIN 50 VEINS", pkg: "1kg", consumption: 0.10, unit: "kg" },
-        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
-        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
-      ],
-      "Ceramic tiles + fibermesh": [
-        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
-        { name: "D-BASE 60", pkg: "25kg", consumption: 4.00, unit: "kg" },
-        { name: "GLASSTEX 150", pkg: "50m²", consumption: 1.00, unit: "m²" },
-        { name: "MARMOFIN 50 BASE (POWDER)", pkg: "20kg", consumption: 0.80, unit: "kg" },
-        { name: "MARMOFIN 50 FINISH (POWDER)", pkg: "20kg", consumption: 0.30, unit: "kg" },
-        { name: "MARMOFIN 50 VEINS", pkg: "1kg", consumption: 0.10, unit: "kg" },
-        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
-        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
-      ],
-      "Ceramic tiles + membrane": [
-        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
-        { name: "D-BASE 60", pkg: "25kg", consumption: 4.00, unit: "kg" },
-        { name: "UW MEMBRANE PLUS", pkg: "30m²", consumption: 1.00, unit: "m²" },
-        { name: "NANOSTUCCO JOINT", pkg: "10kg", consumption: 0.20, unit: "kg" },
-        { name: "MARMOFIN 50 BASE (POWDER)", pkg: "20kg", consumption: 0.80, unit: "kg" },
-        { name: "MARMOFIN 50 FINISH (POWDER)", pkg: "20kg", consumption: 0.30, unit: "kg" },
-        { name: "MARMOFIN 50 VEINS", pkg: "1kg", consumption: 0.10, unit: "kg" },
-        { name: "DECO RESINA", pkg: "5kg", consumption: 0.05, unit: "kg" },
-        { name: "DECO PLUS", pkg: "5+1lt", consumption: 0.06, unit: "lt" }
-      ]
-    }
-  },
-  "PAINT NATURA": {
-    category: "natural paint",
-    applications: {
-      "Wall application": [
-        { name: "RES PRIMER PLUS", pkg: "4lt", consumption: 0.10, unit: "lt" },
-        { name: "PAINT NATURA (POWDER)", pkg: "20kg", consumption: 0.30, unit: "kg" },
-        { name: "NATURA SEAL", pkg: "10lt", consumption: 0.10, unit: "lt" }
-      ]
-    }
-  },
-  "CREATIVO NATURA": {
-    category: "pure textured surfaces",
-    applications: {
-      "Wall application": [
-        { name: "C PRIMER PLUS", pkg: "4lt", consumption: 0.15, unit: "lt" },
-        { name: "CREATIVO NATURA (POWDER)", pkg: "20kg", consumption: 4.00, unit: "kg" },
-        { name: "NATURA SEAL", pkg: "10lt", consumption: 0.10, unit: "lt" }
-      ]
-    }
-  },
-  "NANOFIN METAL": {
-    category: "microcement metal",
-    applications: {
-      "Wall & furniture": [
-        { name: "NANOSTUCCO 500 (POWDER)", pkg: "20kg", consumption: 0.80, unit: "kg" },
-        { name: "NANOFIN METAL (POWDER)", pkg: "3kg", consumption: 0.50, unit: "kg" },
-        { name: "NANOFIN WAX", pkg: "1lt", consumption: 0.04, unit: "lt" },
-        { name: "NANOFIN METAL SEALER", pkg: "1lt", consumption: 0.10, unit: "lt" }
-      ]
-    }
-  },
-  "ELEMENT:20 (concrete/travertino)": {
-    category: "fair-faced concrete",
-    applications: {
-      "Wall application": [
-        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
-        { name: "ELEMENT:20 (POWDER)", pkg: "20kg", consumption: 3.00, unit: "kg" },
-        { name: "COLORTEC", pkg: "10lt", consumption: 0.13, unit: "lt" }
-      ]
-    }
-  },
-  "ELEMENT:20 (bamboo/linea)": {
-    category: "fair-faced concrete",
-    applications: {
-      "Wall application": [
-        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
-        { name: "ELEMENT:20 (POWDER)", pkg: "20kg", consumption: 4.00, unit: "kg" },
-        { name: "COLORFRESH", pkg: "10lt", consumption: 0.10, unit: "lt" }
-      ]
-    }
-  },
-  "TX RASO": {
-    category: "exposed concrete",
-    applications: {
-      "Wall application": [
-        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
-        { name: "TX RASO (POWDER)", pkg: "25kg", consumption: 4.00, unit: "kg" },
-        { name: "COLORTEC", pkg: "10lt", consumption: 0.13, unit: "lt" }
-      ]
-    }
-  },
-  "ELEMENT:10": {
-    category: "retro walls",
-    applications: {
-      "Wall application": [
-        { name: "C PRIMER PLUS", pkg: "5kg", consumption: 0.15, unit: "kg" },
-        { name: "ELEMENT:10 (POWDER)", pkg: "20kg", consumption: 2.20, unit: "kg" },
-        { name: "COLORTEC", pkg: "10lt", consumption: 0.13, unit: "lt" }
-      ]
-    }
-  },
-  "RESAIC": {
-    category: "liquid mosaic",
-    applications: {
-      "Application": [
-        { name: "EP PRIMER PLUS S", pkg: "7+3kg", consumption: 0.15, unit: "kg" },
-        { name: "EP COLOR S", pkg: "7.5+2.5kg", consumption: 0.35, unit: "kg" },
-        { name: "DECO TOP", pkg: "3.35+0.65kg", consumption: 0.18, unit: "kg" },
-        { name: "FLAKES", pkg: "1kg", consumption: 0.05, unit: "kg" }
-      ]
-    }
-  },
-  "EP COLOR PLUS S": {
-    category: "epoxy paint",
-    applications: {
-      "Application": [
-        { name: "EP PRIMER PLUS S", pkg: "7+3kg", consumption: 0.15, unit: "kg" },
-        { name: "EP COLOR S", pkg: "7.5+2.5kg", consumption: 0.35, unit: "kg" }
-      ]
-    }
-  },
-  "EP COLOR PLUS W": {
-    category: "epoxy paint",
-    applications: {
-      "Application": [
-        { name: "EP PRIMER PLUS W", pkg: "14kg", consumption: 0.15, unit: "kg" },
-        { name: "EP COLOR W", pkg: "4+1kg", consumption: 0.35, unit: "kg" }
-      ]
-    }
-  },
-  "PAVITECT RESIN PU 2K UV": {
-    category: "quartz floors",
-    applications: {
-      "Floor application": [
-        { name: "EP PRIMER PLUS", pkg: "15kg", consumption: 0.15, unit: "kg" },
-        { name: "PAVITECT RESIN PU 2K UV", pkg: "6.5kg", consumption: 0.90, unit: "kg" },
-        { name: "AGGREGATES (graphite 2.5-3.5mm)", pkg: "25kg", consumption: 14.00, unit: "kg" },
-        { name: "DECO FLOOR", pkg: "4kg", consumption: 0.15, unit: "kg" }
-      ]
-    }
-  },
-  "PAVITECT RESIN EPOXY UV": {
-    category: "quartz floors",
-    applications: {
-      "Floor application": [
-        { name: "EP PRIMER PLUS", pkg: "15kg", consumption: 0.15, unit: "kg" },
-        { name: "PAVITECT EPOXY UV", pkg: "5kg", consumption: 1.12, unit: "kg" },
-        { name: "AGGREGATES (graphite 2.5-3.5mm)", pkg: "25kg", consumption: 14.00, unit: "kg" },
-        { name: "DECO FLOOR", pkg: "4kg", consumption: 0.15, unit: "kg" }
-      ]
-    }
-  },
-  "INTOTECT RESIN": {
-    category: "granite walls",
-    applications: {
-      "Wall application": [
-        { name: "C PRIMER PLUS", pkg: "5lt", consumption: 0.15, unit: "lt" },
-        { name: "INTOTECT RESIN", pkg: "25kg", consumption: 4.50, unit: "kg" }
-      ]
-    }
-  }
+// ========== PRODUCT & SYSTEM CATALOG (from the Cement Plus BOM + E3/26 price list) ==========
+// PRODUCTS: unit + the pack sizes sold. SYSTEMS: rows [element, environment, substrate, {product: consumption per m²}].
+const PRODUCTS = {
+  "C PRIMER PLUS": { unit: "kg", packs: ["1kg","5kg"], kind: "primer" },
+  "RES PRIMER PLUS": { unit: "lt", packs: ["4lt"], kind: "primer" },
+  "EP PRIMER PLUS": { unit: "kg", packs: ["15kg"], kind: "primer" },
+  "EP PRIMER PLUS S": { unit: "kg", packs: ["7+3kg"], kind: "primer" },
+  "EP PRIMER PLUS W": { unit: "kg", packs: ["14kg"], kind: "primer" },
+  "UW MEMBRANE PLUS": { unit: "m²", packs: ["30m²"], kind: "prep" },
+  "GLASSTEX 150": { unit: "m²", packs: ["50m²"], kind: "prep" },
+  "D-BASE 60": { unit: "kg", packs: ["25kg"], kind: "prep" },
+  "NANOSTUCCO JOINT": { unit: "kg", packs: ["10kg"], kind: "prep" },
+  "NANOSTUCCO 500 (POWDER)": { unit: "kg", packs: ["5kg","10kg","20kg"], kind: "finish" },
+  "NANOFIN 50 VELVET (POWDER)": { unit: "kg", packs: ["10kg","20kg"], kind: "finish" },
+  "NATURA 50 VELVET (POWDER)": { unit: "kg", packs: ["10kg","20kg"], kind: "finish" },
+  "NANOFIN METAL (POWDER)": { unit: "kg", packs: ["3kg"], kind: "finish" },
+  "MARMOFIN 50 BASE (POWDER)": { unit: "kg", packs: ["20kg"], kind: "finish" },
+  "MARMOFIN 50 FINISH (POWDER)": { unit: "kg", packs: ["20kg"], kind: "finish" },
+  "MARMOFIN 50 VEINS": { unit: "kg", packs: ["1kg"], kind: "finish" },
+  "ELEMENT:20 (POWDER)": { unit: "kg", packs: ["20kg"], kind: "finish" },
+  "ELEMENT:10 (POWDER)": { unit: "kg", packs: ["20kg"], kind: "finish" },
+  "TX RASO (POWDER)": { unit: "kg", packs: ["25kg"], kind: "finish" },
+  "INTOTECT RESIN": { unit: "kg", packs: ["25kg"], kind: "finish" },
+  "PAINT NATURA (POWDER)": { unit: "kg", packs: ["20kg"], kind: "finish" },
+  "CREATIVO NATURA (POWDER)": { unit: "kg", packs: ["20kg"], kind: "finish" },
+  "PAVITECT EPOXY UV": { unit: "kg", packs: ["5kg"], kind: "finish" },
+  "PAVITECT RESIN PU 2K UV": { unit: "kg", packs: ["6.5kg"], kind: "finish" },
+  "AGGREGATES (graphite 2.5-3.5mm)": { unit: "kg", packs: ["25kg"], kind: "finish" },
+  "EP COLOR S": { unit: "kg", packs: ["7.5+2.5kg"], kind: "finish" },
+  "EP COLOR W": { unit: "kg", packs: ["4+1kg"], kind: "finish" },
+  "FLAKES": { unit: "kg", packs: ["1kg"], kind: "finish" },
+  "COLORFRESH": { unit: "lt", packs: ["1lt","10lt"], kind: "sealer" },
+  "COLORTEC": { unit: "lt", packs: ["1lt","10lt"], kind: "sealer" },
+  "NATURA SEAL": { unit: "lt", packs: ["1lt","5lt","10lt"], kind: "sealer" },
+  "DECO RESINA": { unit: "kg", packs: ["1kg","5kg"], kind: "sealer" },
+  "DECO PLUS": { unit: "lt", packs: ["1+0.2lt","5+1lt"], kind: "sealer" },
+  "DECO FLOOR": { unit: "lt", packs: ["4lt"], kind: "sealer" },
+  "DECO TOP": { unit: "kg", packs: ["3.35+0.65kg"], kind: "sealer" },
+  "NANOFIN WAX": { unit: "lt", packs: ["1lt"], kind: "sealer" },
+  "NANOFIN METAL SEALER": { unit: "lt", packs: ["1lt"], kind: "sealer" },
+};
+const SYSTEMS = {
+  "NANOSTUCCO 500": { category: "microcement", rows: [
+    ["floors","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["floors","any","damp",{"C PRIMER PLUS":0.15,"UW MEMBRANE PLUS":1.0,"D-BASE 60":4.0,"DECO RESINA":0.05,"DECO PLUS":0.06,"NANOSTUCCO JOINT":0.2}],
+    ["floors","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["floors","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["floors","any","smooth",{"NANOSTUCCO 500 (POWDER)":0.8,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["walls","in","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"COLORFRESH":0.1}],
+    ["walls","in","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"COLORFRESH":0.1}],
+    ["walls","in","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"COLORFRESH":0.1}],
+    ["walls","in","smooth",{"NANOSTUCCO 500 (POWDER)":0.8,"COLORFRESH":0.1}],
+    ["walls","out","friable",{"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["walls","out","tiles",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["walls","out","rough",{"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["walls","out","smooth",{"NANOSTUCCO 500 (POWDER)":0.8,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["stairs","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["stairs","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["stairs","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["stairs","any","smooth",{"NANOSTUCCO 500 (POWDER)":0.8,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["bathrooms","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["bathrooms","any","damp",{"C PRIMER PLUS":0.15,"UW MEMBRANE PLUS":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06,"NANOSTUCCO JOINT":0.2}],
+    ["bathrooms","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["bathrooms","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["bathrooms","any","smooth",{"NANOSTUCCO 500 (POWDER)":0.8,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["furniture","in","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"COLORFRESH":0.1}],
+    ["furniture","in","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"COLORFRESH":0.1}],
+    ["furniture","in","smooth",{"NANOSTUCCO 500 (POWDER)":0.8,"COLORFRESH":0.1}],
+    ["furniture","out","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["furniture","out","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["furniture","out","smooth",{"NANOSTUCCO 500 (POWDER)":0.8,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+  ] },
+  "NANOFIN METAL": { category: "microcement metal", rows: [
+    ["walls","in","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
+    ["walls","in","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
+    ["walls","in","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
+    ["walls","in","smooth",{"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
+    ["walls","out","friable",{"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
+    ["walls","out","tiles",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
+    ["walls","out","rough",{"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
+    ["walls","out","smooth",{"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
+    ["furniture","in","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
+    ["furniture","in","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
+    ["furniture","in","smooth",{"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
+    ["furniture","out","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
+    ["furniture","out","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
+    ["furniture","out","smooth",{"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
+  ] },
+  "NANOFIN 50 VELVET": { category: "microcement", rows: [
+    ["floors","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["floors","any","damp",{"UW MEMBRANE PLUS":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06,"NANOSTUCCO JOINT":0.2}],
+    ["floors","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["floors","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["floors","any","smooth",{"NANOFIN 50 VELVET (POWDER)":0.9,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["walls","in","friable",{"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"COLORFRESH":0.1}],
+    ["walls","in","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"COLORFRESH":0.1}],
+    ["walls","in","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"COLORFRESH":0.1}],
+    ["walls","in","smooth",{"NANOFIN 50 VELVET (POWDER)":0.9,"COLORFRESH":0.1}],
+    ["walls","out","friable",{"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["walls","out","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["walls","out","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["walls","out","smooth",{"NANOFIN 50 VELVET (POWDER)":0.9,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["stairs","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["stairs","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["stairs","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["stairs","any","smooth",{"NANOFIN 50 VELVET (POWDER)":0.9,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["bathrooms","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["bathrooms","any","damp",{"C PRIMER PLUS":0.15,"UW MEMBRANE PLUS":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06,"NANOSTUCCO JOINT":0.2}],
+    ["bathrooms","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["bathrooms","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["bathrooms","any","smooth",{"NANOFIN 50 VELVET (POWDER)":0.9,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["furniture","in","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"COLORFRESH":0.1}],
+    ["furniture","in","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"COLORFRESH":0.1}],
+    ["furniture","in","smooth",{"NANOFIN 50 VELVET (POWDER)":0.9,"COLORFRESH":0.1}],
+    ["furniture","out","friable",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["furniture","out","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["furniture","out","smooth",{"NANOFIN 50 VELVET (POWDER)":0.9,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+  ] },
+  "NATURA 50 VELVET": { category: "microcement", rows: [
+    ["floors","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["floors","any","damp",{"UW MEMBRANE PLUS":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06,"NANOSTUCCO JOINT":0.2}],
+    ["floors","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["floors","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["floors","any","smooth",{"NATURA 50 VELVET (POWDER)":0.9,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["walls","in","friable",{"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"NATURA SEAL":0.1}],
+    ["walls","in","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"NATURA SEAL":0.1}],
+    ["walls","in","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"NATURA SEAL":0.1}],
+    ["walls","in","smooth",{"NATURA 50 VELVET (POWDER)":0.9,"NATURA SEAL":0.1}],
+    ["walls","out","friable",{"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["walls","out","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["walls","out","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["walls","out","smooth",{"NATURA 50 VELVET (POWDER)":0.9,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["stairs","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["stairs","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["stairs","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["stairs","any","smooth",{"NATURA 50 VELVET (POWDER)":0.9,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["bathrooms","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["bathrooms","any","damp",{"C PRIMER PLUS":0.15,"UW MEMBRANE PLUS":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06,"NANOSTUCCO JOINT":0.2}],
+    ["bathrooms","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["bathrooms","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["bathrooms","any","smooth",{"NATURA 50 VELVET (POWDER)":0.9,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["furniture","in","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"NATURA SEAL":0.1}],
+    ["furniture","in","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"NATURA SEAL":0.1}],
+    ["furniture","in","smooth",{"NATURA 50 VELVET (POWDER)":0.9,"NATURA SEAL":0.1}],
+    ["furniture","out","friable",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["furniture","out","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["furniture","out","smooth",{"NATURA 50 VELVET (POWDER)":0.9,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+  ] },
+  "ELEMENT:20 LINEA / BAMBOO": { category: "fair-faced concrete", rows: [
+    ["walls","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"ELEMENT:20 (POWDER)":4.0,"COLORFRESH":0.1}],
+    ["walls","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"ELEMENT:20 (POWDER)":4.0,"COLORFRESH":0.1}],
+    ["walls","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"ELEMENT:20 (POWDER)":4.0,"COLORFRESH":0.1}],
+    ["walls","any","smooth",{"C PRIMER PLUS":0.15,"ELEMENT:20 (POWDER)":4.0,"COLORFRESH":0.1}],
+  ] },
+  "ELEMENT:20 FAIR-FACED / TRAVERTINO": { category: "fair-faced concrete", rows: [
+    ["walls","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"ELEMENT:20 (POWDER)":3.0,"COLORTEC":0.13}],
+    ["walls","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"ELEMENT:20 (POWDER)":3.0,"COLORTEC":0.13}],
+    ["walls","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"ELEMENT:20 (POWDER)":3.0,"COLORTEC":0.13}],
+    ["walls","any","smooth",{"C PRIMER PLUS":0.15,"ELEMENT:20 (POWDER)":3.0,"COLORTEC":0.13}],
+  ] },
+  "ELEMENT:10": { category: "retro walls", rows: [
+    ["walls","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"ELEMENT:10 (POWDER)":2.2,"COLORTEC":0.13}],
+    ["walls","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"ELEMENT:10 (POWDER)":2.2,"COLORTEC":0.13}],
+    ["walls","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"ELEMENT:10 (POWDER)":2.2,"COLORTEC":0.13}],
+    ["walls","any","smooth",{"C PRIMER PLUS":0.15,"ELEMENT:10 (POWDER)":2.2,"COLORTEC":0.13}],
+  ] },
+  "TX RASO": { category: "exposed concrete", rows: [
+    ["walls","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"TX RASO (POWDER)":4.0,"COLORTEC":0.13}],
+    ["walls","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"TX RASO (POWDER)":4.0,"COLORTEC":0.13}],
+    ["walls","any","rough",{"C PRIMER PLUS":0.15,"TX RASO (POWDER)":4.0,"COLORTEC":0.13}],
+    ["walls","any","smooth",{"C PRIMER PLUS":0.15,"TX RASO (POWDER)":4.0,"COLORTEC":0.13}],
+  ] },
+  "PAVITECT RESIN EPOXY UV": { category: "quartz floors", rows: [
+    ["floors","any","friable",{"C PRIMER PLUS":0.15,"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"PAVITECT EPOXY UV":1.12,"DECO FLOOR":0.15}],
+    ["floors","any","damp",{"C PRIMER PLUS":0.15,"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"UW MEMBRANE PLUS":1.0,"D-BASE 60":4.0,"PAVITECT EPOXY UV":1.12,"DECO FLOOR":0.15}],
+    ["floors","any","rough",{"C PRIMER PLUS":0.15,"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"PAVITECT EPOXY UV":1.12,"DECO FLOOR":0.15}],
+    ["floors","any","tiles",{"C PRIMER PLUS":0.15,"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"PAVITECT EPOXY UV":1.12,"DECO FLOOR":0.15}],
+    ["floors","any","smooth",{"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"PAVITECT EPOXY UV":1.12,"DECO FLOOR":0.15}],
+  ] },
+  "PAVITECT RESIN PU 2K UV": { category: "quartz floors", rows: [
+    ["floors","any","friable",{"C PRIMER PLUS":0.15,"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"PAVITECT RESIN PU 2K UV":0.9,"DECO FLOOR":0.15}],
+    ["floors","any","damp",{"C PRIMER PLUS":0.15,"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"UW MEMBRANE PLUS":1.0,"D-BASE 60":4.0,"PAVITECT RESIN PU 2K UV":0.9,"DECO FLOOR":0.15}],
+    ["floors","any","rough",{"C PRIMER PLUS":0.15,"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"PAVITECT RESIN PU 2K UV":0.9,"DECO FLOOR":0.15}],
+    ["floors","any","tiles",{"C PRIMER PLUS":0.15,"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"PAVITECT RESIN PU 2K UV":0.9,"DECO FLOOR":0.15}],
+    ["floors","any","smooth",{"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"PAVITECT RESIN PU 2K UV":0.9,"DECO FLOOR":0.15}],
+  ] },
+  "INTOTECT RESIN": { category: "granite walls", rows: [
+    ["walls","any","friable",{"C PRIMER PLUS":0.15,"INTOTECT RESIN":4.5,"GLASSTEX 150":1.0,"D-BASE 60":4.0}],
+    ["walls","any","damp",{"C PRIMER PLUS":0.15,"INTOTECT RESIN":4.5,"UW MEMBRANE PLUS":1.0,"D-BASE 60":4.0}],
+    ["walls","any","rough",{"C PRIMER PLUS":0.15,"INTOTECT RESIN":4.5,"GLASSTEX 150":1.0,"D-BASE 60":4.0}],
+    ["walls","any","tiles",{"C PRIMER PLUS":0.15,"INTOTECT RESIN":4.5,"GLASSTEX 150":1.0,"D-BASE 60":4.0}],
+    ["walls","any","smooth",{"C PRIMER PLUS":0.15,"INTOTECT RESIN":4.5}],
+  ] },
+  "MARMOFIN 50": { category: "marble microcement", rows: [
+    ["walls","any","smooth",{"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["walls","any","tiles",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"GLASSTEX 150":1.0,"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["walls","any","damp",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"UW MEMBRANE PLUS":1.0,"NANOSTUCCO JOINT":0.2,"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["floors","any","smooth",{"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["floors","any","tiles",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"GLASSTEX 150":1.0,"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["floors","any","damp",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"UW MEMBRANE PLUS":1.0,"NANOSTUCCO JOINT":0.2,"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["bathrooms","any","smooth",{"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["bathrooms","any","tiles",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"GLASSTEX 150":1.0,"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["bathrooms","any","damp",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"UW MEMBRANE PLUS":1.0,"NANOSTUCCO JOINT":0.2,"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["furniture","any","smooth",{"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["furniture","any","tiles",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"GLASSTEX 150":1.0,"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["furniture","any","damp",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"UW MEMBRANE PLUS":1.0,"NANOSTUCCO JOINT":0.2,"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+  ] },
+  "PAINT NATURA": { category: "natural paint", rows: [
+    ["walls","any","any",{"RES PRIMER PLUS":0.1,"PAINT NATURA (POWDER)":0.3,"NATURA SEAL":0.1}],
+  ] },
+  "CREATIVO NATURA": { category: "pure textured surfaces", rows: [
+    ["walls","any","any",{"C PRIMER PLUS":0.15,"CREATIVO NATURA (POWDER)":4.0,"NATURA SEAL":0.1}],
+  ] },
+  "RESAIC": { category: "liquid mosaic", rows: [
+    ["any","any","any",{"EP PRIMER PLUS S":0.15,"EP COLOR S":0.35,"DECO TOP":0.18,"FLAKES":0.05}],
+  ] },
+  "EP COLOR PLUS S": { category: "epoxy paint", rows: [
+    ["any","any","any",{"EP PRIMER PLUS S":0.15,"EP COLOR S":0.35}],
+  ] },
+  "EP COLOR PLUS W": { category: "epoxy paint", rows: [
+    ["any","any","any",{"EP PRIMER PLUS W":0.15,"EP COLOR W":0.35}],
+  ] },
 };
 
 const TEAM = [
@@ -877,47 +864,117 @@ function calcUnits(consumption, area, pkg) {
   return { total: Math.round(total * 100) / 100, units: Math.ceil(total / size), size, pkg };
 }
 
-function getEffectiveProducts(sys) {
-  if (Array.isArray(sys.offerItems)) {
-    return sys.offerItems.map(it => ({ name: it.name, pkg: it.pkg || '', unit: it.unit || 'kg', consumption: 0, fixedUnits: parseFloat(it.quantity) || 0 }));
-  }
-  const cat = CATALOG[sys.systemName];
-  if (!cat || !cat.applications[sys.application]) return [];
-  const defaults = cat.applications[sys.application];
-  const overrides = sys.materialOverrides || {};
-  const products = defaults.map((prod, i) => {
-    const ov = overrides[i] || {};
-    return {
-      name: ov.name !== undefined ? ov.name : prod.name,
-      pkg: ov.pkg !== undefined ? ov.pkg : prod.pkg,
-      consumption: ov.consumption !== undefined ? ov.consumption : prod.consumption,
-      unit: ov.unit !== undefined ? ov.unit : prod.unit
-    };
+// ---- labels (English · Greek) for the surface pickers ----
+const BOM_LABELS = {
+  el: { floors: ['Floors', 'Δάπεδα'], walls: ['Walls', 'Τοίχοι'], stairs: ['Stairs', 'Σκάλες'], bathrooms: ['Bathrooms', 'Μπάνια'], furniture: ['Furniture', 'Έπιπλα'], any: ['Whole application', 'Εφαρμογή'] },
+  env: { in: ['Interior', 'Εσωτερικά'], out: ['Exterior', 'Εξωτερικά'], any: ['Interior / Exterior', 'Εσωτ. / Εξωτ.'] },
+  sub: { friable: ['Friable', 'Σαθρό'], damp: ['Friable + damp', 'Σαθρό / υγρασία'], tiles: ['Existing tiles', 'Πλακίδια'], rough: ['Rough', 'Τραχύ'], smooth: ['Smooth', 'Λείο'], any: ['Standard', 'Στάνταρ'] }
+};
+const bomLabel = (kind, key) => { const v = BOM_LABELS[kind][key] || [key, key]; return v[0] + ' · ' + v[1]; };
+const bomShort = (kind, key) => (BOM_LABELS[kind][key] || [key])[0];
+
+// ---- surface rows of a system: element -> environment -> substrate ----
+function bomRows(name) { return (SYSTEMS[name] || {}).rows || []; }
+function bomEnvMatch(rowEnv, env) { return rowEnv === 'any' || env === 'any' || rowEnv === env; }
+function bomElements(name) { return [...new Set(bomRows(name).map(r => r[0]))]; }
+function bomEnvs(name, el) {
+  const rs = bomRows(name).filter(r => r[0] === el);
+  return rs.some(r => r[1] !== 'any') ? ['in', 'out'].filter(e => rs.some(r => bomEnvMatch(r[1], e))) : ['any'];
+}
+function bomSubs(name, el, env) {
+  const subs = [];
+  bomRows(name).forEach(r => { if (r[0] === el && bomEnvMatch(r[1], env) && !subs.includes(r[2])) subs.push(r[2]); });
+  return subs;
+}
+function bomRow(name, el, env, sub) { return bomRows(name).find(r => r[0] === el && bomEnvMatch(r[1], env) && r[2] === sub) || null; }
+function bomDefaultSurface(name) {
+  const el = bomElements(name)[0], env = bomEnvs(name, el)[0], subs = bomSubs(name, el, env);
+  return { id: uid(), element: el, env, substrate: subs.includes('smooth') ? 'smooth' : subs[0], area: '' };
+}
+function bomSummary(sys) {
+  return (sys.surfaces || []).filter(s => parseFloat(s.area) > 0).map(s => {
+    const bits = [bomShort('el', s.element)];
+    if (s.element !== 'any' && s.env !== 'any' && bomEnvs(sys.systemName, s.element).length > 1) bits.push(bomShort('env', s.env));
+    if (s.substrate !== 'any') bits.push(bomShort('sub', s.substrate));
+    return `${parseFloat(s.area)} m² ${bits.join(' / ')}`;
+  }).join('; ');
+}
+const catalogKeys = () => { const k = new Set(); Object.entries(PRODUCTS).forEach(([n, d]) => d.packs.forEach(p => k.add(n + '|' + p))); return k; };
+const systemNames = () => Object.keys(SYSTEMS);
+
+// ---- smart pack combination: least leftover first, then fewest packs, then the bigger packs ----
+function packMix(name, qty, pref) {
+  qty = Math.round(qty * 1e6) / 1e6;
+  if (!(qty > 0)) return [];
+  const def = PRODUCTS[name];
+  let opts = def ? def.packs.map(p => ({ pkg: p, size: pkgSize(p) })) : [];
+  if (pref && pref !== 'smart') { const o = opts.filter(x => x.pkg === pref); opts = o.length ? o : [{ pkg: pref, size: pkgSize(pref) }]; }
+  if (!opts.length) return [{ pkg: '', units: Math.ceil(qty - 1e-9), size: 1 }];
+  opts.sort((a, b) => b.size - a.size);
+  const eps = 1e-9; let best = null;
+  const rec = (i, got, n, cnt) => {
+    if (i === opts.length) {
+      if (got < qty - eps) return;
+      const waste = got - qty;
+      if (!best || waste < best.waste - eps || (Math.abs(waste - best.waste) <= eps && n < best.n)) best = { waste, n, cnt: cnt.slice() };
+      return;
+    }
+    const s = opts[i].size, rem = Math.max(0, qty - got);
+    if (i === opts.length - 1) { const c = Math.ceil(rem / s - eps); cnt[i] = Math.max(0, c); rec(i + 1, got + cnt[i] * s, n + cnt[i], cnt); return; }
+    const hi = Math.ceil(rem / s - eps), lo = i === 0 ? Math.max(0, Math.floor(rem / s) - 1) : 0;
+    for (let c = hi; c >= lo; c--) { cnt[i] = c; rec(i + 1, got + c * s, n + c, cnt); }
+  };
+  rec(0, 0, 0, []);
+  return opts.map((o, i) => ({ pkg: o.pkg, size: o.size, units: best.cnt[i] || 0 })).filter(x => x.units > 0);
+}
+const packMixText = mix => mix.map(m => `${m.units} × ${m.pkg}`).join(' + ');
+
+// total quantity (kg / lt / m²) every product needs for one system's surface lines
+function bomNeeds(sys) {
+  const out = {};
+  if (!Array.isArray(sys.surfaces)) return out;
+  const scale = sys.fullArea > 0 ? sys.area / sys.fullArea : 1;
+  const ro = sys.rateOverrides || {};
+  sys.surfaces.forEach(s => {
+    const area = (parseFloat(s.area) || 0) * scale;
+    if (area <= 0) return;
+    const row = bomRow(sys.systemName, s.element, s.env, s.substrate);
+    if (!row) return;
+    Object.entries(row[3]).forEach(([p, r]) => { const rate = ro[p] !== undefined ? ro[p] : r; if (rate > 0) out[p] = (out[p] || 0) + rate * area; });
   });
-  if (sys.extraProducts) sys.extraProducts.forEach(ep => products.push(ep));
-  return products;
+  return out;
+}
+
+function getEffectiveProducts(sys) {
+  if (Array.isArray(sys.offerItems)) return sys.offerItems.map(it => ({ name: it.name, pkg: it.pkg || '', unit: it.unit || 'kg', consumption: 0, fixedUnits: parseFloat(it.quantity) || 0 }));
+  return [];
 }
 
 function getAllMaterials(systems) {
-  const mats = {};
+  const mats = {}, needs = {}, prefs = {};
+  const add = (name, pkg, unit, qty, units, sysIdx, fromOffer) => {
+    const key = name + '|' + pkg;
+    if (!mats[key]) mats[key] = { name, pkg, unit, totalQty: 0, totalUnits: 0, sysIndices: [], fromOffer: !!fromOffer };
+    mats[key].totalQty = Math.round((mats[key].totalQty + qty) * 100) / 100;
+    mats[key].totalUnits += units;
+    [].concat(sysIdx).forEach(i => { if (!mats[key].sysIndices.includes(i)) mats[key].sysIndices.push(i); });
+  };
   systems.forEach((sys, sysIdx) => {
-    const products = getEffectiveProducts(sys);
+    if (Array.isArray(sys.surfaces)) {
+      Object.entries(bomNeeds(sys)).forEach(([p, q]) => { const n = needs[p] || (needs[p] = { qty: 0, sys: [] }); n.qty += q; if (!n.sys.includes(sysIdx)) n.sys.push(sysIdx); });
+      Object.entries(sys.packPref || {}).forEach(([p, v]) => { prefs[p] = v; });
+      (sys.extraProducts || []).forEach(ep => { const c = calcUnits(ep.consumption, sys.area, ep.pkg); add(ep.name, ep.pkg, ep.unit, c.units * c.size, c.units, sysIdx, false); });
+      return;
+    }
     const scale = sys.fullArea > 0 ? sys.area / sys.fullArea : 1;
-    products.forEach(prod => {
-      let calc;
-      if (prod.fixedUnits !== undefined) {
-        const size = pkgSize(prod.pkg || '');
-        const units = Math.ceil(prod.fixedUnits * scale - 1e-9);
-        calc = { total: Math.round(units * size * 100) / 100, units };
-      } else {
-        calc = calcUnits(prod.consumption, sys.area, prod.pkg);
-      }
-      const key = prod.name + '|' + prod.pkg;
-      if (!mats[key]) mats[key] = { name: prod.name, pkg: prod.pkg, unit: prod.unit, totalQty: 0, totalUnits: 0, sysIndices: [], fromOffer: prod.fixedUnits !== undefined };
-      mats[key].totalQty += calc.total;
-      mats[key].totalUnits += calc.units;
-      if (!mats[key].sysIndices.includes(sysIdx)) mats[key].sysIndices.push(sysIdx);
+    getEffectiveProducts(sys).forEach(prod => {
+      const size = pkgSize(prod.pkg || '');
+      const units = Math.ceil(prod.fixedUnits * scale - 1e-9);
+      add(prod.name, prod.pkg, prod.unit, Math.round(units * size * 100) / 100, units, sysIdx, true);
     });
+  });
+  Object.entries(needs).forEach(([name, n]) => {
+    packMix(name, n.qty, prefs[name]).forEach(m => add(name, m.pkg, (PRODUCTS[name] || {}).unit || 'kg', m.units * m.size, m.units, n.sys, false));
   });
   return Object.values(mats);
 }
@@ -993,6 +1050,7 @@ function navigate(page, projectId) {
   else if (page === 'orders') renderOrders();
   else if (page === 'reminders') renderReminders();
   else if (page === 'timeline') renderTimeline();
+  else if (page === 'catalogue') renderCatalogue();
 }
 
 document.querySelectorAll('.nav-link').forEach(a => {
@@ -1186,23 +1244,97 @@ function offerTableHtml(items) {
     <button type="button" class="btn btn-secondary btn-sm mt-8" onclick="addOfferRow(this)">+ Add Row</button>`;
 }
 
-function systemCardHtml(sys, docId) {
-  const cat = CATALOG[sys.systemName];
-  const isOffer = Array.isArray(sys.offerItems);
-  const appField = cat
-    ? `<select class="sys-app">${Object.keys(cat.applications).map(a => `<option value="${escAttr(a)}" ${a === sys.application ? 'selected' : ''}>${a}</option>`).join('')}</select>`
-    : `<input type="text" class="sys-app" value="${escAttr(sys.application || 'Imported materials')}">`;
-  return `<div class="system-card" ${isOffer ? 'data-offer="1"' : ''} ${docId ? `data-doc="${docId}"` : ''} data-docname="${escAttr(sys.offerDoc || '')}">
-    <div class="system-card-header"><strong>${escAttr(sys.systemName)}</strong><button type="button" class="remove-btn" onclick="this.closest('.system-card').remove()">✕ Remove</button></div>
-    <div class="form-grid">
-      <div><label>Application</label>${appField}</div>
-      <div><label>Area (m²)</label><input type="number" class="sys-area" value="${sys.area || ''}" min="0" step="any" placeholder="0"></div>
+// ---- surface lines of a BOM system (element -> environment -> substrate -> m²) ----
+function sfOpts(kind, keys, cur) { return keys.map(v => `<option value="${v}" ${v === cur ? 'selected' : ''}>${escAttr(bomLabel(kind, v))}</option>`).join(''); }
+
+function surfRowHtml(sysName, s) {
+  const els = bomElements(sysName), envs = bomEnvs(sysName, s.element), subs = bomSubs(sysName, s.element, s.env);
+  const hideEl = els.length === 1 && els[0] === 'any', hideEnv = envs.length === 1 && envs[0] === 'any', hideSub = subs.length === 1 && subs[0] === 'any';
+  return `<div class="surf-row" data-id="${escAttr(s.id || uid())}">
+    <div class="surf-pick">
+      <div class="sf-c-el" ${hideEl ? 'hidden' : ''}><label>Surface</label><select class="sf-el" onchange="sfChange(this)">${sfOpts('el', els, s.element)}</select></div>
+      <div class="sf-c-env" ${hideEnv ? 'hidden' : ''}><label>Environment</label><select class="sf-env" onchange="sfChange(this)">${sfOpts('env', envs, s.env)}</select></div>
+      <div class="sf-c-sub" ${hideSub ? 'hidden' : ''}><label>Substrate</label><select class="sf-sub" onchange="sfChange(this)">${sfOpts('sub', subs, s.substrate)}</select></div>
+      <div class="sf-c-area"><label>Area (m²)</label><input type="number" class="sf-area" value="${s.area || ''}" min="0" step="any" placeholder="0" oninput="sfChange(this)"></div>
+      <button type="button" class="remove-btn" title="Remove this surface" onclick="sfRemove(this)">✕</button>
     </div>
-    <div class="form-row mt-8"><label>Notes</label><input type="text" class="sys-notes" value="${escAttr(sys.notes)}" placeholder="e.g., Main hall floors"></div>
-    ${isOffer ? `<div class="offer-mats"><div class="om-title">Materials from offer — exact quantities</div>${offerTableHtml(sys.offerItems)}</div>` : ''}
-    <input type="hidden" class="sys-name" value="${escAttr(sys.systemName)}">
-    <input type="hidden" class="sys-id" value="${escAttr(sys.id || '')}">
+    <div class="sf-prev">${sfPrevHtml(sysName, s)}</div>
   </div>`;
+}
+
+function sfPrevHtml(sysName, s) {
+  const row = bomRow(sysName, s.element, s.env, s.substrate);
+  if (!row) return '<span class="text-sm text-muted">No data for this combination</span>';
+  return Object.entries(row[3]).map(([p, r]) => `<span class="sf-chip">${escAttr(p.replace(/ \((POWDER|graphite[^)]*)\)/i, ''))} <b>${r}</b> ${(PRODUCTS[p] || {}).unit || ''}/m²</span>`).join('');
+}
+
+function sfRead(row) {
+  return { id: row.dataset.id || uid(), element: row.querySelector('.sf-el').value, env: row.querySelector('.sf-env').value, substrate: row.querySelector('.sf-sub').value, area: row.querySelector('.sf-area').value };
+}
+
+function sfChange(el) {
+  const row = el.closest('.surf-row'), card = el.closest('.system-card'), name = card.querySelector('.sys-name').value;
+  if (!el.classList.contains('sf-area')) {
+    const cur = sfRead(row), isEl = el.classList.contains('sf-el'), isEnv = el.classList.contains('sf-env');
+    let envs = bomEnvs(name, cur.element);
+    if (isEl) cur.env = envs.includes(cur.env) ? cur.env : envs[0];
+    let subs = bomSubs(name, cur.element, cur.env);
+    if (isEl || isEnv) cur.substrate = subs.includes(cur.substrate) ? cur.substrate : (subs.includes('smooth') ? 'smooth' : subs[0]);
+    row.querySelector('.sf-env').innerHTML = sfOpts('env', envs, cur.env);
+    row.querySelector('.sf-sub').innerHTML = sfOpts('sub', subs, cur.substrate);
+    row.querySelector('.sf-c-env').hidden = envs.length === 1 && envs[0] === 'any';
+    row.querySelector('.sf-c-sub').hidden = subs.length === 1 && subs[0] === 'any';
+  }
+  const s = sfRead(row);
+  row.querySelector('.sf-prev').innerHTML = sfPrevHtml(name, s);
+  sfTotal(card);
+  npPreview();
+}
+
+function sfTotal(card) {
+  const t = [...card.querySelectorAll('.sf-area')].reduce((a, i) => a + (parseFloat(i.value) || 0), 0);
+  const out = card.querySelector('.sf-total');
+  if (out) out.textContent = `Total: ${Math.round(t * 100) / 100} m²`;
+}
+
+function sfAdd(btn) {
+  const card = btn.closest('.system-card'), name = card.querySelector('.sys-name').value;
+  card.querySelector('.surf-list').insertAdjacentHTML('beforeend', surfRowHtml(name, bomDefaultSurface(name)));
+}
+
+function sfRemove(btn) {
+  const card = btn.closest('.system-card');
+  if (card.querySelectorAll('.surf-row').length <= 1) { toast('A system needs at least one surface — remove the whole system instead', 'warn'); return; }
+  btn.closest('.surf-row').remove();
+  sfTotal(card); npPreview();
+}
+
+function systemCardHtml(sys, docId) {
+  const isOffer = Array.isArray(sys.offerItems), isBom = !isOffer && Array.isArray(sys.surfaces);
+  const cat = (SYSTEMS[sys.systemName] || {}).category;
+  const head = `<div class="system-card-header"><strong>${escAttr(sys.systemName)}</strong><div class="flex items-center gap-8">${cat ? `<span class="chip chip-gray" style="font-size:.65rem">${escAttr(cat)}</span>` : ''}<button type="button" class="remove-btn" onclick="this.closest('.system-card').remove();npPreview()">✕ Remove</button></div></div>`;
+  const tail = `<input type="hidden" class="sys-name" value="${escAttr(sys.systemName)}"><input type="hidden" class="sys-id" value="${escAttr(sys.id || '')}">`;
+  const attrs = `${docId ? `data-doc="${docId}"` : ''} data-docname="${escAttr(sys.offerDoc || '')}"`;
+  if (isBom) {
+    return `<div class="system-card" data-bom="1" ${attrs}>${head}
+      <div class="surf-list">${sys.surfaces.map(s => surfRowHtml(sys.systemName, s)).join('')}</div>
+      <div class="flex justify-between items-center mt-8"><button type="button" class="btn btn-secondary btn-sm" onclick="sfAdd(this)">+ Add surface</button><strong class="sf-total text-sm"></strong></div>
+      <div class="form-row mt-8"><label>Notes</label><input type="text" class="sys-notes" value="${escAttr(sys.notes)}" placeholder="e.g., Main hall floors"></div>
+      ${tail}</div>`;
+  }
+  if (isOffer) {
+    return `<div class="system-card" data-offer="1" ${attrs}>${head}
+      <div class="form-grid">
+        <div><label>Application</label><input type="text" class="sys-app" value="${escAttr(sys.application || 'Imported materials')}"></div>
+        <div><label>Area (m²)</label><input type="number" class="sys-area" value="${sys.area || ''}" min="0" step="any" placeholder="0"></div>
+      </div>
+      <div class="form-row mt-8"><label>Notes</label><input type="text" class="sys-notes" value="${escAttr(sys.notes)}" placeholder="e.g., Main hall floors"></div>
+      <div class="offer-mats"><div class="om-title">Materials from offer — exact quantities</div>${offerTableHtml(sys.offerItems)}</div>
+      ${tail}</div>`;
+  }
+  return `<div class="system-card" data-legacy="1" ${attrs}>${head}
+    <div class="form-help">Created with the old catalogue (${escAttr(sys.application || '')}, ${sys.area || 0} m²). It no longer calculates materials — remove it and add the system again with its surfaces.</div>
+    <div class="form-row mt-8"><label>Notes</label><input type="text" class="sys-notes" value="${escAttr(sys.notes)}"></div>${tail}</div>`;
 }
 
 function payRowHtml(i) {
@@ -1257,7 +1389,7 @@ function readPaymentForm() {
 function openNewProject(editId, keepAttached) {
   if (!keepAttached) npAttachedDocs = [];
   const p = editId ? projects[editId] : null;
-  const systemOptions = Object.keys(CATALOG).map(s => `<option value="${s}">${s} (${CATALOG[s].category})</option>`).join('');
+  const systemOptions = systemNames().map(s => `<option value="${escAttr(s)}">${escAttr(s)} — ${escAttr(SYSTEMS[s].category)}</option>`).join('');
   const systemsHtml = p && p.systems ? p.systems.map(s => systemCardHtml(s)).join('') : '';
   const attachHtml = sampleAI ? `
     <div id="npAttachZone" class="attach-zone">
@@ -1292,19 +1424,52 @@ function openNewProject(editId, keepAttached) {
       <button type="button" class="btn btn-secondary btn-sm" onclick="addSystemRow()">Add</button></div>
     </div>
     <div class="systems-list" id="systemsList">${systemsHtml}</div>
-    <div class="form-help mt-8">Add the product systems needed for this project. The app will auto-calculate all materials. Systems read from an offer use the exact quantities of the offer.</div>
+    <div class="form-help mt-8">Add a system, then list its surfaces: what is covered (floors, walls…), where, on which substrate and how many m². The app picks the right layers for each surface (e.g. no mesh or D-Base 60 on a smooth substrate) and totals the materials. Systems read from an offer use the exact quantities of the offer.</div>
+    <div id="npPreview"></div>
   `, `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
      <button class="btn btn-primary" onclick="saveProject('${editId || ''}')">${p ? 'Save Changes' : 'Create Project'}</button>`);
+  document.querySelectorAll('#systemsList .system-card[data-bom="1"]').forEach(sfTotal);
+  npPreview();
   if (npAttachedDocs.length > 0) renderAttachedFiles();
 }
 
 function addSystemRow() {
   const sel = $('addSysSelect');
   const sysName = sel.value;
-  if (!sysName) return;
-  const firstApp = Object.keys(CATALOG[sysName].applications)[0];
-  $('systemsList').insertAdjacentHTML('beforeend', systemCardHtml({ systemName: sysName, application: firstApp, area: '' }));
+  if (!sysName || !SYSTEMS[sysName]) return;
+  $('systemsList').insertAdjacentHTML('beforeend', systemCardHtml({ systemName: sysName, surfaces: [bomDefaultSurface(sysName)], notes: '' }));
+  sfTotal($('systemsList').lastElementChild);
   sel.value = '';
+  npPreview();
+}
+
+// reads one card of the project form; strict = report problems (used when saving)
+function readSystemCard(card, existingSystems, strict) {
+  const sysId = card.querySelector('.sys-id')?.value || '';
+  const sysName = card.querySelector('.sys-name')?.value || '';
+  const notes = card.querySelector('.sys-notes')?.value || '';
+  const orig = sysId ? existingSystems.find(s => s.id === sysId) : null;
+  if (card.dataset.bom === '1') {
+    const all = [...card.querySelectorAll('.surf-row')].map(r => { const s = sfRead(r); s.area = Math.round((parseFloat(s.area) || 0) * 100) / 100; return s; });
+    const surfaces = strict ? all.filter(s => s.area > 0) : all;
+    const area = Math.round(all.reduce((a, s) => a + s.area, 0) * 100) / 100;
+    if (strict && !surfaces.length) { toast(`Enter the m² of at least one surface for ${sysName}`, 'warn'); return null; }
+    const sys = { id: sysId || uid(), systemName: sysName, surfaces, area, notes };
+    sys.application = bomSummary(sys);
+    ['rateOverrides', 'extraProducts', 'packPref'].forEach(k => { if (orig && orig[k]) sys[k] = orig[k]; });
+    return sys;
+  }
+  if (card.dataset.offer === '1') {
+    const app = card.querySelector('.sys-app')?.value || '';
+    const area = parseFloat(card.querySelector('.sys-area')?.value) || 0;
+    const sys = { id: sysId || uid(), systemName: sysName, application: app, area, notes };
+    sys.areaKnown = area > 0;
+    if (area <= 0) sys.area = 1;
+    sys.offerItems = readOfferRows(card);
+    if (card.dataset.docname) sys.offerDoc = card.dataset.docname;
+    return sys;
+  }
+  return { ...(orig || { id: sysId || uid(), systemName: sysName, application: '', area: 0 }), notes };
 }
 
 function saveProject(editId) {
@@ -1313,33 +1478,35 @@ function saveProject(editId) {
   const systemCards = $('systemsList')?.querySelectorAll('.system-card') || [];
   const existingSystems = editId ? (projects[editId]?.systems || []) : [];
   const systems = [];
-  let valid = true;
-  systemCards.forEach(card => {
-    const sysId = card.querySelector('.sys-id')?.value || '';
-    const sysName = card.querySelector('.sys-name')?.value || '';
-    const app = card.querySelector('.sys-app')?.value || '';
-    let area = parseFloat(card.querySelector('.sys-area')?.value) || 0;
-    const notes = card.querySelector('.sys-notes')?.value || '';
-    const orig = sysId ? existingSystems.find(s => s.id === sysId) : null;
-    const sys = { id: sysId || uid(), systemName: sysName, application: app, area, notes };
-    if (card.dataset.offer === '1') {
-      sys.areaKnown = area > 0;
-      if (area <= 0) sys.area = 1;
-      sys.offerItems = readOfferRows(card);
-      if (card.dataset.docname) sys.offerDoc = card.dataset.docname;
-    } else {
-      if (area <= 0) { toast(`Set area for ${sysName}`, 'warn'); valid = false; }
-      if (orig?.materialOverrides) sys.materialOverrides = orig.materialOverrides;
-      if (orig?.extraProducts) sys.extraProducts = orig.extraProducts;
-    }
+  for (const card of systemCards) {
+    const sys = readSystemCard(card, existingSystems, true);
+    if (!sys) return;
     systems.push(sys);
-  });
-  if (!valid) return;
+  }
   if (systems.length === 0) {
     showWarning('No Systems Added', 'You are saving a project without any product systems. You can add them later, but the app cannot calculate materials without them.', () => doSaveProject(editId, name, systems));
     return;
   }
   doSaveProject(editId, name, systems);
+}
+
+// live "what will this project need" table under the system cards
+function npPreview() {
+  const box = $('npPreview');
+  if (!box) return;
+  const existing = [];
+  const systems = [...($('systemsList')?.querySelectorAll('.system-card[data-bom="1"]') || [])].map(c => readSystemCard(c, existing, false)).filter(s => s && s.area > 0);
+  if (!systems.length) { box.innerHTML = ''; return; }
+  const needs = {};
+  systems.forEach(s => Object.entries(bomNeeds(s)).forEach(([k, v]) => { needs[k] = (needs[k] || 0) + v; }));
+  const by = {};
+  getAllMaterials(systems).forEach(m => { (by[m.name] = by[m.name] || []).push(m); });
+  const order = { primer: 0, prep: 1, finish: 2, sealer: 3 };
+  const rows = Object.keys(by).sort((a, b) => ((order[(PRODUCTS[a] || {}).kind] ?? 9) - (order[(PRODUCTS[b] || {}).kind] ?? 9)) || a.localeCompare(b)).map(n => {
+    const u = (PRODUCTS[n] || {}).unit || '';
+    return `<tr><td>${escAttr(n)}</td><td>${needs[n] ? Math.round(needs[n] * 100) / 100 + ' ' + u : '—'}</td><td><strong>${by[n].map(m => `${m.totalUnits} × ${escAttr(m.pkg)}`).join(' + ')}</strong></td></tr>`;
+  }).join('');
+  box.innerHTML = `<div class="np-preview"><div class="text-sm" style="font-weight:600;margin-bottom:6px">Materials this project needs (preview)</div><div class="overflow-x"><table><thead><tr><th>Material</th><th>Needed</th><th>Packs (least leftover)</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 
 // Firestore-style stores reject `undefined`, so strip it before writing; never let a write error bubble into the UI flow
@@ -1458,11 +1625,12 @@ function renderOverview(p) {
   const deliveryPct = totalItems > 0 ? Math.min(100, Math.round(deliveredItems / totalItems * 100)) : 0;
 
   let sysHtml = (p.systems || []).map((s, idx) => {
-    const hasOverrides = s.materialOverrides || s.extraProducts;
+    const hasOverrides = s.rateOverrides || s.extraProducts || s.packPref;
+    const legacy = !Array.isArray(s.offerItems) && !Array.isArray(s.surfaces);
     const fromOffer = Array.isArray(s.offerItems);
     return `<div class="system-card">
-    <div class="system-card-header"><strong>${s.systemName}</strong><div class="flex items-center gap-8">${fromOffer ? '<span class="chip chip-green" style="font-size:.65rem">FROM OFFER</span>' : hasOverrides ? '<span class="chip chip-amber" style="font-size:.65rem">CUSTOM</span>' : ''}${(!fromOffer || s.areaKnown || s.area > 1) ? `<span class="chip chip-blue">${s.area} m²</span>` : ''}</div></div>
-    <div class="system-card-meta"><span>${s.application}</span>${s.notes ? '<span>' + s.notes + '</span>' : ''}</div>
+    <div class="system-card-header"><strong>${s.systemName}</strong><div class="flex items-center gap-8">${legacy ? '<span class="chip chip-red" style="font-size:.65rem">OLD CATALOGUE</span>' : fromOffer ? '<span class="chip chip-green" style="font-size:.65rem">FROM OFFER</span>' : hasOverrides ? '<span class="chip chip-amber" style="font-size:.65rem">CUSTOM</span>' : ''}${(!fromOffer || s.areaKnown || s.area > 1) ? `<span class="chip chip-blue">${s.area} m²</span>` : ''}</div></div>
+    <div class="system-card-meta"><span>${escAttr(Array.isArray(s.surfaces) ? bomSummary(s) : s.application)}</span>${s.notes ? '<span>' + s.notes + '</span>' : ''}</div>
   </div>`;
   }).join('');
 
@@ -1600,30 +1768,65 @@ function otherPhasesQty(p, excludeId) {
   return out;
 }
 
+// products of the project grouped for the phase table: BOM products are planned in kg/lt (any pack mix), offer lines in packs
+function phaseGroups(p, editId) {
+  const ph = editId ? (p.phases || []).find(x => x.id === editId) : null;
+  const other = otherPhasesQty(p, editId), cur = ph ? phaseQtyMap(p, ph) : {};
+  const needs = {};
+  (p.systems || []).forEach(s => Object.entries(bomNeeds(s)).forEach(([k, v]) => { needs[k] = (needs[k] || 0) + v; }));
+  const groups = {}, order = [];
+  const grp = (id, name) => groups[id] || (order.push(id), groups[id] = { id, name, need: null, unit: '', rows: {} });
+  getAllMaterials(p.systems || []).forEach(m => {
+    const gr = grp(m.fromOffer ? m.name + '#offer' : m.name, m.name);
+    gr.unit = m.unit; gr.rows[m.pkg] = { pkg: m.pkg, total: m.totalUnits };
+  });
+  Object.keys(needs).forEach(n => {
+    const gr = grp(n, n);
+    gr.need = needs[n]; gr.unit = (PRODUCTS[n] || {}).unit || gr.unit;
+    ((PRODUCTS[n] || {}).packs || []).forEach(pk => { gr.rows[pk] = gr.rows[pk] || { pkg: pk, total: 0 }; });
+  });
+  [other, cur].forEach(map => Object.keys(map).forEach(k => {
+    const [n, pk] = k.split('|');
+    const gr = groups[n] || groups[n + '#offer'] || (() => { const g2 = grp(n, n); g2.unit = (PRODUCTS[n] || {}).unit || pkgUnitOf(pk); return g2; })();
+    gr.rows[pk || ''] = gr.rows[pk || ''] || { pkg: pk || '', total: 0 };
+  }));
+  return order.map(id => ({ ...groups[id], rows: Object.values(groups[id].rows).sort((a, b) => pkgSize(b.pkg) - pkgSize(a.pkg)) }));
+}
+
+function projectPackPref(p) {
+  const out = {};
+  (p.systems || []).forEach(s => Object.assign(out, s.packPref || {}));
+  return out;
+}
+
 function openAddPhase(editId) {
   const p = projects[currentProject];
   const ph = editId ? (p.phases || []).find(x => x.id === editId) : null;
   const mats = getAllMaterials(p.systems || []);
   const other = otherPhasesQty(p, editId);
   const cur = ph ? phaseQtyMap(p, ph) : {};
-  const rows = mats.map(m => {
-    const key = m.name + '|' + m.pkg, o = other[key] || 0, q = cur[key] || '';
-    return `<tr class="phq-row"><td><strong>${escAttr(m.name)}</strong></td><td>${escAttr(m.pkg)}</td><td>${m.totalUnits}</td><td>${o}</td>
-      <td><input type="number" class="phq" data-key="${escAttr(key)}" data-total="${m.totalUnits}" data-other="${o}" min="0" step="1" value="${q}" placeholder="0" style="width:80px;font-weight:600" oninput="phqChange(this)"></td>
-      <td class="phq-left"></td></tr>`;
+  const rows = phaseGroups(p, editId).map(g => {
+    const kgMode = g.need !== null;
+    const minSize = Math.min(...g.rows.map(r => pkgSize(r.pkg) || 1));
+    return g.rows.map((r, i) => {
+      const key = g.name + '|' + r.pkg, o = other[key] || 0, q = cur[key] || '';
+      return `<tr class="phq-row ${r.total ? '' : 'phq-alt'}">${i === 0 ? `<td rowspan="${g.rows.length}" style="vertical-align:top"><strong>${escAttr(g.name)}</strong>${kgMode ? `<div class="text-sm text-muted">needs ${Math.round(g.need * 100) / 100} ${g.unit}</div>` : ''}</td>` : ''}<td>${escAttr(r.pkg)}</td><td>${r.total || '—'}</td><td>${o || '—'}</td>
+        <td><input type="number" class="phq" data-key="${escAttr(key)}" data-group="${escAttr(g.id)}" data-size="${pkgSize(r.pkg)}" data-total="${r.total}" data-other="${o}" min="0" step="1" value="${q}" placeholder="0" style="width:80px;font-weight:600" oninput="phqChange(this)"></td>
+        ${i === 0 ? `<td rowspan="${g.rows.length}" class="phq-left" style="vertical-align:top" data-group="${escAttr(g.id)}" data-need="${kgMode ? g.need : -1}" data-unit="${escAttr(g.unit)}" data-min="${minSize}" data-name="${escAttr(g.name)}"></td>` : ''}</tr>`;
+    }).join('');
   }).join('');
-  const areaSys = (p.systems || []).filter(s => s.area > 0 && (!Array.isArray(s.offerItems) ? !!CATALOG[s.systemName] : (s.areaKnown || s.area > 1)));
+  const areaSys = (p.systems || []).filter(s => s.area > 0 && (Array.isArray(s.offerItems) ? (s.areaKnown || s.area > 1) : Array.isArray(s.surfaces)));
   const otherArea = sysId => (p.phases || []).filter(x => x.id !== editId).reduce((sum, x) => sum + ((x.allocations || {})[sysId] || 0), 0);
   const areaRows = areaSys.map(s => {
     const alloc = ph ? (ph.allocations || {})[s.id] || '' : '';
     const oa = otherArea(s.id);
-    return `<div class="phase-area-row"><div style="flex:1;min-width:200px"><strong>${escAttr(s.systemName)}</strong> <span class="text-muted text-sm">${escAttr(s.application)}</span>
-        <div class="text-sm text-muted">Project ${s.area} m² · other phases ${oa} m² · left after this phase: <strong class="pa-left">${Math.max(0, s.area - oa)}</strong> m²</div></div>
+    return `<div class="phase-area-row"><div style="flex:1;min-width:200px"><strong>${escAttr(s.systemName)}</strong> <span class="text-muted text-sm">${escAttr(Array.isArray(s.surfaces) ? bomSummary(s) : s.application)}</span>
+        <div class="text-sm text-muted">Project ${s.area} m² · other phases ${oa} m² · left after this phase: <strong class="pa-left">${Math.max(0, Math.round((s.area - oa) * 100) / 100)}</strong> m²</div></div>
       <div style="display:flex;gap:6px;align-items:end"><div><label>m² in this phase</label><input type="number" class="phase-alloc" data-sysid="${s.id}" data-area="${s.area}" data-other="${oa}" value="${alloc}" min="0" step="any" placeholder="0" style="width:110px" oninput="phaseFromArea()"></div>
       <button type="button" class="btn btn-secondary btn-sm" onclick="phaseAreaRemaining('${s.id}')">Remaining</button></div></div>`;
   }).join('');
   const areaHtml = `<div class="flex justify-between items-center mb-8"><h3>Add by surface (m²)</h3></div>
-    ${areaSys.length ? `<div class="form-help mb-8">Enter the m² of a system in this phase and <strong>all its materials are calculated automatically</strong> from its consumption rates (offer systems are scaled in proportion). Changing the m² recalculates the quantities below.</div>${areaRows}`
+    ${areaSys.length ? `<div class="form-help mb-8">Enter the m² of a system in this phase and <strong>all its materials are calculated automatically</strong>: each surface line of the system is scaled in proportion and the packs are combined with the least leftover. Changing the m² recalculates the quantities below.</div>${areaRows}`
       : `<div class="form-help mb-8">No system with a known surface in this project. Enter pack quantities below, or add a product system with its m² to the project.</div>`}
     <div class="mt-8"><button type="button" class="btn btn-secondary btn-sm" onclick="closeModal();editCurrentProject()">Need another system? Edit project</button></div>`;
   openModal(ph ? 'Edit Phase' : 'Add Phase', `
@@ -1635,34 +1838,70 @@ function openAddPhase(editId) {
     <hr style="border:none;border-top:1px solid var(--border-light);margin:16px 0">
     <div class="flex justify-between items-center mb-8"><h3>Materials for this phase (packs)</h3>
       ${mats.length ? `<button type="button" class="btn btn-secondary btn-sm" onclick="phaseFillRemaining()">Fill with all remaining</button>` : ''}</div>
-    <div class="form-help mb-8">Filled automatically from the m² above, or type pack quantities directly. "Left" is what remains for later phases.</div>
-    ${mats.length ? `<div class="overflow-x"><table><thead><tr><th>Material</th><th>Pack</th><th>Project total</th><th>Other phases</th><th>This phase</th><th>Left</th></tr></thead><tbody>${rows}</tbody></table></div>`
+    <div class="form-help mb-8">Filled automatically from the m² above, or type pack quantities directly (any pack size). "Left to plan" is what the project still needs for later phases, counted in kg / lt / m² so different pack sizes add up.</div>
+    ${mats.length ? `<div class="overflow-x"><table><thead><tr><th>Material</th><th>Pack</th><th>Project packs</th><th>Other phases</th><th>This phase</th><th>Left to plan</th></tr></thead><tbody>${rows}</tbody></table></div>`
       : '<div class="empty-state"><p>Add product systems to the project first.</p></div>'}
   `, `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
      <button class="btn btn-primary" onclick="savePhase('${editId || ''}')">${ph ? 'Save' : 'Add Phase'}</button>`);
-  document.querySelectorAll('.phq').forEach(phqRefresh);
+  document.querySelectorAll('.phq-left').forEach(c => phqGroup(c.dataset.group));
 }
 
-function phqRefresh(inp) {
-  const left = (+inp.dataset.total || 0) - (+inp.dataset.other || 0) - (parseInt(inp.value) || 0);
-  const cell = inp.closest('tr').querySelector('.phq-left');
-  cell.textContent = left;
-  cell.style.color = left < 0 ? 'var(--red)' : '';
-  cell.style.fontWeight = left < 0 ? '700' : '';
+// planned vs needed for one product group of the phase table
+function phqState(gid) {
+  const cell = [...document.querySelectorAll('.phq-left')].find(c => c.dataset.group === gid);
+  if (!cell) return null;
+  const rows = [...document.querySelectorAll('.phq')].filter(i => i.dataset.group === gid);
+  const need = +cell.dataset.need, min = +cell.dataset.min || 0;
+  let left, over;
+  if (need >= 0) {
+    left = need - rows.reduce((t, i) => t + ((+i.dataset.other || 0) + (parseInt(i.value) || 0)) * (+i.dataset.size || 0), 0);
+    over = left < -min + 1e-9;
+  } else {
+    left = rows.reduce((t, i) => t + (+i.dataset.total || 0) - (+i.dataset.other || 0) - (parseInt(i.value) || 0), 0);
+    over = left < 0;
+  }
+  return { cell, rows, need, left: Math.round(left * 100) / 100, over, unit: need >= 0 ? cell.dataset.unit : 'packs', name: cell.dataset.name };
 }
+
+function phqGroup(gid) {
+  const st = phqState(gid);
+  if (!st) return;
+  st.cell.textContent = `${st.left} ${st.unit}`;
+  st.cell.style.color = st.over ? 'var(--red)' : '';
+  st.cell.style.fontWeight = st.over ? '700' : '';
+}
+function phqRefresh(inp) { phqGroup(inp.dataset.group); }
 function phqChange(inp) { delete inp.dataset.auto; phqRefresh(inp); }
+const phqRefreshAll = () => document.querySelectorAll('.phq-left').forEach(c => phqGroup(c.dataset.group));
+
+// fill a group's pack inputs with a pack combination for `qty` (kg / lt / m²)
+function phqSetMix(gid, name, qty, p) {
+  const mix = packMix(name, qty, projectPackPref(p)[name]);
+  document.querySelectorAll('.phq').forEach(i => {
+    if (i.dataset.group !== gid) return;
+    const m = mix.find(x => name + '|' + x.pkg === i.dataset.key);
+    i.value = m ? m.units : '';
+    if (m) i.dataset.auto = '1'; else delete i.dataset.auto;
+  });
+}
 
 function phaseFillRemaining() {
-  document.querySelectorAll('.phq').forEach(inp => {
-    inp.value = Math.max(0, (+inp.dataset.total || 0) - (+inp.dataset.other || 0));
-    delete inp.dataset.auto;
-    phqRefresh(inp);
+  const p = projects[currentProject];
+  document.querySelectorAll('.phq-left').forEach(c => {
+    const st = phqState(c.dataset.group);
+    if (st.need >= 0) {
+      const otherKg = st.rows.reduce((t, i) => t + (+i.dataset.other || 0) * (+i.dataset.size || 0), 0);
+      phqSetMix(c.dataset.group, st.name, Math.max(0, st.need - otherKg), p);
+    } else {
+      st.rows.forEach(i => { i.value = Math.max(0, (+i.dataset.total || 0) - (+i.dataset.other || 0)) || ''; delete i.dataset.auto; });
+    }
   });
+  phqRefreshAll();
 }
 
 function phaseFromArea() {
   const p = projects[currentProject];
-  const calc = {};
+  const scaled = [];
   document.querySelectorAll('.phase-alloc').forEach(inp => {
     const m2 = parseFloat(inp.value) || 0;
     const sys = (p.systems || []).find(s => s.id === inp.dataset.sysid);
@@ -1670,25 +1909,16 @@ function phaseFromArea() {
     const rest = (+inp.dataset.area || 0) - (+inp.dataset.other || 0) - m2;
     left.textContent = Math.round(rest * 100) / 100;
     left.style.color = rest < 0 ? 'var(--red)' : '';
-    if (!sys || m2 <= 0) return;
-    if (Array.isArray(sys.offerItems)) {
-      sys.offerItems.forEach(it => {
-        const k = it.name + '|' + (it.pkg || '');
-        calc[k] = (calc[k] || 0) + Math.ceil((Number(it.quantity) || 0) * m2 / sys.area - 1e-9);
-      });
-    } else {
-      getEffectiveProducts(sys).forEach(prod => {
-        const k = prod.name + '|' + prod.pkg;
-        calc[k] = (calc[k] || 0) + calcUnits(prod.consumption, m2, prod.pkg).units;
-      });
-    }
+    if (sys && m2 > 0) scaled.push({ ...sys, area: m2, fullArea: sys.area });
   });
+  const calc = {};
+  getAllMaterials(scaled).forEach(m => { calc[m.name + '|' + m.pkg] = m.totalUnits; });
   document.querySelectorAll('.phq').forEach(inp => {
     const k = inp.dataset.key;
     if (k in calc) { inp.value = calc[k]; inp.dataset.auto = '1'; }
     else if (inp.dataset.auto === '1') { inp.value = ''; delete inp.dataset.auto; }
-    phqRefresh(inp);
   });
+  phqRefreshAll();
 }
 
 function phaseAreaRemaining(sysId) {
@@ -1696,21 +1926,22 @@ function phaseAreaRemaining(sysId) {
   if (!inp) return;
   inp.value = Math.max(0, Math.round(((+inp.dataset.area || 0) - (+inp.dataset.other || 0)) * 100) / 100) || '';
   phaseFromArea();
-  // finishing the system's area: use the exact leftover packs so per-phase rounding never overshoots the project total
+  // finishing a system: products used by this system only get exactly what is still left, so per-phase rounding never overshoots the project need
   const p = projects[currentProject];
   const sys = (p.systems || []).find(x => x.id === sysId);
   if (!sys) return;
-  const keys = (Array.isArray(sys.offerItems) ? sys.offerItems.map(it => ({ name: it.name, pkg: it.pkg || '' })) : getEffectiveProducts(sys)).map(x => x.name + '|' + x.pkg);
-  const sharedWithOther = k => [...document.querySelectorAll('.phase-alloc')].some(o => o.dataset.sysid !== sysId && (parseFloat(o.value) || 0) > 0 && (() => {
-    const os = (p.systems || []).find(x => x.id === o.dataset.sysid);
-    return os && (Array.isArray(os.offerItems) ? os.offerItems.map(it => it.name + '|' + (it.pkg || '')) : getEffectiveProducts(os).map(x => x.name + '|' + x.pkg)).includes(k);
-  })());
-  document.querySelectorAll('.phq').forEach(q => {
-    if (!keys.includes(q.dataset.key) || sharedWithOther(q.dataset.key)) return;
-    q.value = Math.max(0, (+q.dataset.total || 0) - (+q.dataset.other || 0)) || '';
-    q.dataset.auto = '1';
-    phqRefresh(q);
+  const usedBy = (s, name) => Array.isArray(s.surfaces) ? (bomNeeds(s)[name] || 0) > 0 : (s.offerItems || []).some(it => it.name === name);
+  document.querySelectorAll('.phq-left').forEach(c => {
+    const st = phqState(c.dataset.group), name = st.name;
+    if (!usedBy(sys, name) || (p.systems || []).some(o => o.id !== sysId && usedBy(o, name))) return;
+    if (st.need >= 0) {
+      const otherKg = st.rows.reduce((t, i) => t + (+i.dataset.other || 0) * (+i.dataset.size || 0), 0);
+      phqSetMix(c.dataset.group, name, Math.max(0, st.need - otherKg), p);
+    } else {
+      st.rows.forEach(i => { i.value = Math.max(0, (+i.dataset.total || 0) - (+i.dataset.other || 0)) || ''; i.dataset.auto = '1'; });
+    }
   });
+  phqRefreshAll();
 }
 
 function openEditPhase(phId) { openAddPhase(phId); }
@@ -1722,10 +1953,11 @@ function savePhase(editId) {
   const quantities = {}, warnings = [];
   document.querySelectorAll('.phq').forEach(inp => {
     const q = parseInt(inp.value) || 0;
-    if (q <= 0) return;
-    quantities[inp.dataset.key] = q;
-    const total = +inp.dataset.total || 0, other = +inp.dataset.other || 0;
-    if (q + other > total) warnings.push(`${escAttr(inp.dataset.key.split('|')[0])}: ${q + other} packs planned across phases but the project needs ${total}`);
+    if (q > 0) quantities[inp.dataset.key] = q;
+  });
+  document.querySelectorAll('.phq-left').forEach(c => {
+    const st = phqState(c.dataset.group);
+    if (st && st.over) warnings.push(`${escAttr(st.name)}: ${Math.abs(st.left)} ${st.unit} more planned across phases than the project needs`);
   });
   const allocations = {};
   document.querySelectorAll('.phase-alloc').forEach(inp => {
@@ -2110,11 +2342,7 @@ function openStockEdit() {
   // Collect all known materials
   const allMats = new Set();
   Object.keys(stockData).forEach(k => allMats.add(k));
-  Object.values(CATALOG).forEach(sys => {
-    Object.values(sys.applications).forEach(app => {
-      app.forEach(prod => allMats.add(prod.name + '|' + prod.pkg));
-    });
-  });
+  catalogKeys().forEach(k => allMats.add(k));
   const sorted = [...allMats].sort();
   const rows = sorted.map(key => stockRowHtml(key, stockData[key] || { quantity: 0, minStock: 0 })).join('');
   const erpHtml = sampleAI ? `<div class="flex items-center gap-8 mb-16"><button class="btn btn-secondary btn-sm" onclick="closeModal();navigate('stock');openReconcile()">Compare with ERP files…</button><span class="text-sm text-muted">Upload ERP stock files and review every difference before changing anything.</span></div>` : '';
@@ -2190,6 +2418,7 @@ function erpChunks(text, max = 14000) {
 function erpPrompt(known) {
   return `You are reading an inventory / stock export from the ERP of Cement Plus (microcement, Greece). It is Excel/CSV/PDF content, usually Greek. Extract the CURRENT ON-HAND STOCK quantity per product.
 
+Alias: the product RASOCOL 600 (any spelling) is now called D-BASE 60 — use the D-BASE 60 key.
 Known stock keys ("PRODUCT NAME|PACK SIZE"):
 ${known.join('\n')}
 
@@ -2530,7 +2759,7 @@ let reconCtl = null;
 
 function allMaterialKeys() {
   const keys = new Set(Object.keys(stockData));
-  Object.values(CATALOG).forEach(sys => Object.values(sys.applications).forEach(ps => ps.forEach(p => keys.add(p.name + '|' + p.pkg))));
+  catalogKeys().forEach(k => keys.add(k));
   return [...keys];
 }
 
@@ -2779,7 +3008,7 @@ function renderOrders() {
 
 function openNewOrder() {
   const allMats = new Set();
-  Object.values(CATALOG).forEach(sys => Object.values(sys.applications).forEach(app => app.forEach(prod => allMats.add(prod.name + '|' + prod.pkg))));
+  catalogKeys().forEach(k => allMats.add(k));
   Object.keys(stockData).forEach(k => allMats.add(k));
   const sorted = [...allMats].sort();
   const rows = sorted.map(key => {
@@ -2868,7 +3097,7 @@ function editOrder(ordId) {
   const o = orders[ordId];
   if (!o || o.status !== 'pending') { toast('Only pending orders can be edited', 'warn'); return; }
   const allMats = new Set();
-  Object.values(CATALOG).forEach(sys => Object.values(sys.applications).forEach(app => app.forEach(prod => allMats.add(prod.name + '|' + prod.pkg))));
+  catalogKeys().forEach(k => allMats.add(k));
   Object.keys(stockData).forEach(k => allMats.add(k));
   const sorted = [...allMats].sort();
   const existingQty = {};
@@ -3047,107 +3276,122 @@ function showAllAlerts() {
   openModal('All Active Alerts (' + alerts.length + ')', `<div class="alert-list">${html}</div>`, '<button class="btn btn-secondary" onclick="closeModal()">Close</button>');
 }
 
+// ========== CATALOGUE PAGE (read-only view of the BOM) ==========
+let catView = 'systems', catSystem = '';
+const KIND_ORDER = { primer: 0, prep: 1, finish: 2, sealer: 3 };
+const KIND_LABEL = { primer: 'Primer', prep: 'Preparation', finish: 'Finish', sealer: 'Sealer / protection' };
+
+function setCatView(v) { catView = v; renderCatalogue(); }
+function setCatSystem(n) { catSystem = n; renderCatalogue(); }
+
+function renderCatalogue() {
+  const names = systemNames();
+  if (!SYSTEMS[catSystem]) catSystem = names[0];
+  const tabs = `<div class="flex gap-8 mb-16">
+    <button class="btn ${catView === 'systems' ? 'btn-primary' : 'btn-secondary'} btn-sm" onclick="setCatView('systems')">Systems & consumption</button>
+    <button class="btn ${catView === 'products' ? 'btn-primary' : 'btn-secondary'} btn-sm" onclick="setCatView('products')">Products & packs</button></div>`;
+  let body = '';
+  if (catView === 'systems') {
+    const sys = SYSTEMS[catSystem];
+    const prods = [...new Set(sys.rows.flatMap(r => Object.keys(r[3])))].sort((a, b) => ((KIND_ORDER[PRODUCTS[a].kind] ?? 9) - (KIND_ORDER[PRODUCTS[b].kind] ?? 9)) || a.localeCompare(b));
+    const rows = sys.rows.map(r => `<tr><td>${escAttr(bomShort('el', r[0]))}</td><td>${r[1] === 'any' && bomEnvs(catSystem, r[0]).length === 1 ? 'Interior / Exterior' : escAttr(bomShort('env', r[1]))}</td><td>${escAttr(bomShort('sub', r[2]))}</td>${prods.map(p => `<td class="cat-n">${r[3][p] !== undefined ? r[3][p] : ''}</td>`).join('')}</tr>`).join('');
+    body = `<div class="flex items-center gap-8 mb-16"><select id="catSystemSel" style="width:auto" onchange="setCatSystem(this.value)">${names.map(n => `<option value="${escAttr(n)}" ${n === catSystem ? 'selected' : ''}>${escAttr(n)} — ${escAttr(SYSTEMS[n].category)}</option>`).join('')}</select>
+      <span class="text-sm text-muted">Consumption per m² of surface, per product (kg, lt or m² as shown in the pack unit). Empty = layer not needed.</span></div>
+      <div class="overflow-x"><table class="cat-table"><thead><tr><th>Surface</th><th>Environment</th><th>Substrate</th>${prods.map(p => `<th class="cat-n" title="${escAttr(p)}">${escAttr(p.replace(/ \((POWDER|graphite[^)]*)\)/i, ''))}<div class="text-sm text-muted" style="font-weight:400">${PRODUCTS[p].unit}/m²</div></th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  } else {
+    const usedIn = {};
+    Object.entries(SYSTEMS).forEach(([n, s]) => new Set(s.rows.flatMap(r => Object.keys(r[3]))).forEach(p => { (usedIn[p] = usedIn[p] || []).push(n); }));
+    const rows = Object.entries(PRODUCTS).sort((a, b) => ((KIND_ORDER[a[1].kind] ?? 9) - (KIND_ORDER[b[1].kind] ?? 9)) || a[0].localeCompare(b[0])).map(([n, d]) => {
+      const stock = d.packs.map(pk => { const q = (stockData[n + '|' + pk] || {}).quantity; return q ? `${q} × ${pk}` : ''; }).filter(Boolean).join(' · ');
+      return `<tr><td><strong>${escAttr(n)}</strong></td><td>${KIND_LABEL[d.kind] || ''}</td><td>${d.unit}</td><td>${d.packs.map(escAttr).join(', ')}</td><td>${stock || '—'}</td><td class="text-sm text-muted">${(usedIn[n] || []).map(escAttr).join(', ')}</td></tr>`;
+    }).join('');
+    body = `<div class="text-sm text-muted mb-16">${Object.keys(PRODUCTS).length} products. When a project needs a quantity, the app combines these pack sizes with the least leftover (e.g. 23 kg of Nanostucco 500 = 1 × 20kg + 1 × 5kg).</div>
+      <div class="overflow-x"><table><thead><tr><th>Product</th><th>Layer</th><th>Unit</th><th>Pack sizes</th><th>In stock</th><th>Used in</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+  $('catalogueContent').innerHTML = tabs + body;
+}
+
 // ========== CATALOG / MATERIAL EDITING ==========
 function openEditProjectMaterials(sysIdx) {
   const p = projects[currentProject];
   if (!p || !p.systems[sysIdx]) return;
   const sys = p.systems[sysIdx];
   if (Array.isArray(sys.offerItems)) { openEditOfferMaterials(sysIdx); return; }
-  const catDef = CATALOG[sys.systemName];
-  if (!catDef || !catDef.applications[sys.application]) { toast('System or application not found in catalog', 'error'); return; }
-  const defaultProducts = catDef.applications[sys.application];
-  const overrides = sys.materialOverrides || {};
-
-  let rows = defaultProducts.map((prod, i) => {
-    const ov = overrides[i] || {};
-    const name = ov.name !== undefined ? ov.name : prod.name;
-    const pkg = ov.pkg !== undefined ? ov.pkg : prod.pkg;
-    const consumption = ov.consumption !== undefined ? ov.consumption : prod.consumption;
-    const unit = ov.unit !== undefined ? ov.unit : prod.unit;
-    return `<div class="inline-edit-row" data-idx="${i}">
-      <div style="flex:2"><label>Product</label><input type="text" class="ov-name" value="${escAttr(name)}"></div>
-      <div style="flex:1"><label>Pkg</label><input type="text" class="ov-pkg" value="${escAttr(pkg)}"></div>
-      <div style="flex:1"><label>Consumption/${unit}</label><input type="number" class="ov-consumption" value="${consumption}" step="0.01" min="0"></div>
-      <div style="flex:0.5"><label>Unit</label><input type="text" class="ov-unit" value="${escAttr(unit)}" style="max-width:60px"></div>
-      <button class="remove-btn" onclick="this.closest('.inline-edit-row').remove()" title="Remove material">✕</button>
-    </div>`;
+  if (!Array.isArray(sys.surfaces)) { toast('This system comes from the old catalogue — remove it and add it again with its surfaces', 'warn'); return; }
+  // standard rate range of every product over the surface lines actually used
+  const std = {};
+  sys.surfaces.forEach(s => {
+    const row = bomRow(sys.systemName, s.element, s.env, s.substrate);
+    if (row) Object.entries(row[3]).forEach(([n, r]) => { const e = std[n] || (std[n] = { lo: r, hi: r }); e.lo = Math.min(e.lo, r); e.hi = Math.max(e.hi, r); });
+  });
+  const ro = sys.rateOverrides || {}, pp = sys.packPref || {};
+  const rows = Object.keys(std).map(n => {
+    const d = PRODUCTS[n] || {}, e = std[n], rng = e.lo === e.hi ? e.lo : `${e.lo}–${e.hi}`;
+    return `<tr data-prod="${escAttr(n)}"><td><strong>${escAttr(n)}</strong></td>
+      <td>${rng} ${d.unit || ''}/m²</td>
+      <td><input type="number" class="mo-rate" value="${ro[n] !== undefined ? ro[n] : ''}" placeholder="${rng}" step="0.01" min="0" style="width:90px" data-std="${e.lo === e.hi ? e.lo : ''}"></td>
+      <td><select class="mo-pack"><option value="smart">Smart mix (least leftover)</option>${(d.packs || []).map(k => `<option value="${escAttr(k)}" ${pp[n] === k ? 'selected' : ''}>Only ${escAttr(k)}</option>`).join('')}</select></td></tr>`;
   }).join('');
-
-  openModal('Edit Materials — ' + sys.systemName + ' (' + sys.application + ')', `
-    <div class="form-help mb-16">Override product names, packaging, or consumption rates for this project. Changes only affect this project, not the master catalog.</div>
-    <div id="matOverrideRows">${rows}</div>
-    <button class="btn btn-secondary btn-sm mt-16" onclick="addCustomMaterialRow()">+ Add Custom Material</button>
+  const extras = (sys.extraProducts || []).map(extraRowHtml).join('');
+  openModal('Adjust materials — ' + sys.systemName, `
+    <div class="form-help mb-16">Standard rates come from the Cement Plus BOM for each surface of this system. Change a rate only for this project (leave empty for the standard rate, 0 = do not use the product) or fix the pack size used to supply it. Changes affect this project only.</div>
+    <div class="overflow-x"><table><thead><tr><th>Product</th><th>BOM rate</th><th>Rate for this project</th><th>Packs</th></tr></thead><tbody id="matRateRows">${rows}</tbody></table></div>
+    <h3 class="mt-16 mb-8">Extra materials</h3>
+    <div id="matOverrideRows">${extras}</div>
+    <button class="btn btn-secondary btn-sm mt-8" onclick="addCustomMaterialRow()">+ Add extra material</button>
+    <datalist id="prodNames">${Object.keys(PRODUCTS).map(n => `<option value="${escAttr(n)}">`).join('')}</datalist>
   `, `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-     <button class="btn btn-secondary" onclick="resetMaterialOverrides(${sysIdx})">Reset to Defaults</button>
+     <button class="btn btn-secondary" onclick="resetMaterialOverrides(${sysIdx})">Reset to BOM</button>
      <button class="btn btn-primary" onclick="saveMaterialOverrides(${sysIdx})">Save Changes</button>`);
 }
 
-function addCustomMaterialRow() {
-  const container = $('matOverrideRows');
-  const idx = container.querySelectorAll('.inline-edit-row').length;
-  const el = document.createElement('div');
-  el.className = 'inline-edit-row';
-  el.dataset.idx = idx;
-  el.dataset.custom = 'true';
-  el.innerHTML = `
-    <div style="flex:2"><label>Product</label><input type="text" class="ov-name" value="" placeholder="Product name"></div>
-    <div style="flex:1"><label>Pkg</label><input type="text" class="ov-pkg" value="" placeholder="e.g. 20kg"></div>
-    <div style="flex:1"><label>Consumption/m²</label><input type="number" class="ov-consumption" value="0" step="0.01" min="0"></div>
-    <div style="flex:0.5"><label>Unit</label><input type="text" class="ov-unit" value="kg" style="max-width:60px"></div>
-    <button class="remove-btn" onclick="this.closest('.inline-edit-row').remove()" title="Remove material">✕</button>`;
-  container.appendChild(el);
+function extraRowHtml(ep) {
+  return `<div class="inline-edit-row">
+    <div style="flex:2"><label>Product</label><input type="text" class="ov-name" list="prodNames" value="${escAttr(ep.name)}" placeholder="Product name"></div>
+    <div style="flex:1"><label>Pack</label><input type="text" class="ov-pkg" value="${escAttr(ep.pkg)}" placeholder="e.g. 20kg"></div>
+    <div style="flex:1"><label>Per m²</label><input type="number" class="ov-consumption" value="${ep.consumption === undefined ? 0 : ep.consumption}" step="0.01" min="0"></div>
+    <div style="flex:0.5"><label>Unit</label><input type="text" class="ov-unit" value="${escAttr(ep.unit || 'kg')}" style="max-width:60px"></div>
+    <button class="remove-btn" onclick="this.closest('.inline-edit-row').remove()" title="Remove material">✕</button>
+  </div>`;
 }
+
+function addCustomMaterialRow() { $('matOverrideRows').insertAdjacentHTML('beforeend', extraRowHtml({ name: '', pkg: '', consumption: 0, unit: 'kg' })); }
 
 function saveMaterialOverrides(sysIdx) {
   const p = projects[currentProject];
   const sys = p.systems[sysIdx];
-  const catDef = CATALOG[sys.systemName];
-  const defaultProducts = catDef ? catDef.applications[sys.application] || [] : [];
-  const rows = $('matOverrideRows').querySelectorAll('.inline-edit-row');
-  const overrides = {};
-  const extraProducts = [];
-
-  rows.forEach(row => {
-    const idx = parseInt(row.dataset.idx);
-    const isCustom = row.dataset.custom === 'true';
-    const name = row.querySelector('.ov-name').value.trim();
-    const pkg = row.querySelector('.ov-pkg').value.trim();
-    const consumption = parseFloat(row.querySelector('.ov-consumption').value) || 0;
-    const unit = row.querySelector('.ov-unit').value.trim() || 'kg';
-    if (!name) return;
-
-    if (isCustom || idx >= defaultProducts.length) {
-      extraProducts.push({ name, pkg, consumption, unit });
-    } else {
-      const def = defaultProducts[idx];
-      const ov = {};
-      if (name !== def.name) ov.name = name;
-      if (pkg !== def.pkg) ov.pkg = pkg;
-      if (consumption !== def.consumption) ov.consumption = consumption;
-      if (unit !== def.unit) ov.unit = unit;
-      if (Object.keys(ov).length > 0) overrides[idx] = ov;
-    }
+  const rateOverrides = {}, packPref = {}, extraProducts = [];
+  document.querySelectorAll('#matRateRows tr').forEach(tr => {
+    const n = tr.dataset.prod, inp = tr.querySelector('.mo-rate'), v = inp.value.trim();
+    if (v !== '' && !(inp.dataset.std !== '' && parseFloat(v) === parseFloat(inp.dataset.std))) rateOverrides[n] = Math.max(0, parseFloat(v) || 0);
+    const pk = tr.querySelector('.mo-pack').value;
+    if (pk !== 'smart') packPref[n] = pk;
   });
-
-  sys.materialOverrides = Object.keys(overrides).length > 0 ? overrides : undefined;
-  sys.extraProducts = extraProducts.length > 0 ? extraProducts : undefined;
+  document.querySelectorAll('#matOverrideRows .inline-edit-row').forEach(row => {
+    const name = row.querySelector('.ov-name').value.trim();
+    if (!name) return;
+    extraProducts.push({ name, pkg: row.querySelector('.ov-pkg').value.trim(), consumption: parseFloat(row.querySelector('.ov-consumption').value) || 0, unit: row.querySelector('.ov-unit').value.trim() || 'kg' });
+  });
+  ['rateOverrides', 'packPref', 'extraProducts'].forEach(k => delete sys[k]);
+  if (Object.keys(rateOverrides).length) sys.rateOverrides = rateOverrides;
+  if (Object.keys(packPref).length) sys.packPref = packPref;
+  if (extraProducts.length) sys.extraProducts = extraProducts;
   p.updatedAt = new Date().toISOString();
-  if (db) db.doc('projects/' + p.id).set(p);
-  logActivity(`edited materials for ${sys.systemName} in "${p.name}"`);
+  saveProjectDoc(p);
+  logActivity(`adjusted materials for ${sys.systemName} in "${p.name}"`);
   closeModal();
-  toast('Material overrides saved');
+  toast('Material adjustments saved');
   renderProjectDetail();
 }
 
 function resetMaterialOverrides(sysIdx) {
   const p = projects[currentProject];
   const sys = p.systems[sysIdx];
-  delete sys.materialOverrides;
-  delete sys.extraProducts;
+  ['rateOverrides', 'packPref', 'extraProducts'].forEach(k => delete sys[k]);
   p.updatedAt = new Date().toISOString();
-  if (db) db.doc('projects/' + p.id).set(p);
+  saveProjectDoc(p);
   closeModal();
-  toast('Reset to catalog defaults');
+  toast('Reset to the BOM rates');
   renderProjectDetail();
 }
 
@@ -3895,16 +4139,12 @@ async function scanNewProjectFile() {
     }
     const limits = await sampleAI.limits().catch(() => null);
     const canSendImages = !!limits?.images;
-    const knownProducts = [];
-    for (const sys of Object.values(CATALOG)) {
-      for (const products of Object.values(sys.applications)) {
-        products.forEach(pr => { if (!knownProducts.includes(pr.name)) knownProducts.push(pr.name); });
-      }
-    }
+    const knownProducts = Object.keys(PRODUCTS);
     const prompt = `You are reading a commercial document (offer/quotation or invoice, usually in Greek) issued by Cement Plus, a microcement company in Greece.
 Read it VERY carefully, line by line: header, customer block, line-item table, totals, payment terms and small print. Copy values exactly as printed (keep Greek text, never translate or invent). If something is not in the document use "" (or 0 / []).
 
-Known product systems: ${Object.keys(CATALOG).join(', ')}
+Known product systems: ${systemNames().join(', ')}
+Note: the product formerly called RASOCOL 600 is now named D-BASE 60 — always use D-BASE 60.
 Known products: ${knownProducts.join(', ')}
 
 Return ONLY one JSON object:
@@ -3991,13 +4231,13 @@ function applyScannedData(data, file) {
   const docId = uid();
   let matCount = 0;
   (Array.isArray(data.systems) ? data.systems : []).forEach((sys, n) => {
-    const key = Object.keys(CATALOG).find(k => k.toLowerCase() === String(sys.systemName || '').trim().toLowerCase());
+    const key = systemNames().find(k => k.toLowerCase() === String(sys.systemName || '').trim().toLowerCase());
     const materials = (Array.isArray(sys.materials) ? sys.materials : []).map(m => ({
       name: String(m.name || '').trim(), pkg: String(m.pkg || '').trim(),
       quantity: parseFloat(m.quantity) || 0, unit: String(m.unit || 'kg').trim()
     })).filter(m => m.name);
     if (!key && materials.length === 0) return;
-    const app = key && CATALOG[key].applications[sys.application] ? sys.application : (key ? Object.keys(CATALOG[key].applications)[0] : 'Imported materials');
+    const app = 'Imported materials';
     const card = { systemName: key || String(sys.systemName || '').trim() || `${label} ${data.documentNumber || ''} items ${n + 1}`.trim(), application: app, area: parseFloat(sys.area) || 0, notes: '', offerDoc: file.name };
     if (materials.length) { card.offerItems = materials; matCount += materials.length; }
     $('systemsList').insertAdjacentHTML('beforeend', systemCardHtml(card, docId));
@@ -4712,7 +4952,7 @@ function buildChatInput() {
 
 function chatRules() {
   const names = Object.values(projects).map(p => `${p.name} (${p.client || '—'}, ${p.status})`).slice(0, 80).join('; ');
-  const sysNames = Object.keys(CATALOG).join(', ');
+  const sysNames = systemNames().join(', ');
   return `You are "Cement Plus AI", the built-in assistant of Cement Plus Daily, the project and warehouse management app of Cement Plus (microcement manufacturer/applicator, Larissa, Greece). You are talking to ${currentUser}, usually Alex, the managing director, a mechanical engineer who runs several SMEs: give simple but advanced, clearly stated answers, short by default, with numbers and units. Reply in the language the user writes in (Greek or English). Dates written by the user are Greek style day/month/year (11/8/2026 = 11 August 2026). Today is ${today()}.
 
 HOW TO ANSWER
@@ -4725,11 +4965,11 @@ HOW TO ANSWER
 ABOUT THE APP
 Left menu: Dashboard (KPIs, alerts, analytics charts), Projects, Stock, Orders, Reminders, Timeline (Gantt of project phases).
 Projects list: New Project, table with checkboxes; selecting rows shows a bar with bulk actions (set status, export CSV, delete).
-New Project: "Attach Offer or Invoice" lets AI read a PDF/photo and fill client, location, deadline, notes, payment terms and the exact material quantities; each attached file has Preview, Edit and delete. Product systems can also be added manually from the catalog; materials are then calculated from consumption per m2.
+New Project: "Attach Offer or Invoice" lets AI read a PDF/photo and fill client, location, deadline, notes, payment terms and the exact material quantities; each attached file has Preview, Edit and delete. Product systems can also be added manually: pick a system, then list its surfaces (surface type, interior/exterior, substrate, m2); the app picks the layers from the Cement Plus BOM for each surface (e.g. no mesh or D-Base 60 on a smooth substrate), adds up the materials and combines packs with the least leftover (shown live as a preview).
 Project tabs: Overview (systems, progress), Phases (a delivery/production stage: choose pack quantities per material for the phase, optional m2 helper, start and target dates, status; "Issue to production" creates a production order), Materials (required packs, in stock, delivered, remaining), Payment Terms (total, terms, installments with Paid/Pending/Overdue, mark paid), Deliveries (record a delivery: deducts stock, delivery note CSV, photos), Files (upload, preview), Production (the project's production orders), Notes.
 Production (left menu, also a tab per project): the procedure for giving work to the production unit. The office issues a production order (project, optional phase, materials and packs to produce, due date, priority, instructions); the production unit starts it (Issued > In production) and opens the big floor view (made for gloves) where they tap the packs produced in real time, set the current stage (Preparing, Mixing, Packing, Quality check, Ready) and add notes; everyone sees the live progress on the Production page and the dashboard. They finish it by confirming produced quantities (optionally added to warehouse stock). Phases are different: they split a project's delivery in stages.
 Stock: quantities and minimum levels per material (Update Stock). Reconcile with ERP (Stock page): upload ERP stock file(s), see differences vs app stock, apply ERP values per material or in bulk. Orders: supplier orders pending > ordered > received (receiving adds to stock); Reorder Planner (Orders page): per material suggested order = remaining demand of active projects + minimum stock - stock - already ordered, with needed-by date (earliest phase target date or project deadline), lead time and order-by date, plus one-click order creation; older AUTO-... orders were created by a removed auto-reorder, now the dashboard shows an alert pointing to the planner. Reminders: assign to team members with date/time. Emails are switched off for now. Data is shared by the whole team in one database.
-Catalog (17 product systems): ${sysNames}.
+Catalog: ${systemNames().length} product systems built from the Cement Plus BOM (consumption per m2 depends on surface type x interior/exterior x substrate: friable, friable+damp, existing tiles, rough, smooth) and ${Object.keys(PRODUCTS).length} products with their pack sizes. Systems: ${sysNames}. Rasocol 600 was renamed D-BASE 60.
 Not in the app today (candidates when asked what is missing): unit prices, costs and margins per material or project; supplier database and supplier prices; a customer database (client is free text); issuing offers/invoices from the app; user roles and permissions; calendar sync; returns and credit notes; stock by batch number or warehouse location; multi-currency (EUR only); reports/export to accounting.
 
 CURRENT PROJECTS: ${names || 'none yet'}.
@@ -4813,7 +5053,7 @@ function toolSalesReport(a) {
   if (!any && mat) {
     const names = new Set();
     Object.values(deliveries).forEach(d => (d.items || []).forEach(i => names.add(i.name)));
-    Object.keys(CATALOG).forEach(s => Object.values(CATALOG[s].applications).forEach(ps => ps.forEach(p => names.add(p.name))));
+    Object.keys(PRODUCTS).forEach(n => names.add(n));
     out.no_match_hint = [...names].filter(nm => chatNorm(nm).includes(chatNorm(mat).split(/\s+/)[0])).slice(0, 12);
   }
   return out;
@@ -4848,7 +5088,7 @@ function toolProjectDetails(a) {
   dels.forEach(d => (d.items || []).forEach(i => { delivered[i.material] = (delivered[i.material] || 0) + (Number(i.quantity) || 0); }));
   return {
     name: p.name, client: p.client, location: p.location, status: p.status, deadline: p.deadline || null, notes: p.notes || '',
-    systems: (p.systems || []).map(s => ({ system: s.systemName, application: s.application, area_m2: s.area, from_offer: Array.isArray(s.offerItems) })),
+    systems: (p.systems || []).map(s => ({ system: s.systemName, application: Array.isArray(s.surfaces) ? bomSummary(s) : s.application, surfaces: Array.isArray(s.surfaces) ? s.surfaces.map(x => ({ surface: x.element, environment: x.env, substrate: x.substrate, area_m2: x.area })) : undefined, area_m2: s.area, from_offer: Array.isArray(s.offerItems) })),
     materials: getAllMaterials(p.systems || []).slice(0, 60).map(m => { const k = m.name + '|' + m.pkg; return { name: m.name, pkg: m.pkg, units_needed: m.totalUnits, delivered_units: delivered[k] || 0, in_stock: (stockData[k] || {}).quantity || 0 }; }),
     payment: { ...projectPayment(p), terms: p.payment?.terms || '', installments: (p.payment?.installments || []).map(i => ({ label: i.label, amount: i.amount, due: i.dueDate, paid: !!i.paid })) },
     phases: (p.phases || []).map(ph => { const g = phaseProgress(p, ph); return { name: ph.name, status: ph.status, target_date: ph.targetDate, planned_packs: g.planned, produced_packs: g.produced, delivered_packs: g.delivered, materials: g.rows.slice(0, 20).map(r => ({ material: r.name, pack: r.pkg, planned: r.planned, in_production: r.inProd, produced: r.produced, delivered: r.delivered })) }; }),
