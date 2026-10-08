@@ -3349,18 +3349,30 @@ function renderCatalogue() {
       <span class="text-sm text-muted">Consumption per m² of surface, per product (kg, lt or m² as shown in the pack unit). Empty = layer not needed.</span></div>
       <div class="overflow-x"><table class="cat-table"><thead><tr><th>Surface</th><th>Environment</th><th>Substrate</th>${prods.map(p => `<th class="cat-n" title="${escAttr(p)}">${escAttr(p.replace(/ \((POWDER|graphite[^)]*)\)/i, ''))}<div class="text-sm text-muted" style="font-weight:400">${PRODUCTS[p].unit}/m²</div></th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
   } else {
-    const usedIn = {};
-    Object.entries(SYSTEMS).forEach(([n, s]) => new Set(s.rows.flatMap(r => Object.keys(r[3]))).forEach(p => { (usedIn[p] = usedIn[p] || []).push(n); }));
-    const rows = Object.entries(PRODUCTS).sort((a, b) => ((KIND_ORDER[a[1].kind] ?? 9) - (KIND_ORDER[b[1].kind] ?? 9)) || a[0].localeCompare(b[0])).map(([n, d]) => {
-      const tot = {};
-      Object.entries(stockData).forEach(([k, v]) => { const [kn, kp] = k.split('|'); if (v.quantity > 0 && productBase(kn) === n) tot[kp] = (tot[kp] || 0) + v.quantity; });
-      const stock = Object.entries(tot).sort((x, y) => pkgSize(y[0]) - pkgSize(x[0])).map(([pk, q]) => `${Math.round(q * 100) / 100} × ${pk}`).join(' · ');
-      return `<tr><td><strong>${escAttr(n)}</strong></td><td>${KIND_LABEL[d.kind] || ''}</td><td>${d.unit}</td><td>${d.packs.map(escAttr).join(', ')}</td><td>${stock || '—'}</td><td class="text-sm text-muted">${(usedIn[n] || []).map(escAttr).join(', ')}</td></tr>`;
-    }).join('');
-    body = `<div class="text-sm text-muted mb-16">${Object.keys(PRODUCTS).length} products. When a project needs a quantity, the app combines these pack sizes with the least leftover (e.g. 23 kg of Nanostucco 500 = 1 × 20kg + 1 × 5kg).</div>
-      <div class="overflow-x"><table><thead><tr><th>Product</th><th>Layer</th><th>Unit</th><th>Pack sizes</th><th>In stock (all colours)</th><th>Used in</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    body = `<div class="flex items-center gap-8 mb-16" style="flex-wrap:wrap"><input type="search" id="catSearch" value="${escAttr(catQuery)}" placeholder="Search product, colour, pack, layer or system… (e.g. graphite, snow, 25kg)" oninput="catQuery=this.value;renderCatProducts()" style="max-width:380px">
+      <span class="text-sm text-muted" id="catCount"></span></div><div id="catProdTable"></div>`;
   }
   $('catalogueContent').innerHTML = tabs + body;
+  if (catView === 'products') renderCatProducts();
+}
+
+let catQuery = '';
+function renderCatProducts() {
+  const usedIn = {};
+  Object.entries(SYSTEMS).forEach(([n, s]) => new Set(s.rows.flatMap(r => Object.keys(r[3]))).forEach(p => { (usedIn[p] = usedIn[p] || []).push(n); }));
+  const q = catQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const all = Object.entries(PRODUCTS).sort((a, b) => ((KIND_ORDER[a[1].kind] ?? 9) - (KIND_ORDER[b[1].kind] ?? 9)) || a[0].localeCompare(b[0]));
+  const list = all.filter(([n, d]) => { const hay = `${n} ${d.packs.join(' ')} ${KIND_LABEL[d.kind] || ''} ${d.unit} ${(usedIn[n] || []).join(' ')} ${(COLOURS[n] || []).join(' ')}`.toLowerCase(); return q.every(t => hay.includes(t)); });
+  $('catCount').textContent = q.length ? `${list.length} of ${all.length} products` : `${all.length} products`;
+  if (!list.length) { $('catProdTable').innerHTML = '<div class="empty-state" style="padding:32px"><p>No product matches your search.</p></div>'; return; }
+  const rows = list.map(([n, d]) => {
+    const tot = {};
+    Object.entries(stockData).forEach(([k, v]) => { const [kn, kp] = k.split('|'); if (v.quantity > 0 && productBase(kn) === n) tot[kp] = (tot[kp] || 0) + v.quantity; });
+    const stock = Object.entries(tot).sort((x, y) => pkgSize(y[0]) - pkgSize(x[0])).map(([pk, qn]) => `${Math.round(qn * 100) / 100} × ${pk}`).join(' · ');
+    return `<tr><td><strong>${escAttr(n)}</strong></td><td>${KIND_LABEL[d.kind] || ''}</td><td>${d.unit}</td><td>${d.packs.map(escAttr).join(', ')}</td><td>${stock || '—'}</td><td class="text-sm text-muted">${(usedIn[n] || []).map(escAttr).join(', ')}</td></tr>`;
+  }).join('');
+  $('catProdTable').innerHTML = `<div class="text-sm text-muted mb-16">When a project needs a quantity, the app combines these pack sizes with the least leftover (e.g. 23 kg of Nanostucco 500 = 1 × 20kg + 1 × 5kg).</div>
+    <div class="overflow-x"><table><thead><tr><th>Product</th><th>Layer</th><th>Unit</th><th>Pack sizes</th><th>In stock (all colours)</th><th>Used in</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 // ========== CATALOG / MATERIAL EDITING ==========
