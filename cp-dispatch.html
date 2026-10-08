@@ -668,6 +668,32 @@ const PRODUCTS = {
   "COLORTEC MAX": { unit: "lt", packs: ["1lt","10lt"], kind: "sealer" },
   "NANOFIN WAX": { unit: "lt", packs: ["1lt"], kind: "sealer" },
   "NANOFIN METAL SEALER": { unit: "lt", packs: ["0.5lt","1lt"], kind: "sealer" },
+  "AGGREGATES (carbon 1-2.5mm)": { unit: "kg", packs: ["20kg"], kind: "aggregate" },
+  "AGGREGATES (carbon 2.5-4mm)": { unit: "kg", packs: ["20kg"], kind: "aggregate" },
+  "D-BASE UNO": { unit: "kg", packs: ["25kg"], kind: "other" },
+  "DECO CARE": { unit: "lt", packs: ["0.25lt","1lt"], kind: "other" },
+  "DECO CHLORE": { unit: "kg", packs: ["4kg"], kind: "other" },
+  "DECO MAX CLEAR": { unit: "kg", packs: ["3.2+1.8kg"], kind: "other" },
+  "DECO MAX RAL 9016": { unit: "kg", packs: ["3.8+1.2kg"], kind: "other" },
+  "DECO SAFE COARSE": { unit: "kg", packs: ["1kg"], kind: "other" },
+  "DECO SAFE FINE": { unit: "kg", packs: ["1kg"], kind: "other" },
+  "AGGREGATES (evergreen 2.0-5.0mm)": { unit: "kg", packs: ["25kg"], kind: "aggregate" },
+  "AGGREGATES (famagusta 2.0-4.0mm)": { unit: "kg", packs: ["25kg"], kind: "aggregate" },
+  "AGGREGATES (graphite 1.6-2.5mm)": { unit: "kg", packs: ["25kg"], kind: "aggregate" },
+  "AGGREGATES (graphite 1-1.8mm)": { unit: "kg", packs: ["25kg"], kind: "aggregate" },
+  "AGGREGATES (graphite 3.0-5.0mm)": { unit: "kg", packs: ["25kg"], kind: "aggregate" },
+  "HEVADEX BLOWERPROOF LIQUID": { unit: "kg", packs: ["10kg"], kind: "other" },
+  "HUMID CEM": { unit: "kg", packs: ["37.5kg"], kind: "other" },
+  "HUMID PRIMER PLUS": { unit: "kg", packs: ["1.4+3.6kg"], kind: "other" },
+  "HYDROMIX FLUID": { unit: "kg", packs: ["5kg"], kind: "other" },
+  "AGGREGATES (jasper 2.0-4.0mm)": { unit: "kg", packs: ["25kg"], kind: "aggregate" },
+  "AGGREGATES (opal 2.5-4mm)": { unit: "kg", packs: ["20kg"], kind: "aggregate" },
+  "AGGREGATES (pebble 3-5mm)": { unit: "kg", packs: ["20kg"], kind: "aggregate" },
+  "RASOCOL 500 WHITE": { unit: "kg", packs: ["25kg"], kind: "other" },
+  "AGGREGATES (river 1.5-2.5mm)": { unit: "kg", packs: ["20kg"], kind: "aggregate" },
+  "AGGREGATES (river 2.5-4mm)": { unit: "kg", packs: ["20kg"], kind: "aggregate" },
+  "AGGREGATES (sand 1-2mm)": { unit: "kg", packs: ["25kg"], kind: "aggregate" },
+  "AGGREGATES (terra 1.6-2.5mm)": { unit: "kg", packs: ["25kg"], kind: "aggregate" },
 };
 const SYSTEMS = {
   "NANOSTUCCO 500": { category: "microcement", colour: "NANOSTUCCO 500 (POWDER)", rows: [
@@ -3302,8 +3328,8 @@ function showAllAlerts() {
 
 // ========== CATALOGUE PAGE (read-only view of the BOM) ==========
 let catView = 'systems', catSystem = '';
-const KIND_ORDER = { primer: 0, prep: 1, finish: 2, sealer: 3 };
-const KIND_LABEL = { primer: 'Primer', prep: 'Preparation', finish: 'Finish', sealer: 'Sealer / protection' };
+const KIND_ORDER = { primer: 0, prep: 1, finish: 2, sealer: 3, aggregate: 4, other: 5 };
+const KIND_LABEL = { primer: 'Primer', prep: 'Preparation', finish: 'Finish', sealer: 'Sealer / protection', aggregate: 'Aggregate', other: 'Other product' };
 
 function setCatView(v) { catView = v; renderCatalogue(); }
 function setCatSystem(n) { catSystem = n; renderCatalogue(); }
