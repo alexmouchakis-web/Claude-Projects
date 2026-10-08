@@ -319,6 +319,7 @@ tr:hover td{background:var(--surface-alt)}
 .surf-pick > .sf-c-area{flex:0 0 110px}
 .surf-pick > [hidden]{display:none}
 .surf-pick label{font-size:.72rem}
+.surf-pick > .sf-c-col{flex:0 1 150px}
 .sf-prev{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
 .sf-chip{font-size:.7rem;padding:2px 8px;border-radius:999px;background:var(--surface);border:1px solid var(--border-light);color:var(--ink-2);white-space:nowrap}
 .sf-chip b{color:var(--ink)}
@@ -560,7 +561,8 @@ body.chat-open #chatPanel{transform:none;visibility:visible}
       <button class="btn btn-secondary btn-sm" id="reconBackBtn" onclick="closeReconcileView()" hidden>← Back to Stock</button>
       <button class="btn btn-secondary btn-sm" id="reconBtn" onclick="openReconcile()">Reconcile with ERP</button>
       <button class="btn btn-secondary btn-sm" id="stockEditBtn" onclick="openStockEdit()">Update Stock</button></div></div>
-    <div class="card" id="stockMain"><div class="card-body no-pad overflow-x" id="stockTable"></div></div>
+    <div id="stockMain"><div class="mb-8"><input type="search" id="stockSearch" placeholder="Search material or colour… (e.g. nanostucco snow)" oninput="renderStock()" style="max-width:360px"></div>
+    <div class="card"><div class="card-body no-pad overflow-x" id="stockTable"></div></div></div>
     <div id="reconView" hidden></div>
   </div>
 
@@ -625,17 +627,18 @@ body.chat-open #chatPanel{transform:none;visibility:visible}
 // PRODUCTS: unit + the pack sizes sold. SYSTEMS: rows [element, environment, substrate, {product: consumption per m²}].
 const PRODUCTS = {
   "C PRIMER PLUS": { unit: "kg", packs: ["1kg","5kg"], kind: "primer" },
-  "RES PRIMER PLUS": { unit: "lt", packs: ["4lt"], kind: "primer" },
-  "EP PRIMER PLUS": { unit: "kg", packs: ["15kg"], kind: "primer" },
-  "EP PRIMER PLUS S": { unit: "kg", packs: ["7+3kg"], kind: "primer" },
-  "EP PRIMER PLUS W": { unit: "kg", packs: ["14kg"], kind: "primer" },
+  "RES PRIMER PLUS": { unit: "lt", packs: ["1lt","4lt"], kind: "primer" },
+  "EP PRIMER PLUS": { unit: "kg", packs: ["3.3+1.7kg","10+5kg"], kind: "primer" },
+  "EP PRIMER PLUS S": { unit: "kg", packs: ["3.5+1.5kg","7+3kg"], kind: "primer" },
+  "EP PRIMER PLUS W": { unit: "kg", packs: ["5+2kg","14kg"], kind: "primer" },
   "UW MEMBRANE PLUS": { unit: "m²", packs: ["30m²"], kind: "prep" },
-  "GLASSTEX 150": { unit: "m²", packs: ["50m²"], kind: "prep" },
+  "GLASSTEX 160": { unit: "m²", packs: ["50m²"], kind: "prep" },
+  "GLASSTEX 74": { unit: "m²", packs: ["50m²"], kind: "prep" },
   "D-BASE 60": { unit: "kg", packs: ["25kg"], kind: "prep" },
   "NANOSTUCCO JOINT": { unit: "kg", packs: ["10kg"], kind: "prep" },
   "NANOSTUCCO 500 (POWDER)": { unit: "kg", packs: ["5kg","10kg","20kg"], kind: "finish" },
-  "NANOFIN 50 VELVET (POWDER)": { unit: "kg", packs: ["10kg","20kg"], kind: "finish" },
-  "NATURA 50 VELVET (POWDER)": { unit: "kg", packs: ["10kg","20kg"], kind: "finish" },
+  "NANOFIN 50 VELVET (POWDER)": { unit: "kg", packs: ["5kg","10kg","20kg"], kind: "finish" },
+  "NATURA 50 VELVET (POWDER)": { unit: "kg", packs: ["5kg","10kg","20kg"], kind: "finish" },
   "NANOFIN METAL (POWDER)": { unit: "kg", packs: ["3kg"], kind: "finish" },
   "MARMOFIN 50 BASE (POWDER)": { unit: "kg", packs: ["20kg"], kind: "finish" },
   "MARMOFIN 50 FINISH (POWDER)": { unit: "kg", packs: ["20kg"], kind: "finish" },
@@ -644,10 +647,10 @@ const PRODUCTS = {
   "ELEMENT:10 (POWDER)": { unit: "kg", packs: ["20kg"], kind: "finish" },
   "TX RASO (POWDER)": { unit: "kg", packs: ["25kg"], kind: "finish" },
   "INTOTECT RESIN": { unit: "kg", packs: ["25kg"], kind: "finish" },
-  "PAINT NATURA (POWDER)": { unit: "kg", packs: ["20kg"], kind: "finish" },
+  "PAINT NATURA (POWDER)": { unit: "kg", packs: ["5kg","10kg","20kg"], kind: "finish" },
   "CREATIVO NATURA (POWDER)": { unit: "kg", packs: ["20kg"], kind: "finish" },
-  "PAVITECT EPOXY UV": { unit: "kg", packs: ["5kg"], kind: "finish" },
-  "PAVITECT RESIN PU 2K UV": { unit: "kg", packs: ["6.5kg"], kind: "finish" },
+  "PAVITECT EPOXY UV": { unit: "kg", packs: ["3.33+1.67kg"], kind: "finish" },
+  "PAVITECT RESIN PU 2K UV": { unit: "kg", packs: ["3.12+3.38kg"], kind: "finish" },
   "AGGREGATES (graphite 2.5-3.5mm)": { unit: "kg", packs: ["25kg"], kind: "finish" },
   "EP COLOR S": { unit: "kg", packs: ["7.5+2.5kg"], kind: "finish" },
   "EP COLOR W": { unit: "kg", packs: ["4+1kg"], kind: "finish" },
@@ -657,193 +660,199 @@ const PRODUCTS = {
   "NATURA SEAL": { unit: "lt", packs: ["1lt","5lt","10lt"], kind: "sealer" },
   "DECO RESINA": { unit: "kg", packs: ["1kg","5kg"], kind: "sealer" },
   "DECO PLUS": { unit: "lt", packs: ["1+0.2lt","5+1lt"], kind: "sealer" },
-  "DECO FLOOR": { unit: "lt", packs: ["4lt"], kind: "sealer" },
-  "DECO TOP": { unit: "kg", packs: ["3.35+0.65kg"], kind: "sealer" },
+  "DECO FLOOR": { unit: "kg", packs: ["4kg"], kind: "sealer" },
+  "DECO TOP": { unit: "kg", packs: ["3.35+0.65kg","12.6+2.4kg"], kind: "sealer" },
+  "DECO TOP ECO MATE": { unit: "kg", packs: ["11.7+3.3kg"], kind: "sealer" },
+  "DECO TOP EVO W MAT": { unit: "kg", packs: ["2.7+0.3kg","8.1+0.9kg"], kind: "sealer" },
+  "COLORFRESH INTENSIV": { unit: "lt", packs: ["1lt","10lt"], kind: "sealer" },
+  "COLORTEC MAX": { unit: "lt", packs: ["1lt","10lt"], kind: "sealer" },
   "NANOFIN WAX": { unit: "lt", packs: ["1lt"], kind: "sealer" },
-  "NANOFIN METAL SEALER": { unit: "lt", packs: ["1lt"], kind: "sealer" },
+  "NANOFIN METAL SEALER": { unit: "lt", packs: ["0.5lt","1lt"], kind: "sealer" },
 };
 const SYSTEMS = {
-  "NANOSTUCCO 500": { category: "microcement", rows: [
-    ["floors","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+  "NANOSTUCCO 500": { category: "microcement", colour: "NANOSTUCCO 500 (POWDER)", rows: [
+    ["floors","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["floors","any","damp",{"C PRIMER PLUS":0.15,"UW MEMBRANE PLUS":1.0,"D-BASE 60":4.0,"DECO RESINA":0.05,"DECO PLUS":0.06,"NANOSTUCCO JOINT":0.2}],
-    ["floors","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["floors","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["floors","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["floors","any","smooth",{"NANOSTUCCO 500 (POWDER)":0.8,"DECO RESINA":0.05,"DECO PLUS":0.06}],
-    ["walls","in","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"COLORFRESH":0.1}],
-    ["walls","in","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"COLORFRESH":0.1}],
+    ["walls","in","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"COLORFRESH":0.1}],
+    ["walls","in","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"COLORFRESH":0.1}],
     ["walls","in","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"COLORFRESH":0.1}],
     ["walls","in","smooth",{"NANOSTUCCO 500 (POWDER)":0.8,"COLORFRESH":0.1}],
     ["walls","out","friable",{"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["walls","out","tiles",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["walls","out","rough",{"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["walls","out","smooth",{"NANOSTUCCO 500 (POWDER)":0.8,"DECO RESINA":0.05,"DECO PLUS":0.06}],
-    ["stairs","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
-    ["stairs","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["stairs","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["stairs","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["stairs","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["stairs","any","smooth",{"NANOSTUCCO 500 (POWDER)":0.8,"DECO RESINA":0.05,"DECO PLUS":0.06}],
-    ["bathrooms","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["bathrooms","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["bathrooms","any","damp",{"C PRIMER PLUS":0.15,"UW MEMBRANE PLUS":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06,"NANOSTUCCO JOINT":0.2}],
-    ["bathrooms","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["bathrooms","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["bathrooms","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["bathrooms","any","smooth",{"NANOSTUCCO 500 (POWDER)":0.8,"DECO RESINA":0.05,"DECO PLUS":0.06}],
-    ["furniture","in","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"COLORFRESH":0.1}],
+    ["furniture","in","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"COLORFRESH":0.1}],
     ["furniture","in","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"COLORFRESH":0.1}],
     ["furniture","in","smooth",{"NANOSTUCCO 500 (POWDER)":0.8,"COLORFRESH":0.1}],
-    ["furniture","out","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["furniture","out","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["furniture","out","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":1.0,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["furniture","out","smooth",{"NANOSTUCCO 500 (POWDER)":0.8,"DECO RESINA":0.05,"DECO PLUS":0.06}],
   ] },
-  "NANOFIN METAL": { category: "microcement metal", rows: [
-    ["walls","in","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
-    ["walls","in","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
+  "NANOFIN METAL": { category: "microcement metal", colour: "NANOFIN METAL (POWDER)", rows: [
+    ["walls","in","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
+    ["walls","in","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
     ["walls","in","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
     ["walls","in","smooth",{"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
     ["walls","out","friable",{"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
     ["walls","out","tiles",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
     ["walls","out","rough",{"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
     ["walls","out","smooth",{"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
-    ["furniture","in","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
+    ["furniture","in","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
     ["furniture","in","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
     ["furniture","in","smooth",{"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
-    ["furniture","out","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
+    ["furniture","out","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
     ["furniture","out","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
     ["furniture","out","smooth",{"NANOSTUCCO 500 (POWDER)":0.8,"NANOFIN METAL (POWDER)":0.5,"NANOFIN WAX":0.04,"NANOFIN METAL SEALER":0.1}],
   ] },
-  "NANOFIN 50 VELVET": { category: "microcement", rows: [
-    ["floors","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+  "NANOFIN 50 VELVET": { category: "microcement", colour: "NANOFIN 50 VELVET (POWDER)", rows: [
+    ["floors","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["floors","any","damp",{"UW MEMBRANE PLUS":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06,"NANOSTUCCO JOINT":0.2}],
-    ["floors","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["floors","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["floors","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["floors","any","smooth",{"NANOFIN 50 VELVET (POWDER)":0.9,"DECO RESINA":0.05,"DECO PLUS":0.06}],
-    ["walls","in","friable",{"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"COLORFRESH":0.1}],
-    ["walls","in","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"COLORFRESH":0.1}],
+    ["walls","in","friable",{"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"COLORFRESH":0.1}],
+    ["walls","in","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"COLORFRESH":0.1}],
     ["walls","in","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"COLORFRESH":0.1}],
     ["walls","in","smooth",{"NANOFIN 50 VELVET (POWDER)":0.9,"COLORFRESH":0.1}],
-    ["walls","out","friable",{"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
-    ["walls","out","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["walls","out","friable",{"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["walls","out","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["walls","out","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["walls","out","smooth",{"NANOFIN 50 VELVET (POWDER)":0.9,"DECO RESINA":0.05,"DECO PLUS":0.06}],
-    ["stairs","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
-    ["stairs","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["stairs","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["stairs","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["stairs","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["stairs","any","smooth",{"NANOFIN 50 VELVET (POWDER)":0.9,"DECO RESINA":0.05,"DECO PLUS":0.06}],
-    ["bathrooms","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["bathrooms","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["bathrooms","any","damp",{"C PRIMER PLUS":0.15,"UW MEMBRANE PLUS":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06,"NANOSTUCCO JOINT":0.2}],
-    ["bathrooms","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["bathrooms","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["bathrooms","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["bathrooms","any","smooth",{"NANOFIN 50 VELVET (POWDER)":0.9,"DECO RESINA":0.05,"DECO PLUS":0.06}],
-    ["furniture","in","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"COLORFRESH":0.1}],
+    ["furniture","in","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"COLORFRESH":0.1}],
     ["furniture","in","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"COLORFRESH":0.1}],
     ["furniture","in","smooth",{"NANOFIN 50 VELVET (POWDER)":0.9,"COLORFRESH":0.1}],
     ["furniture","out","friable",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["furniture","out","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NANOFIN 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["furniture","out","smooth",{"NANOFIN 50 VELVET (POWDER)":0.9,"DECO RESINA":0.05,"DECO PLUS":0.06}],
   ] },
-  "NATURA 50 VELVET": { category: "microcement", rows: [
-    ["floors","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+  "NATURA 50 VELVET": { category: "microcement", colour: "NATURA 50 VELVET (POWDER)", rows: [
+    ["floors","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["floors","any","damp",{"UW MEMBRANE PLUS":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06,"NANOSTUCCO JOINT":0.2}],
-    ["floors","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["floors","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["floors","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["floors","any","smooth",{"NATURA 50 VELVET (POWDER)":0.9,"DECO RESINA":0.05,"DECO PLUS":0.06}],
-    ["walls","in","friable",{"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"NATURA SEAL":0.1}],
-    ["walls","in","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"NATURA SEAL":0.1}],
+    ["walls","in","friable",{"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"NATURA SEAL":0.1}],
+    ["walls","in","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"NATURA SEAL":0.1}],
     ["walls","in","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"NATURA SEAL":0.1}],
     ["walls","in","smooth",{"NATURA 50 VELVET (POWDER)":0.9,"NATURA SEAL":0.1}],
-    ["walls","out","friable",{"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
-    ["walls","out","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["walls","out","friable",{"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["walls","out","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["walls","out","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["walls","out","smooth",{"NATURA 50 VELVET (POWDER)":0.9,"DECO RESINA":0.05,"DECO PLUS":0.06}],
-    ["stairs","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
-    ["stairs","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["stairs","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["stairs","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["stairs","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["stairs","any","smooth",{"NATURA 50 VELVET (POWDER)":0.9,"DECO RESINA":0.05,"DECO PLUS":0.06}],
-    ["bathrooms","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["bathrooms","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["bathrooms","any","damp",{"C PRIMER PLUS":0.15,"UW MEMBRANE PLUS":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06,"NANOSTUCCO JOINT":0.2}],
-    ["bathrooms","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["bathrooms","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["bathrooms","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["bathrooms","any","smooth",{"NATURA 50 VELVET (POWDER)":0.9,"DECO RESINA":0.05,"DECO PLUS":0.06}],
-    ["furniture","in","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"NATURA SEAL":0.1}],
+    ["furniture","in","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"NATURA SEAL":0.1}],
     ["furniture","in","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"NATURA SEAL":0.1}],
     ["furniture","in","smooth",{"NATURA 50 VELVET (POWDER)":0.9,"NATURA SEAL":0.1}],
     ["furniture","out","friable",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["furniture","out","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"NATURA 50 VELVET (POWDER)":1.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["furniture","out","smooth",{"NATURA 50 VELVET (POWDER)":0.9,"DECO RESINA":0.05,"DECO PLUS":0.06}],
   ] },
-  "ELEMENT:20 LINEA / BAMBOO": { category: "fair-faced concrete", rows: [
-    ["walls","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"ELEMENT:20 (POWDER)":4.0,"COLORFRESH":0.1}],
-    ["walls","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"ELEMENT:20 (POWDER)":4.0,"COLORFRESH":0.1}],
+  "ELEMENT:20 LINEA / BAMBOO": { category: "fair-faced concrete", colour: "ELEMENT:20 (POWDER)", rows: [
+    ["walls","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"ELEMENT:20 (POWDER)":4.0,"COLORFRESH":0.1}],
+    ["walls","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"ELEMENT:20 (POWDER)":4.0,"COLORFRESH":0.1}],
     ["walls","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"ELEMENT:20 (POWDER)":4.0,"COLORFRESH":0.1}],
     ["walls","any","smooth",{"C PRIMER PLUS":0.15,"ELEMENT:20 (POWDER)":4.0,"COLORFRESH":0.1}],
   ] },
-  "ELEMENT:20 FAIR-FACED / TRAVERTINO": { category: "fair-faced concrete", rows: [
-    ["walls","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"ELEMENT:20 (POWDER)":3.0,"COLORTEC":0.13}],
-    ["walls","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"ELEMENT:20 (POWDER)":3.0,"COLORTEC":0.13}],
+  "ELEMENT:20 FAIR-FACED / TRAVERTINO": { category: "fair-faced concrete", colour: "ELEMENT:20 (POWDER)", rows: [
+    ["walls","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"ELEMENT:20 (POWDER)":3.0,"COLORTEC":0.13}],
+    ["walls","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"ELEMENT:20 (POWDER)":3.0,"COLORTEC":0.13}],
     ["walls","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"ELEMENT:20 (POWDER)":3.0,"COLORTEC":0.13}],
     ["walls","any","smooth",{"C PRIMER PLUS":0.15,"ELEMENT:20 (POWDER)":3.0,"COLORTEC":0.13}],
   ] },
-  "ELEMENT:10": { category: "retro walls", rows: [
-    ["walls","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"ELEMENT:10 (POWDER)":2.2,"COLORTEC":0.13}],
-    ["walls","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"ELEMENT:10 (POWDER)":2.2,"COLORTEC":0.13}],
+  "ELEMENT:10": { category: "retro walls", colour: "ELEMENT:10 (POWDER)", rows: [
+    ["walls","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"ELEMENT:10 (POWDER)":2.2,"COLORTEC":0.13}],
+    ["walls","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"ELEMENT:10 (POWDER)":2.2,"COLORTEC":0.13}],
     ["walls","any","rough",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"ELEMENT:10 (POWDER)":2.2,"COLORTEC":0.13}],
     ["walls","any","smooth",{"C PRIMER PLUS":0.15,"ELEMENT:10 (POWDER)":2.2,"COLORTEC":0.13}],
   ] },
-  "TX RASO": { category: "exposed concrete", rows: [
-    ["walls","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"TX RASO (POWDER)":4.0,"COLORTEC":0.13}],
-    ["walls","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"TX RASO (POWDER)":4.0,"COLORTEC":0.13}],
+  "TX RASO": { category: "exposed concrete", colour: "TX RASO (POWDER)", rows: [
+    ["walls","any","friable",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"TX RASO (POWDER)":4.0,"COLORTEC":0.13}],
+    ["walls","any","tiles",{"C PRIMER PLUS":0.15,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"TX RASO (POWDER)":4.0,"COLORTEC":0.13}],
     ["walls","any","rough",{"C PRIMER PLUS":0.15,"TX RASO (POWDER)":4.0,"COLORTEC":0.13}],
     ["walls","any","smooth",{"C PRIMER PLUS":0.15,"TX RASO (POWDER)":4.0,"COLORTEC":0.13}],
   ] },
   "PAVITECT RESIN EPOXY UV": { category: "quartz floors", rows: [
-    ["floors","any","friable",{"C PRIMER PLUS":0.15,"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"PAVITECT EPOXY UV":1.12,"DECO FLOOR":0.15}],
+    ["floors","any","friable",{"C PRIMER PLUS":0.15,"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"PAVITECT EPOXY UV":1.12,"DECO FLOOR":0.15}],
     ["floors","any","damp",{"C PRIMER PLUS":0.15,"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"UW MEMBRANE PLUS":1.0,"D-BASE 60":4.0,"PAVITECT EPOXY UV":1.12,"DECO FLOOR":0.15}],
-    ["floors","any","rough",{"C PRIMER PLUS":0.15,"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"PAVITECT EPOXY UV":1.12,"DECO FLOOR":0.15}],
-    ["floors","any","tiles",{"C PRIMER PLUS":0.15,"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"PAVITECT EPOXY UV":1.12,"DECO FLOOR":0.15}],
+    ["floors","any","rough",{"C PRIMER PLUS":0.15,"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"PAVITECT EPOXY UV":1.12,"DECO FLOOR":0.15}],
+    ["floors","any","tiles",{"C PRIMER PLUS":0.15,"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"PAVITECT EPOXY UV":1.12,"DECO FLOOR":0.15}],
     ["floors","any","smooth",{"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"PAVITECT EPOXY UV":1.12,"DECO FLOOR":0.15}],
   ] },
   "PAVITECT RESIN PU 2K UV": { category: "quartz floors", rows: [
-    ["floors","any","friable",{"C PRIMER PLUS":0.15,"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"PAVITECT RESIN PU 2K UV":0.9,"DECO FLOOR":0.15}],
+    ["floors","any","friable",{"C PRIMER PLUS":0.15,"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"PAVITECT RESIN PU 2K UV":0.9,"DECO FLOOR":0.15}],
     ["floors","any","damp",{"C PRIMER PLUS":0.15,"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"UW MEMBRANE PLUS":1.0,"D-BASE 60":4.0,"PAVITECT RESIN PU 2K UV":0.9,"DECO FLOOR":0.15}],
-    ["floors","any","rough",{"C PRIMER PLUS":0.15,"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"PAVITECT RESIN PU 2K UV":0.9,"DECO FLOOR":0.15}],
-    ["floors","any","tiles",{"C PRIMER PLUS":0.15,"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"GLASSTEX 150":1.0,"D-BASE 60":4.0,"PAVITECT RESIN PU 2K UV":0.9,"DECO FLOOR":0.15}],
+    ["floors","any","rough",{"C PRIMER PLUS":0.15,"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"PAVITECT RESIN PU 2K UV":0.9,"DECO FLOOR":0.15}],
+    ["floors","any","tiles",{"C PRIMER PLUS":0.15,"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"GLASSTEX 160":1.0,"D-BASE 60":4.0,"PAVITECT RESIN PU 2K UV":0.9,"DECO FLOOR":0.15}],
     ["floors","any","smooth",{"EP PRIMER PLUS":0.15,"AGGREGATES (graphite 2.5-3.5mm)":14.0,"PAVITECT RESIN PU 2K UV":0.9,"DECO FLOOR":0.15}],
   ] },
-  "INTOTECT RESIN": { category: "granite walls", rows: [
-    ["walls","any","friable",{"C PRIMER PLUS":0.15,"INTOTECT RESIN":4.5,"GLASSTEX 150":1.0,"D-BASE 60":4.0}],
+  "INTOTECT RESIN": { category: "granite walls", colour: "INTOTECT RESIN", rows: [
+    ["walls","any","friable",{"C PRIMER PLUS":0.15,"INTOTECT RESIN":4.5,"GLASSTEX 160":1.0,"D-BASE 60":4.0}],
     ["walls","any","damp",{"C PRIMER PLUS":0.15,"INTOTECT RESIN":4.5,"UW MEMBRANE PLUS":1.0,"D-BASE 60":4.0}],
-    ["walls","any","rough",{"C PRIMER PLUS":0.15,"INTOTECT RESIN":4.5,"GLASSTEX 150":1.0,"D-BASE 60":4.0}],
-    ["walls","any","tiles",{"C PRIMER PLUS":0.15,"INTOTECT RESIN":4.5,"GLASSTEX 150":1.0,"D-BASE 60":4.0}],
+    ["walls","any","rough",{"C PRIMER PLUS":0.15,"INTOTECT RESIN":4.5,"GLASSTEX 160":1.0,"D-BASE 60":4.0}],
+    ["walls","any","tiles",{"C PRIMER PLUS":0.15,"INTOTECT RESIN":4.5,"GLASSTEX 160":1.0,"D-BASE 60":4.0}],
     ["walls","any","smooth",{"C PRIMER PLUS":0.15,"INTOTECT RESIN":4.5}],
   ] },
   "MARMOFIN 50": { category: "marble microcement", rows: [
     ["walls","any","smooth",{"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
-    ["walls","any","tiles",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"GLASSTEX 150":1.0,"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["walls","any","tiles",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"GLASSTEX 160":1.0,"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["walls","any","damp",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"UW MEMBRANE PLUS":1.0,"NANOSTUCCO JOINT":0.2,"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["floors","any","smooth",{"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
-    ["floors","any","tiles",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"GLASSTEX 150":1.0,"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["floors","any","tiles",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"GLASSTEX 160":1.0,"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["floors","any","damp",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"UW MEMBRANE PLUS":1.0,"NANOSTUCCO JOINT":0.2,"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["bathrooms","any","smooth",{"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
-    ["bathrooms","any","tiles",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"GLASSTEX 150":1.0,"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["bathrooms","any","tiles",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"GLASSTEX 160":1.0,"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["bathrooms","any","damp",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"UW MEMBRANE PLUS":1.0,"NANOSTUCCO JOINT":0.2,"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["furniture","any","smooth",{"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
-    ["furniture","any","tiles",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"GLASSTEX 150":1.0,"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
+    ["furniture","any","tiles",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"GLASSTEX 160":1.0,"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
     ["furniture","any","damp",{"C PRIMER PLUS":0.15,"D-BASE 60":4.0,"UW MEMBRANE PLUS":1.0,"NANOSTUCCO JOINT":0.2,"MARMOFIN 50 BASE (POWDER)":0.8,"MARMOFIN 50 FINISH (POWDER)":0.3,"MARMOFIN 50 VEINS":0.1,"DECO RESINA":0.05,"DECO PLUS":0.06}],
   ] },
-  "PAINT NATURA": { category: "natural paint", rows: [
+  "PAINT NATURA": { category: "natural paint", colour: "PAINT NATURA (POWDER)", rows: [
     ["walls","any","any",{"RES PRIMER PLUS":0.1,"PAINT NATURA (POWDER)":0.3,"NATURA SEAL":0.1}],
   ] },
-  "CREATIVO NATURA": { category: "pure textured surfaces", rows: [
+  "CREATIVO NATURA": { category: "pure textured surfaces", colour: "CREATIVO NATURA (POWDER)", rows: [
     ["walls","any","any",{"C PRIMER PLUS":0.15,"CREATIVO NATURA (POWDER)":4.0,"NATURA SEAL":0.1}],
   ] },
-  "RESAIC": { category: "liquid mosaic", rows: [
+  "RESAIC": { category: "liquid mosaic", colour: "FLAKES", rows: [
     ["any","any","any",{"EP PRIMER PLUS S":0.15,"EP COLOR S":0.35,"DECO TOP":0.18,"FLAKES":0.05}],
   ] },
-  "EP COLOR PLUS S": { category: "epoxy paint", rows: [
+  "EP COLOR PLUS S": { category: "epoxy paint", colour: "EP COLOR S", rows: [
     ["any","any","any",{"EP PRIMER PLUS S":0.15,"EP COLOR S":0.35}],
   ] },
-  "EP COLOR PLUS W": { category: "epoxy paint", rows: [
+  "EP COLOR PLUS W": { category: "epoxy paint", colour: "EP COLOR W", rows: [
     ["any","any","any",{"EP PRIMER PLUS W":0.15,"EP COLOR W":0.35}],
   ] },
 };
+// colours seen in the ERP stock per product (free text is allowed too)
+const COLOURS = {"ELEMENT:10 (POWDER)":["ALMOND","CREME","FOG","GREY","ICE","IVORY","MOCCA","OLIVE","ROCK","SEPIA","SNOW","STEPPA","VANILLA","WOOD"],"ELEMENT:20 (POWDER)":["BETON","CREME","GREY","ROCK","SNOW","STEPPA"],"EP COLOR W":["GREY RAL 7005"],"FLAKES":["BLACK/GREY","BLACK/WHITE","BLUE","BROWN","GREEN","WHITE","YELLOW"],"INTOTECT RESIN":["CRYSTAL","FOREST","GARNET","GREY","GREY QUARTZ","ROCK","SAND STONE"],"NANOSTUCCO 500 (POWDER)":["BETON","BLOSSOM","BLUEBERRY","CACTUS","CIEL","CLAY","CLOUD","CREME","EARTH","EXTRA SNOW","GREY","LAGO","MARRON","NAVY","NIGHT","OLIVE","PACIFIC","ROCK","SAUMON","SNOW","STEPPA"],"NANOFIN 50 VELVET (POWDER)":["BETON","BLOSSOM","CACTUS","CIEL","CLAY","CLOUD","CREME","DUNE","EARTH","GREY","LAGO","MARRON","NAVY","NIGHT","OLIVE","PACIFIC","ROCK","SNOW","STEPPA","WOOD"],"NANOFIN METAL (POWDER)":["COPPER","GOLD","SILVER"],"NATURA 50 VELVET (POWDER)":["BETON","CACTUS","CREME","PACIFIC","ROCK","SNOW","STEPPA"],"PAINT NATURA (POWDER)":["ALMOND","AMBER","BEIGE","CAMEL","FOG","LINEN","OAT","OAT LIGHT","SAND","SANDY TAUPE 5","SEPIA","SIENNA","SMOKE","TIMBER","WALNUT"],"CREATIVO NATURA (POWDER)":["SNOW"],"TX RASO (POWDER)":["BETON","GREY","SNOW"]};
 
 const TEAM = [
   { name: "Alex", role: "Managing Director", email: "alex@cementplus.gr" },
@@ -889,24 +898,32 @@ function bomSubs(name, el, env) {
 function bomRow(name, el, env, sub) { return bomRows(name).find(r => r[0] === el && bomEnvMatch(r[1], env) && r[2] === sub) || null; }
 function bomDefaultSurface(name) {
   const el = bomElements(name)[0], env = bomEnvs(name, el)[0], subs = bomSubs(name, el, env);
-  return { id: uid(), element: el, env, substrate: subs.includes('smooth') ? 'smooth' : subs[0], area: '' };
+  return { id: uid(), element: el, env, substrate: subs.includes('smooth') ? 'smooth' : subs[0], colour: '', area: '' };
 }
 function bomSummary(sys) {
   return (sys.surfaces || []).filter(s => parseFloat(s.area) > 0).map(s => {
     const bits = [bomShort('el', s.element)];
     if (s.element !== 'any' && s.env !== 'any' && bomEnvs(sys.systemName, s.element).length > 1) bits.push(bomShort('env', s.env));
     if (s.substrate !== 'any') bits.push(bomShort('sub', s.substrate));
-    return `${parseFloat(s.area)} m² ${bits.join(' / ')}`;
+    return `${parseFloat(s.area)} m² ${bits.join(' / ')}${s.colour ? ' · ' + String(s.colour).toUpperCase() : ''}`;
   }).join('; ');
 }
 const catalogKeys = () => { const k = new Set(); Object.entries(PRODUCTS).forEach(([n, d]) => d.packs.forEach(p => k.add(n + '|' + p))); return k; };
 const systemNames = () => Object.keys(SYSTEMS);
 
+// ---- colours: the colour-carrying finish of a system is stocked and produced per colour ("NANOSTUCCO 500 SNOW") ----
+const colourShort = base => base.replace(/ \(POWDER\)$/, '');
+const COLOURABLE = [...new Set(Object.values(SYSTEMS).map(s => s.colour).filter(Boolean))].sort((a, b) => colourShort(b).length - colourShort(a).length);
+const colourName = (base, colour) => colour ? `${colourShort(base)} ${String(colour).trim().toUpperCase()}` : base;
+function productBase(name) { if (PRODUCTS[name]) return name; return COLOURABLE.find(x => name.startsWith(colourShort(x) + ' ')) || name; }
+const productDef = name => PRODUCTS[productBase(name)] || null;
+const colourSlug = base => 'cl-' + base.replace(/[^A-Za-z0-9]+/g, '-');
+
 // ---- smart pack combination: least leftover first, then fewest packs, then the bigger packs ----
 function packMix(name, qty, pref) {
   qty = Math.round(qty * 1e6) / 1e6;
   if (!(qty > 0)) return [];
-  const def = PRODUCTS[name];
+  const def = productDef(name);
   let opts = def ? def.packs.map(p => ({ pkg: p, size: pkgSize(p) })) : [];
   if (pref && pref !== 'smart') { const o = opts.filter(x => x.pkg === pref); opts = o.length ? o : [{ pkg: pref, size: pkgSize(pref) }]; }
   if (!opts.length) return [{ pkg: '', units: Math.ceil(qty - 1e-9), size: 1 }];
@@ -934,13 +951,13 @@ function bomNeeds(sys) {
   const out = {};
   if (!Array.isArray(sys.surfaces)) return out;
   const scale = sys.fullArea > 0 ? sys.area / sys.fullArea : 1;
-  const ro = sys.rateOverrides || {};
+  const ro = sys.rateOverrides || {}, colourBase = (SYSTEMS[sys.systemName] || {}).colour;
   sys.surfaces.forEach(s => {
     const area = (parseFloat(s.area) || 0) * scale;
     if (area <= 0) return;
     const row = bomRow(sys.systemName, s.element, s.env, s.substrate);
     if (!row) return;
-    Object.entries(row[3]).forEach(([p, r]) => { const rate = ro[p] !== undefined ? ro[p] : r; if (rate > 0) out[p] = (out[p] || 0) + rate * area; });
+    Object.entries(row[3]).forEach(([p, r]) => { const rate = ro[p] !== undefined ? ro[p] : r, name = p === colourBase && s.colour ? colourName(p, s.colour) : p; if (rate > 0) out[name] = (out[name] || 0) + rate * area; });
   });
   return out;
 }
@@ -974,7 +991,7 @@ function getAllMaterials(systems) {
     });
   });
   Object.entries(needs).forEach(([name, n]) => {
-    packMix(name, n.qty, prefs[name]).forEach(m => add(name, m.pkg, (PRODUCTS[name] || {}).unit || 'kg', m.units * m.size, m.units, n.sys, false));
+    packMix(name, n.qty, prefs[productBase(name)]).forEach(m => add(name, m.pkg, (productDef(name) || {}).unit || 'kg', m.units * m.size, m.units, n.sys, false));
   });
   return Object.values(mats);
 }
@@ -1255,6 +1272,7 @@ function surfRowHtml(sysName, s) {
       <div class="sf-c-el" ${hideEl ? 'hidden' : ''}><label>Surface</label><select class="sf-el" onchange="sfChange(this)">${sfOpts('el', els, s.element)}</select></div>
       <div class="sf-c-env" ${hideEnv ? 'hidden' : ''}><label>Environment</label><select class="sf-env" onchange="sfChange(this)">${sfOpts('env', envs, s.env)}</select></div>
       <div class="sf-c-sub" ${hideSub ? 'hidden' : ''}><label>Substrate</label><select class="sf-sub" onchange="sfChange(this)">${sfOpts('sub', subs, s.substrate)}</select></div>
+      ${(SYSTEMS[sysName] || {}).colour ? `<div class="sf-c-col"><label>Colour</label><input type="text" class="sf-col" list="${colourSlug(SYSTEMS[sysName].colour)}" value="${escAttr(s.colour || '')}" placeholder="e.g. SNOW" oninput="sfChange(this)"></div>` : ''}
       <div class="sf-c-area"><label>Area (m²)</label><input type="number" class="sf-area" value="${s.area || ''}" min="0" step="any" placeholder="0" oninput="sfChange(this)"></div>
       <button type="button" class="remove-btn" title="Remove this surface" onclick="sfRemove(this)">✕</button>
     </div>
@@ -1265,16 +1283,17 @@ function surfRowHtml(sysName, s) {
 function sfPrevHtml(sysName, s) {
   const row = bomRow(sysName, s.element, s.env, s.substrate);
   if (!row) return '<span class="text-sm text-muted">No data for this combination</span>';
-  return Object.entries(row[3]).map(([p, r]) => `<span class="sf-chip">${escAttr(p.replace(/ \((POWDER|graphite[^)]*)\)/i, ''))} <b>${r}</b> ${(PRODUCTS[p] || {}).unit || ''}/m²</span>`).join('');
+  const cb = (SYSTEMS[sysName] || {}).colour;
+  return Object.entries(row[3]).map(([p, r]) => `<span class="sf-chip">${escAttr((p === cb && s.colour ? colourName(p, s.colour) : p).replace(/ \((POWDER|graphite[^)]*)\)/i, ''))} <b>${r}</b> ${(PRODUCTS[p] || {}).unit || ''}/m²</span>`).join('');
 }
 
 function sfRead(row) {
-  return { id: row.dataset.id || uid(), element: row.querySelector('.sf-el').value, env: row.querySelector('.sf-env').value, substrate: row.querySelector('.sf-sub').value, area: row.querySelector('.sf-area').value };
+  return { id: row.dataset.id || uid(), element: row.querySelector('.sf-el').value, env: row.querySelector('.sf-env').value, substrate: row.querySelector('.sf-sub').value, colour: (row.querySelector('.sf-col')?.value || '').trim().toUpperCase(), area: row.querySelector('.sf-area').value };
 }
 
 function sfChange(el) {
   const row = el.closest('.surf-row'), card = el.closest('.system-card'), name = card.querySelector('.sys-name').value;
-  if (!el.classList.contains('sf-area')) {
+  if (!el.classList.contains('sf-area') && !el.classList.contains('sf-col')) {
     const cur = sfRead(row), isEl = el.classList.contains('sf-el'), isEnv = el.classList.contains('sf-env');
     let envs = bomEnvs(name, cur.element);
     if (isEl) cur.env = envs.includes(cur.env) ? cur.env : envs[0];
@@ -1299,7 +1318,9 @@ function sfTotal(card) {
 
 function sfAdd(btn) {
   const card = btn.closest('.system-card'), name = card.querySelector('.sys-name').value;
-  card.querySelector('.surf-list').insertAdjacentHTML('beforeend', surfRowHtml(name, bomDefaultSurface(name)));
+  const prev = card.querySelector('.surf-row:last-child .sf-col'), ns = bomDefaultSurface(name);
+  if (prev) ns.colour = prev.value.trim().toUpperCase();
+  card.querySelector('.surf-list').insertAdjacentHTML('beforeend', surfRowHtml(name, ns));
 }
 
 function sfRemove(btn) {
@@ -1311,13 +1332,14 @@ function sfRemove(btn) {
 
 function systemCardHtml(sys, docId) {
   const isOffer = Array.isArray(sys.offerItems), isBom = !isOffer && Array.isArray(sys.surfaces);
-  const cat = (SYSTEMS[sys.systemName] || {}).category;
+  const cat = (SYSTEMS[sys.systemName] || {}).category, cb = (SYSTEMS[sys.systemName] || {}).colour;
   const head = `<div class="system-card-header"><strong>${escAttr(sys.systemName)}</strong><div class="flex items-center gap-8">${cat ? `<span class="chip chip-gray" style="font-size:.65rem">${escAttr(cat)}</span>` : ''}<button type="button" class="remove-btn" onclick="this.closest('.system-card').remove();npPreview()">✕ Remove</button></div></div>`;
   const tail = `<input type="hidden" class="sys-name" value="${escAttr(sys.systemName)}"><input type="hidden" class="sys-id" value="${escAttr(sys.id || '')}">`;
   const attrs = `${docId ? `data-doc="${docId}"` : ''} data-docname="${escAttr(sys.offerDoc || '')}"`;
   if (isBom) {
     return `<div class="system-card" data-bom="1" ${attrs}>${head}
       <div class="surf-list">${sys.surfaces.map(s => surfRowHtml(sys.systemName, s)).join('')}</div>
+      ${cb ? `<datalist id="${colourSlug(cb)}">${(COLOURS[cb] || []).map(c => `<option value="${escAttr(c)}">`).join('')}</datalist>` : ''}
       <div class="flex justify-between items-center mt-8"><button type="button" class="btn btn-secondary btn-sm" onclick="sfAdd(this)">+ Add surface</button><strong class="sf-total text-sm"></strong></div>
       <div class="form-row mt-8"><label>Notes</label><input type="text" class="sys-notes" value="${escAttr(sys.notes)}" placeholder="e.g., Main hall floors"></div>
       ${tail}</div>`;
@@ -1502,8 +1524,8 @@ function npPreview() {
   const by = {};
   getAllMaterials(systems).forEach(m => { (by[m.name] = by[m.name] || []).push(m); });
   const order = { primer: 0, prep: 1, finish: 2, sealer: 3 };
-  const rows = Object.keys(by).sort((a, b) => ((order[(PRODUCTS[a] || {}).kind] ?? 9) - (order[(PRODUCTS[b] || {}).kind] ?? 9)) || a.localeCompare(b)).map(n => {
-    const u = (PRODUCTS[n] || {}).unit || '';
+  const rows = Object.keys(by).sort((a, b) => ((order[(productDef(a) || {}).kind] ?? 9) - (order[(productDef(b) || {}).kind] ?? 9)) || a.localeCompare(b)).map(n => {
+    const u = (productDef(n) || {}).unit || '';
     return `<tr><td>${escAttr(n)}</td><td>${needs[n] ? Math.round(needs[n] * 100) / 100 + ' ' + u : '—'}</td><td><strong>${by[n].map(m => `${m.totalUnits} × ${escAttr(m.pkg)}`).join(' + ')}</strong></td></tr>`;
   }).join('');
   box.innerHTML = `<div class="np-preview"><div class="text-sm" style="font-weight:600;margin-bottom:6px">Materials this project needs (preview)</div><div class="overflow-x"><table><thead><tr><th>Material</th><th>Needed</th><th>Packs (least leftover)</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
@@ -1782,12 +1804,12 @@ function phaseGroups(p, editId) {
   });
   Object.keys(needs).forEach(n => {
     const gr = grp(n, n);
-    gr.need = needs[n]; gr.unit = (PRODUCTS[n] || {}).unit || gr.unit;
-    ((PRODUCTS[n] || {}).packs || []).forEach(pk => { gr.rows[pk] = gr.rows[pk] || { pkg: pk, total: 0 }; });
+    gr.need = needs[n]; gr.unit = (productDef(n) || {}).unit || gr.unit;
+    ((productDef(n) || {}).packs || []).forEach(pk => { gr.rows[pk] = gr.rows[pk] || { pkg: pk, total: 0 }; });
   });
   [other, cur].forEach(map => Object.keys(map).forEach(k => {
     const [n, pk] = k.split('|');
-    const gr = groups[n] || groups[n + '#offer'] || (() => { const g2 = grp(n, n); g2.unit = (PRODUCTS[n] || {}).unit || pkgUnitOf(pk); return g2; })();
+    const gr = groups[n] || groups[n + '#offer'] || (() => { const g2 = grp(n, n); g2.unit = (productDef(n) || {}).unit || pkgUnitOf(pk); return g2; })();
     gr.rows[pk || ''] = gr.rows[pk || ''] || { pkg: pk || '', total: 0 };
   }));
   return order.map(id => ({ ...groups[id], rows: Object.values(groups[id].rows).sort((a, b) => pkgSize(b.pkg) - pkgSize(a.pkg)) }));
@@ -2315,8 +2337,9 @@ function deleteNote(idx) {
 // ========== STOCK ==========
 function renderStock() {
   if (reconOpen) renderRecon();
-  const entries = Object.entries(stockData).sort((a, b) => a[0].localeCompare(b[0]));
-  if (entries.length === 0) {
+  const q = ($('stockSearch')?.value || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const entries = Object.entries(stockData).filter(([k]) => q.every(t => k.toLowerCase().includes(t))).sort((a, b) => a[0].localeCompare(b[0]));
+  if (entries.length === 0 && !q.length) {
     $('stockTable').innerHTML = '<div class="empty-state" style="padding:48px"><p>No stock data yet. Update your warehouse inventory to get started.</p><button class="btn btn-primary" onclick="openStockEdit()">Update Stock</button></div>';
     return;
   }
@@ -2329,6 +2352,7 @@ function renderStock() {
     });
   });
 
+  if (entries.length === 0) { $('stockTable').innerHTML = '<div class="empty-state" style="padding:32px"><p>No material matches your search.</p></div>'; return; }
   let rows = entries.map(([key, val]) => {
     const [name, pkg] = key.split('|');
     const dem = demand[key] || 0;
@@ -3302,11 +3326,13 @@ function renderCatalogue() {
     const usedIn = {};
     Object.entries(SYSTEMS).forEach(([n, s]) => new Set(s.rows.flatMap(r => Object.keys(r[3]))).forEach(p => { (usedIn[p] = usedIn[p] || []).push(n); }));
     const rows = Object.entries(PRODUCTS).sort((a, b) => ((KIND_ORDER[a[1].kind] ?? 9) - (KIND_ORDER[b[1].kind] ?? 9)) || a[0].localeCompare(b[0])).map(([n, d]) => {
-      const stock = d.packs.map(pk => { const q = (stockData[n + '|' + pk] || {}).quantity; return q ? `${q} × ${pk}` : ''; }).filter(Boolean).join(' · ');
+      const tot = {};
+      Object.entries(stockData).forEach(([k, v]) => { const [kn, kp] = k.split('|'); if (v.quantity > 0 && productBase(kn) === n) tot[kp] = (tot[kp] || 0) + v.quantity; });
+      const stock = Object.entries(tot).sort((x, y) => pkgSize(y[0]) - pkgSize(x[0])).map(([pk, q]) => `${Math.round(q * 100) / 100} × ${pk}`).join(' · ');
       return `<tr><td><strong>${escAttr(n)}</strong></td><td>${KIND_LABEL[d.kind] || ''}</td><td>${d.unit}</td><td>${d.packs.map(escAttr).join(', ')}</td><td>${stock || '—'}</td><td class="text-sm text-muted">${(usedIn[n] || []).map(escAttr).join(', ')}</td></tr>`;
     }).join('');
     body = `<div class="text-sm text-muted mb-16">${Object.keys(PRODUCTS).length} products. When a project needs a quantity, the app combines these pack sizes with the least leftover (e.g. 23 kg of Nanostucco 500 = 1 × 20kg + 1 × 5kg).</div>
-      <div class="overflow-x"><table><thead><tr><th>Product</th><th>Layer</th><th>Unit</th><th>Pack sizes</th><th>In stock</th><th>Used in</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      <div class="overflow-x"><table><thead><tr><th>Product</th><th>Layer</th><th>Unit</th><th>Pack sizes</th><th>In stock (all colours)</th><th>Used in</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
   $('catalogueContent').innerHTML = tabs + body;
 }
