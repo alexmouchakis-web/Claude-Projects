@@ -179,7 +179,7 @@ tr:hover td{background:var(--surface-alt)}
 .tab-panel.active{display:block}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;opacity:0;pointer-events:none;transition:opacity .2s}
 .modal-overlay.open{opacity:1;pointer-events:auto}
-.modal{background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);width:100%;max-width:640px;max-height:90vh;display:flex;flex-direction:column}
+.modal{background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);width:100%;max-width:1040px;max-height:94vh;display:flex;flex-direction:column}
 .modal-header{padding:20px 24px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between}
 .modal-header h2{font-size:1.1rem}
 .modal-close{background:none;padding:4px;color:var(--ink-3);border-radius:6px}
@@ -3859,15 +3859,11 @@ function poRowsHtml(p, excludeId, phaseId, existing, existingPick) {
   return mats.map(m => {
     const key = m.name + '|' + m.pkg;
     const issuedAll = poIssuedQty(p.id, key, excludeId), a = avail(key);
-    let q = '', pk = '';
-    if (existing == null) {
-      // new order: take what is still needed and split it automatically — pick what the warehouse has, produce the rest
-      const need = phQty ? Math.max(0, (phQty[key] || 0) - poIssuedQty(p.id, key, excludeId, phaseId)) : Math.max(0, m.totalUnits - issuedAll);
-      pk = Math.min(need, a) || ''; q = need - (pk || 0) || '';
-    } else { q = existing[key] != null ? existing[key] : ''; pk = existingPick && existingPick[key] != null ? existingPick[key] : ''; }
+    let q = '';
+    if (existing == null) q = (phQty ? Math.max(0, (phQty[key] || 0) - poIssuedQty(p.id, key, excludeId, phaseId)) : Math.max(0, m.totalUnits - issuedAll)) || '';
+    else q = ((existing[key] || 0) + ((existingPick || {})[key] || 0)) || '';   // an older order may still carry warehouse picks: they are merged into the produce quantity
     return `<tr><td><strong>${escAttr(m.name)}</strong></td><td>${escAttr(m.pkg)}</td><td>${m.totalUnits}</td>${phQty ? `<td>${phQty[key] || 0}</td>` : ''}<td>${issuedAll}</td><td>${a}</td>
-      <td><input type="number" class="po-pick" data-key="${escAttr(key)}" data-avail="${a}" min="0" step="1" value="${pk}" placeholder="0" style="width:72px;font-weight:600" oninput="poQtyChange()"></td>
-      <td><input type="number" class="po-qty" data-key="${escAttr(key)}" data-total="${m.totalUnits}" data-issued="${issuedAll}" min="0" step="1" value="${q}" placeholder="0" style="width:72px;font-weight:600" oninput="poQtyChange()"></td></tr>`;
+      <td><input type="number" class="po-qty" data-key="${escAttr(key)}" data-total="${m.totalUnits}" data-issued="${issuedAll}" min="0" step="1" value="${q}" placeholder="0" style="width:84px;font-weight:600" oninput="poQtyChange()"></td></tr>`;
   }).join('');
 }
 
@@ -3875,7 +3871,7 @@ function poItemsTable(p, excludeId, phaseId, existing, existingPick) {
   const ph = phaseId ? (p.phases || []).find(x => x.id === phaseId) : null;
   const rows = poRowsHtml(p, excludeId, phaseId, existing, existingPick);
   if (!rows) return '<div class="empty-state"><p>This project has no materials yet. Add product systems first.</p></div>';
-  return `<div class="overflow-x"><table><thead><tr><th>Material</th><th>Pack</th><th>Project total</th>${ph ? '<th>This phase</th>' : ''}<th>Already issued</th><th title="In stock minus what other active projects reserved">Available</th><th title="Packs taken from the warehouse — not produced">Pick from warehouse</th><th title="Packs the production unit has to make">Produce</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `<div class="overflow-x"><table><thead><tr><th>Material</th><th>Pack</th><th>Project total</th>${ph ? '<th>This phase</th>' : ''}<th>Already issued</th><th title="In stock minus what other active projects reserved">Available in warehouse</th><th>Produce (packs)</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 function openProdOrder(projectId, phaseId, editId) {
@@ -3900,8 +3896,8 @@ function openProdOrder(projectId, phaseId, editId) {
     </div>
     <div class="form-row"><label>Instructions for the production unit</label><textarea id="poNotes" rows="2" placeholder="e.g., colour code, batch size, packaging">${escAttr(o ? o.notes : '')}</textarea></div>
     <hr style="border:none;border-top:1px solid var(--border-light);margin:12px 0">
-    <div class="flex justify-between items-center mb-8"><h3>What to hand over</h3><button type="button" class="btn btn-secondary btn-sm" onclick="poFillRemaining()">Fill with all remaining</button></div>
-    <div class="form-help mb-8">Packs already in the warehouse are <strong>picked</strong>, only the missing ones are <strong>produced</strong> — the split is calculated for you and can be changed.</div>
+    <div class="flex justify-between items-center mb-8"><h3>What to produce</h3><button type="button" class="btn btn-secondary btn-sm" onclick="poFillRemaining()">Fill with all remaining</button></div>
+    <div class="form-help mb-8">Everything the production unit has to prepare for this order — produced, or taken from the warehouse. "Available" shows what the warehouse holds after other active projects' reservations.</div>
     <div id="poItems">${poItemsTable(p, editId, phId, existing, existingPick)}</div>`,
     `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePO('${editId || ''}')">${o ? 'Save' : 'Issue to production'}</button>`);
 }
@@ -3925,54 +3921,34 @@ function poPhaseChange() {
 }
 
 function poQtyChange() {
-  const sum = key => [...document.querySelectorAll('.po-qty,.po-pick')].filter(i => i.dataset.key === key).reduce((t, i) => t + (parseInt(i.value) || 0), 0);
   document.querySelectorAll('.po-qty').forEach(inp => {
-    const over = sum(inp.dataset.key) + (+inp.dataset.issued || 0) > (+inp.dataset.total || 0);
+    const over = (parseInt(inp.value) || 0) + (+inp.dataset.issued || 0) > (+inp.dataset.total || 0);
     inp.style.borderColor = over ? 'var(--red)' : '';
   });
-  document.querySelectorAll('.po-pick').forEach(inp => { inp.style.borderColor = (parseInt(inp.value) || 0) > (+inp.dataset.avail || 0) ? 'var(--red)' : ''; });
 }
 
 function poFillRemaining() {
-  document.querySelectorAll('.po-qty').forEach(inp => {
-    const need = Math.max(0, (+inp.dataset.total || 0) - (+inp.dataset.issued || 0));
-    const pk = [...document.querySelectorAll('.po-pick')].find(i => i.dataset.key === inp.dataset.key);
-    const take = pk ? Math.min(need, +pk.dataset.avail || 0) : 0;
-    if (pk) pk.value = take || '';
-    inp.value = need - take || '';
-  });
+  document.querySelectorAll('.po-qty').forEach(inp => { inp.value = Math.max(0, (+inp.dataset.total || 0) - (+inp.dataset.issued || 0)) || ''; });
   poQtyChange();
 }
 
 function savePO(editId) {
   const p = projects[$('poProject').value];
   if (!p) return;
-  const items = [], picks = [], warnings = [], sums = {}, totals = {};
-  const prevPicks = editId && productionOrders[editId] ? poPicks(productionOrders[editId]) : [];
+  const items = [], warnings = [];
   document.querySelectorAll('.po-qty').forEach(inp => {
     const q = parseInt(inp.value) || 0;
-    totals[inp.dataset.key] = { total: +inp.dataset.total || 0, issued: +inp.dataset.issued || 0 };
     if (q <= 0) return;
     const [name, pkg] = inp.dataset.key.split('|');
     items.push({ material: inp.dataset.key, name, pkg, ordered: q, produced: 0 });
-    sums[inp.dataset.key] = (sums[inp.dataset.key] || 0) + q;
+    if (q + (+inp.dataset.issued || 0) > (+inp.dataset.total || 0)) warnings.push(`${escAttr(name)}: ${q + (+inp.dataset.issued || 0)} packs issued in total, project needs ${inp.dataset.total}`);
   });
-  document.querySelectorAll('.po-pick').forEach(inp => {
-    const q = parseInt(inp.value) || 0;
-    if (q <= 0) return;
-    const [name, pkg] = inp.dataset.key.split('|');
-    const prev = prevPicks.find(k => k.material === inp.dataset.key);
-    picks.push({ material: inp.dataset.key, name, pkg, qty: q, done: !!(prev && prev.done) });
-    sums[inp.dataset.key] = (sums[inp.dataset.key] || 0) + q;
-    if (q > (+inp.dataset.avail || 0)) warnings.push(`${escAttr(name)} ${escAttr(pkg)}: picking ${q} but only ${inp.dataset.avail} available (stock minus other projects' reservations)`);
-  });
-  if (!items.length && !picks.length) { toast('Enter a quantity for at least one material', 'warn'); return; }
-  Object.entries(sums).forEach(([k, v]) => { const t = totals[k]; if (t && v + t.issued > t.total) warnings.push(`${escAttr(k.split('|')[0])}: ${v + t.issued} packs issued in total, project needs ${t.total}`); });
+  if (!items.length) { toast('Enter a quantity for at least one material', 'warn'); return; }
   if (!editId) {
     const first = ((p.payment || {}).installments || [])[0];
     if (first && !first.paid && ((Number(first.amount) || 0) > 0 || (Number(first.percent) || 0) > 0)) warnings.unshift(`Advance not paid: "${escAttr(first.label)}" (${first.percent ? first.percent + '% · ' : ''}€${first.amount || 0}) is not marked as paid yet.`);
   }
-  const go = () => doSavePO(editId, p, items, picks);
+  const go = () => doSavePO(editId, p, items, []);
   if (warnings.length) showWarning('Check Before Issuing', warnings.join('<br>') + '<br><br>Issue anyway?', go);
   else go();
 }
@@ -3993,7 +3969,7 @@ function doSavePO(editId, p, items, picks) {
     productionOrders[id] = o;
   }
   dbSet('production/' + o.id, o);
-  logActivity(`${editId ? 'edited' : 'issued'} production order ${o.ref} (${items.length} to produce, ${picks.length} to pick) for "${p.name}"`);
+  logActivity(`${editId ? 'edited' : 'issued'} production order ${o.ref} (${items.length} materials) for "${p.name}"`);
   closeModal();
   toast(editId ? 'Production order updated' : `Production order ${o.ref} issued`);
   refreshProductionViews();
@@ -4036,7 +4012,7 @@ function poComplete(id) {
     <div class="overflow-x"><table><thead><tr><th>Material</th><th>Pack</th><th>Ordered</th><th>Produced</th></tr></thead><tbody>${(o.items || []).map((i, k) => `<tr><td>${escAttr(i.name)}</td><td>${escAttr(i.pkg)}</td><td>${i.ordered}</td><td><input type="number" class="po-done" data-i="${k}" min="0" step="1" value="${o.items.some(x => x.produced > 0) ? (i.produced || 0) : i.ordered}" style="width:80px;font-weight:600"></td></tr>`).join('')}</tbody></table></div>
     ${poPicks(o).length ? `<div class="mt-16"><label>Taken from the warehouse</label>${poPicks(o).map((k, n) => `<label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.85rem;margin:4px 0"><input type="checkbox" class="list-check po-pick-done" data-i="${n}" ${k.done ? 'checked' : 'checked'}> ${k.qty} × ${escAttr(k.name)} <span class="text-muted">${escAttr(k.pkg)} — picked and ready</span></label>`).join('')}</div>` : ''}
     <div class="form-row mt-16"><label>Production notes (optional)</label><textarea id="poDoneNotes" rows="2">${escAttr(o.productionNotes || '')}</textarea></div>
-    <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.85rem"><input type="checkbox" id="poAddStock" class="list-check" checked> Add the produced quantities to warehouse stock</label>`,
+    <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.85rem"><input type="checkbox" id="poAddStock" class="list-check"> Also add these quantities to warehouse stock (tick only for packs that were newly produced and are not in stock yet — packs taken from the warehouse are deducted when the delivery is recorded)</label>`,
     `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="doPoComplete('${id}')">Mark completed</button>`);
 }
 
@@ -4103,6 +4079,19 @@ function poView(id) {
     ${(o.log || []).length ? `<div class="mt-16"><label>Production log</label>${(o.log || []).slice().reverse().slice(0, 40).map(e => `<div class="text-sm">${fmtDate(e.at)} ${fmtTime(e.at)} — <strong>${escAttr(e.by)}</strong> ${escAttr(poLogText(e))}</div>`).join('')}</div>` : ''}
     <div class="mt-16"><label>History</label>${(o.history || []).map(h => `<div class="text-sm">${fmtDate(h.at)} — ${escAttr(h.text)} <span class="text-muted">(${escAttr(h.by)})</span></div>`).join('') || '—'}</div>`,
     `<button class="btn btn-secondary" onclick="closeModal()">Close</button><button class="btn btn-primary" onclick="poDownload('${id}')">Download</button>`);
+}
+
+// orders issued while the warehouse picks were a separate list: they are now plain lines under Produce
+function poMergePicks(o) {
+  if (!poIsOpen(o) || !(o.picks || []).length) return false;
+  (o.picks || []).forEach(k => {
+    const it = (o.items || []).find(x => x.material === k.material);
+    if (it) { it.ordered = (Number(it.ordered) || 0) + (Number(k.qty) || 0); if (k.done) it.produced = (Number(it.produced) || 0) + (Number(k.qty) || 0); }
+    else (o.items = o.items || []).push({ material: k.material, name: k.name, pkg: k.pkg, ordered: Number(k.qty) || 0, produced: k.done ? (Number(k.qty) || 0) : 0 });
+  });
+  o.picks = [];
+  poLog(o, 'Warehouse picks merged into the produce list');
+  return true;
 }
 
 function poTogglePick(id, n, checked) {
@@ -5345,7 +5334,7 @@ Projects list: New Project, table with checkboxes; selecting rows shows a bar wi
 New Project: "Attach Offer or Invoice" lets AI read a PDF/photo and fill client, location, deadline, notes, payment terms and the exact material quantities; each attached file has Preview, Edit and delete. Product systems can also be added manually: pick a system, then list its surfaces (surface type, interior/exterior, substrate, m2); the app picks the layers from the Cement Plus BOM for each surface (e.g. no mesh or D-Base 60 on a smooth substrate), adds up the materials and combines packs with the least leftover (shown live as a preview).
 Project tabs: Overview (systems, progress), Phases (a delivery/production stage: choose pack quantities per material for the phase, optional m2 helper, start and target dates, status; "Issue to production" creates a production order), Materials (required packs, in stock, delivered, remaining), Payment Terms (total, terms, installments with Paid/Pending/Overdue, mark paid), Deliveries (record a delivery: deducts stock, delivery note CSV, photos), Files (upload, preview), Production (the project's production orders), Notes.
 Production (left menu, also a tab per project): the procedure for giving work to the production unit. The office issues a production order (project, optional phase, materials and packs to produce, due date, priority, instructions); the production unit starts it (Issued > In production) and opens the big floor view (made for gloves) where they tap the packs produced in real time, set the current stage (Preparing, Mixing, Packing, Quality check, Ready) and add notes; everyone sees the live progress on the Production page and the dashboard. They finish it by confirming produced quantities (optionally added to warehouse stock). Phases are different: they split a project's delivery in stages.
-Production orders split every line into PRODUCE (packs the production unit must make) and PICK from the warehouse (packs already in stock); only produced packs are added to stock on completion and the delivery deducts everything. Issuing an order warns when the first instalment (advance) is not paid. When a project's last open production order is completed, the project gets a Ready for loading status (chip, dashboard alert) until a delivery is recorded or Mark loaded is pressed. Active projects reserve stock: the Materials tab shows In stock, Reserved (other active projects) and Available. Packs for a quantity are chosen as the cheapest mix by the BOM list prices (e.g. 23 kg Nanostucco = 20kg + 5kg). Materials tab > Check offer / invoice compares an ERP document with the BOM calculation and asks the user how to resolve each difference. Stock: quantities and minimum levels per material (Update Stock). Reconcile with ERP (Stock page): upload ERP stock file(s), see differences vs app stock, apply ERP values per material or in bulk. Orders: supplier orders pending > ordered > received (receiving adds to stock); Reorder Planner (Orders page): per material suggested order = remaining demand of active projects + minimum stock - stock - already ordered, with needed-by date (earliest phase target date or project deadline), lead time and order-by date, plus one-click order creation; older AUTO-... orders were created by a removed auto-reorder, now the dashboard shows an alert pointing to the planner. Reminders: assign to team members with date/time. Emails are switched off for now. Data is shared by the whole team in one database.
+A production order lists everything the production unit prepares (produced or taken from the warehouse) under Produce; completing it does not change stock unless the user ticks 'add to warehouse', and the delivery deducts everything. Issuing an order warns when the first instalment (advance) is not paid. When a project's last open production order is completed, the project gets a Ready for loading status (chip, dashboard alert) until a delivery is recorded or Mark loaded is pressed. Active projects reserve stock: the Materials tab shows In stock, Reserved (other active projects) and Available. Packs for a quantity are chosen as the cheapest mix by the BOM list prices (e.g. 23 kg Nanostucco = 20kg + 5kg). Materials tab > Check offer / invoice compares an ERP document with the BOM calculation and asks the user how to resolve each difference. Stock: quantities and minimum levels per material (Update Stock). Reconcile with ERP (Stock page): upload ERP stock file(s), see differences vs app stock, apply ERP values per material or in bulk. Orders: supplier orders pending > ordered > received (receiving adds to stock); Reorder Planner (Orders page): per material suggested order = remaining demand of active projects + minimum stock - stock - already ordered, with needed-by date (earliest phase target date or project deadline), lead time and order-by date, plus one-click order creation; older AUTO-... orders were created by a removed auto-reorder, now the dashboard shows an alert pointing to the planner. Reminders: assign to team members with date/time. Emails are switched off for now. Data is shared by the whole team in one database.
 Catalog: ${systemNames().length} product systems built from the Cement Plus BOM (consumption per m2 depends on surface type x interior/exterior x substrate: friable, friable+damp, existing tiles, rough, smooth) and ${Object.keys(PRODUCTS).length} products with their pack sizes. Systems: ${sysNames}. Rasocol 600 was renamed D-BASE 60.
 Not in the app today (candidates when asked what is missing): unit prices, costs and margins per material or project; supplier database and supplier prices; a customer database (client is free text); issuing offers/invoices from the app; user roles and permissions; calendar sync; returns and credit notes; stock by batch number or warehouse location; multi-currency (EUR only); reports/export to accounting.
 
@@ -5577,7 +5566,7 @@ async function init() {
     });
     // Subscribe to production orders
     db.collection('production').onSnapshot(snap => {
-      snap.docs.forEach(doc => { if (doc.exists && !poTimers[doc.id]) productionOrders[doc.id] = thaw(doc.data()); });
+      snap.docs.forEach(doc => { if (doc.exists && !poTimers[doc.id]) { const o = productionOrders[doc.id] = thaw(doc.data()); if (poMergePicks(o)) dbSet('production/' + o.id, o); } });
       snap.docChanges().forEach(ch => { if (ch.type === 'removed') delete productionOrders[ch.doc.id]; });
       updateProdBadge();
       renderCurrentPage();
