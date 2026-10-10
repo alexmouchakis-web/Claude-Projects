@@ -626,19 +626,19 @@ body.chat-open #chatPanel{transform:none;visibility:visible}
 // ========== PRODUCT & SYSTEM CATALOG (from the Cement Plus BOM + E3/26 price list) ==========
 // PRODUCTS: unit + the pack sizes sold. SYSTEMS: rows [element, environment, substrate, {product: consumption per m²}].
 const PRODUCTS = {
-  "C PRIMER PLUS": { unit: "kg", packs: ["1kg","5kg"], kind: "primer" },
+  "C PRIMER PLUS": { unit: "kg", packs: ["1kg","5kg"], kind: "primer", price: {"1kg":8,"5kg":7.6} },
   "RES PRIMER PLUS": { unit: "lt", packs: ["1lt","4lt"], kind: "primer" },
   "EP PRIMER PLUS": { unit: "kg", packs: ["3.3+1.7kg","10+5kg"], kind: "primer" },
   "EP PRIMER PLUS S": { unit: "kg", packs: ["3.5+1.5kg","7+3kg"], kind: "primer" },
   "EP PRIMER PLUS W": { unit: "kg", packs: ["5+2kg","14kg"], kind: "primer" },
-  "UW MEMBRANE PLUS": { unit: "m²", packs: ["30m²"], kind: "prep" },
-  "GLASSTEX 160": { unit: "m²", packs: ["50m²"], kind: "prep" },
+  "UW MEMBRANE PLUS": { unit: "m²", packs: ["30m²"], kind: "prep", price: {"30m²":8.1} },
+  "GLASSTEX 160": { unit: "m²", packs: ["50m²"], kind: "prep", price: {"50m²":1.7} },
   "GLASSTEX 74": { unit: "m²", packs: ["50m²"], kind: "prep" },
-  "D-BASE 60": { unit: "kg", packs: ["25kg"], kind: "prep" },
+  "D-BASE 60": { unit: "kg", packs: ["25kg"], kind: "prep", price: {"25kg":3.53} },
   "NANOSTUCCO JOINT": { unit: "kg", packs: ["10kg"], kind: "prep" },
-  "NANOSTUCCO 500 (POWDER)": { unit: "kg", packs: ["5kg","10kg","20kg"], kind: "finish" },
-  "NANOFIN 50 VELVET (POWDER)": { unit: "kg", packs: ["5kg","10kg","20kg"], kind: "finish" },
-  "NATURA 50 VELVET (POWDER)": { unit: "kg", packs: ["5kg","10kg","20kg"], kind: "finish" },
+  "NANOSTUCCO 500 (POWDER)": { unit: "kg", packs: ["5kg","10kg","20kg"], kind: "finish", price: {"5kg":23.9,"10kg":20.44,"20kg":18.3} },
+  "NANOFIN 50 VELVET (POWDER)": { unit: "kg", packs: ["5kg","10kg","20kg"], kind: "finish", price: {"10kg":20.22,"20kg":18.2} },
+  "NATURA 50 VELVET (POWDER)": { unit: "kg", packs: ["5kg","10kg","20kg"], kind: "finish", price: {"10kg":24.33,"20kg":21.62} },
   "NANOFIN METAL (POWDER)": { unit: "kg", packs: ["3kg"], kind: "finish" },
   "MARMOFIN 50 BASE (POWDER)": { unit: "kg", packs: ["20kg"], kind: "finish" },
   "MARMOFIN 50 FINISH (POWDER)": { unit: "kg", packs: ["20kg"], kind: "finish" },
@@ -655,11 +655,11 @@ const PRODUCTS = {
   "EP COLOR S": { unit: "kg", packs: ["7.5+2.5kg"], kind: "finish" },
   "EP COLOR W": { unit: "kg", packs: ["4+1kg"], kind: "finish" },
   "FLAKES": { unit: "kg", packs: ["1kg"], kind: "finish" },
-  "COLORFRESH": { unit: "lt", packs: ["1lt","10lt"], kind: "sealer" },
+  "COLORFRESH": { unit: "lt", packs: ["1lt","10lt"], kind: "sealer", price: {"1lt":45.68,"10lt":42} },
   "COLORTEC": { unit: "lt", packs: ["1lt","10lt"], kind: "sealer" },
-  "NATURA SEAL": { unit: "lt", packs: ["1lt","5lt","10lt"], kind: "sealer" },
-  "DECO RESINA": { unit: "kg", packs: ["1kg","5kg"], kind: "sealer" },
-  "DECO PLUS": { unit: "lt", packs: ["1+0.2lt","5+1lt"], kind: "sealer" },
+  "NATURA SEAL": { unit: "lt", packs: ["1lt","5lt","10lt"], kind: "sealer", price: {"1lt":45.3,"5lt":38.5} },
+  "DECO RESINA": { unit: "kg", packs: ["1kg","5kg"], kind: "sealer", price: {"1kg":73.5,"5kg":71} },
+  "DECO PLUS": { unit: "lt", packs: ["1+0.2lt","5+1lt"], kind: "sealer", price: {"1+0.2lt":87.5,"5+1lt":83.25} },
   "DECO FLOOR": { unit: "kg", packs: ["4kg"], kind: "sealer" },
   "DECO TOP": { unit: "kg", packs: ["3.35+0.65kg","12.6+2.4kg"], kind: "sealer" },
   "DECO TOP ECO MATE": { unit: "kg", packs: ["11.7+3.3kg"], kind: "sealer" },
@@ -946,29 +946,34 @@ function productBase(name) { if (PRODUCTS[name]) return name; return COLOURABLE.
 const productDef = name => PRODUCTS[productBase(name)] || null;
 const colourSlug = base => 'cl-' + base.replace(/[^A-Za-z0-9]+/g, '-');
 
-// ---- smart pack combination: least leftover first, then fewest packs, then the bigger packs ----
+// ---- smart pack combination, following the BOM xls: the cheapest mix of packs for the customer (list price per pack size),
+// ties -> fewest packs, then least leftover. Products without a price list use least leftover, then fewest packs. ----
 function packMix(name, qty, pref) {
   qty = Math.round(qty * 1e6) / 1e6;
   if (!(qty > 0)) return [];
   const def = productDef(name);
   let opts = def ? def.packs.map(p => ({ pkg: p, size: pkgSize(p) })) : [];
   if (pref && pref !== 'smart') { const o = opts.filter(x => x.pkg === pref); opts = o.length ? o : [{ pkg: pref, size: pkgSize(pref) }]; }
+  else if (def && def.price) { const o = opts.filter(x => def.price[x.pkg] !== undefined); if (o.length) opts = o; }
   if (!opts.length) return [{ pkg: '', units: Math.ceil(qty - 1e-9), size: 1 }];
+  const priced = !!(def && def.price && opts.every(o => def.price[o.pkg] !== undefined));
   opts.sort((a, b) => b.size - a.size);
   const eps = 1e-9; let best = null;
-  const rec = (i, got, n, cnt) => {
+  const rec = (i, got, n, cost, cnt) => {
     if (i === opts.length) {
       if (got < qty - eps) return;
       const waste = got - qty;
-      if (!best || waste < best.waste - eps || (Math.abs(waste - best.waste) <= eps && n < best.n)) best = { waste, n, cnt: cnt.slice() };
+      const better = !best || (priced && cost < best.cost - 1e-6) || ((!priced || Math.abs(cost - best.cost) <= 1e-6) && (priced ? (n < best.n || (n === best.n && waste < best.waste - eps)) : (waste < best.waste - eps || (Math.abs(waste - best.waste) <= eps && n < best.n))));
+      if (better) best = { waste, n, cost, cnt: cnt.slice() };
       return;
     }
-    const s = opts[i].size, rem = Math.max(0, qty - got);
-    if (i === opts.length - 1) { const c = Math.ceil(rem / s - eps); cnt[i] = Math.max(0, c); rec(i + 1, got + cnt[i] * s, n + cnt[i], cnt); return; }
-    const hi = Math.ceil(rem / s - eps), lo = i === 0 ? Math.max(0, Math.floor(rem / s) - 1) : 0;
-    for (let c = hi; c >= lo; c--) { cnt[i] = c; rec(i + 1, got + c * s, n + c, cnt); }
+    const s = opts[i].size, rem = Math.max(0, qty - got), unitCost = priced ? s * def.price[opts[i].pkg] : 0;
+    if (i === opts.length - 1) { const c = Math.max(0, Math.ceil(rem / s - eps)); cnt[i] = c; rec(i + 1, got + c * s, n + c, cost + c * unitCost, cnt); return; }
+    let hi = Math.ceil(rem / s - eps), lo = i === 0 ? Math.max(0, Math.floor(rem / s) - 1) : 0;
+    if (i > 0) hi = Math.min(hi, Math.ceil(opts[i - 1].size / s));
+    for (let c = hi; c >= lo; c--) { cnt[i] = c; rec(i + 1, got + c * s, n + c, cost + c * unitCost, cnt); }
   };
-  rec(0, 0, 0, []);
+  rec(0, 0, 0, 0, []);
   return opts.map((o, i) => ({ pkg: o.pkg, size: o.size, units: best.cnt[i] || 0 })).filter(x => x.units > 0);
 }
 const packMixText = mix => mix.map(m => `${m.units} × ${m.pkg}`).join(' + ');
@@ -1031,7 +1036,7 @@ function getEffectiveProducts(sys) {
 }
 
 function getAllMaterials(systems) {
-  const mats = {}, needs = {}, prefs = {};
+  const mats = {}, needs = {}, prefs = {}, fixed = {};
   const add = (name, pkg, unit, qty, units, sysIdx, fromOffer) => {
     const key = name + '|' + pkg;
     if (!mats[key]) mats[key] = { name, pkg, unit, totalQty: 0, totalUnits: 0, sysIndices: [], fromOffer: !!fromOffer };
@@ -1043,6 +1048,8 @@ function getAllMaterials(systems) {
     if (Array.isArray(sys.surfaces)) {
       Object.entries(bomNeeds(sys)).forEach(([p, q]) => { const n = needs[p] || (needs[p] = { qty: 0, sys: [] }); n.qty += q; if (!n.sys.includes(sysIdx)) n.sys.push(sysIdx); });
       Object.entries(sys.packPref || {}).forEach(([p, v]) => { prefs[p] = v; });
+      const fscale = sys.fullArea > 0 ? sys.area / sys.fullArea : 1;
+      Object.entries(sys.packFixed || {}).forEach(([p, packs]) => { if (!fixed[p]) fixed[p] = { packs, scale: fscale }; });
       (sys.extraProducts || []).forEach(ep => { const c = calcUnits(ep.consumption, sys.area, ep.pkg); add(ep.name, ep.pkg, ep.unit, c.units * c.size, c.units, sysIdx, false); });
       return;
     }
@@ -1054,6 +1061,7 @@ function getAllMaterials(systems) {
     });
   });
   Object.entries(needs).forEach(([name, n]) => {
+    if (fixed[name]) { fixed[name].packs.forEach(x => { const u = Math.ceil(x.units * fixed[name].scale - 1e-9); if (u > 0) add(name, x.pkg, (productDef(name) || {}).unit || 'kg', u * pkgSize(x.pkg), u, n.sys, false); }); return; }
     packMix(name, n.qty, prefs[productBase(name)]).forEach(m => add(name, m.pkg, (productDef(name) || {}).unit || 'kg', m.units * m.size, m.units, n.sys, false));
   });
   return Object.values(mats);
@@ -1253,6 +1261,7 @@ function generateAlerts() {
     const days = daysDiff(o.expectedDate, now);
     if (days < 0) alerts.push({ level: 'red', message: `Order "${o.ref || o.id}" is ${Math.abs(days)} days overdue`, go: "navigate('orders')" });
   });
+  Object.values(projects).filter(p => p.loading && p.loading.ready && p.status !== 'archived').forEach(p => alerts.push({ level: 'blue', message: `📦 Ready for loading: "${p.name}" (${p.loading.ref || 'production completed'})`, go: proj(p.id) }));
   Object.values(productionOrders).filter(poIsOpen).forEach(o => {
     if (poOverdue(o)) alerts.push({ level: 'red', message: `Production order ${o.ref} (${o.projectName}) is overdue`, go: "navigate('production')" });
     else if (o.status === 'issued' && o.issuedAt && daysDiff(now, o.issuedAt) >= 2) alerts.push({ level: 'amber', message: `Production order ${o.ref} has been waiting ${daysDiff(now, o.issuedAt)} days to start`, go: "navigate('production')" });
@@ -1292,7 +1301,7 @@ function renderProjects() {
     <table><thead><tr><th style="width:36px"><input type="checkbox" class="list-check" onchange="toggleAll('chk-proj',this);updateToggleLabel('chk-proj','togProj')"></th><th>Project</th><th>Client</th><th>Location</th><th>Status</th><th>Systems</th><th>Deadline</th></tr></thead><tbody>${pArr.map(p => `<tr class="clickable" onclick="navigate('project-detail','${p.id}')">
     <td onclick="event.stopPropagation()"><input type="checkbox" class="list-check chk-proj" value="${p.id}" onchange="updateBatchBar('chk-proj','batchProj');updateToggleLabel('chk-proj','togProj')"></td>
     <td><strong>${p.name}</strong></td><td>${p.client || '—'}</td><td>${p.location || '—'}</td>
-    <td><span class="chip ${statusChip(p.status)}">${p.status}</span></td>
+    <td><span class="chip ${statusChip(p.status)}">${p.status}</span>${p.loading && p.loading.ready ? ' <span class="chip chip-green">Ready for loading</span>' : ''}</td>
     <td>${(p.systems || []).length}</td><td>${fmtDate(p.deadline)}</td>
   </tr>`).join('')}</tbody></table>`;
 }
@@ -1633,7 +1642,10 @@ function doSaveProject(editId, name, systems) {
     if (currentProject === id) renderProjectDetail();
     else navigate('projects');
   } catch (e) { console.error(e); }
-  if (docs.length) uploadOfferDocs(id, docs);
+  const chk = docs.find(d => d.checkLines);
+  if (chk) setTimeout(() => runOfferCheck(id, chk.checkLines, chk.file, chk.docType, chk.docNumber), 400);
+  else if (docs.length) uploadOfferDocs(id, docs);
+  if (chk && docs.length > 1) uploadOfferDocs(id, docs.filter(d => d !== chk));
 }
 
 async function uploadOfferDocs(projectId, docs) {
@@ -1687,7 +1699,7 @@ function renderProjectDetail() {
   const statusColors = { planning: 'chip-blue', active: 'chip-green', completed: 'chip-gray', archived: 'chip-gray' };
   $('projDetailStatus').className = 'chip ' + (statusColors[p.status] || 'chip-gray');
   $('projDetailStatus').textContent = p.status;
-  $('projDetailMeta').innerHTML = `${p.client ? p.client + ' • ' : ''}${p.location || ''} ${p.deadline ? ' • Deadline: ' + fmtDate(p.deadline) : ''}`;
+  $('projDetailMeta').innerHTML = `${p.client ? p.client + ' • ' : ''}${p.location || ''} ${p.deadline ? ' • Deadline: ' + fmtDate(p.deadline) : ''}${p.loading && p.loading.ready ? ` • <span class="chip chip-green">Ready for loading</span> <button class="btn btn-secondary btn-sm" style="padding:2px 8px" onclick="markLoaded('${p.id}')">Mark loaded</button>` : ''}`;
   renderOverview(p);
   renderPhases(p);
   renderMaterials(p);
@@ -1733,7 +1745,7 @@ function renderOverview(p) {
 function phaseProgress(p, ph) {
   const planned = phaseQtyMap(p, ph);
   const inProd = {}, produced = {}, delivered = {};
-  Object.values(productionOrders).filter(o => o.projectId === p.id && o.phaseId === ph.id && o.status !== 'cancelled').forEach(o => (o.items || []).forEach(i => {
+  Object.values(productionOrders).filter(o => o.projectId === p.id && o.phaseId === ph.id && o.status !== 'cancelled').forEach(o => poAllLines(o).forEach(i => {
     if (o.status === 'completed') produced[i.material] = (produced[i.material] || 0) + (Number(i.produced) || 0);
     else {
       produced[i.material] = (produced[i.material] || 0) + (Number(i.produced) || 0);
@@ -2103,21 +2115,23 @@ function renderMaterials(p) {
     return;
   }
   const projDels = Object.values(deliveries).filter(d => d.projectId === p.id);
+  const reservedOthers = reservedForOthers(p.id);
   let rows = mats.map(m => {
     const sKey = m.name + '|' + m.pkg;
     const stock = (stockData[sKey] || {}).quantity || 0;
+    const reserved = reservedOthers[sKey] || 0, avail = Math.max(0, stock - reserved);
     const delivered = projDels.reduce((s, d) => s + (d.items || []).filter(i => i.material === sKey).reduce((ss, i) => ss + (i.quantity || 0), 0), 0);
     const remaining = m.totalUnits - delivered;
-    const diff = stock - remaining;
+    const diff = avail - remaining;
     const statusCls = remaining <= 0 ? 'chip-green' : diff >= 0 ? 'chip-blue' : 'chip-red';
-    const statusText = remaining <= 0 ? 'Fully delivered' : diff >= 0 ? 'Stock OK' : 'Need ' + Math.abs(diff);
+    const statusText = remaining <= 0 ? 'Fully delivered' : diff >= 0 ? 'Stock OK' : 'To produce / buy ' + Math.abs(diff);
     const editIdx = m.sysIndices[0];
-    return `<tr><td><div class="flex items-center gap-8"><button class="catalog-edit-btn" onclick="openEditProjectMaterials(${editIdx})" title="Edit this material"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button><strong>${m.name}</strong>${m.fromOffer ? `<button class="remove-btn" title="Delete material" onclick="deleteOfferMaterial('${encodeURIComponent(sKey).replace(/'/g, '%27')}')">✕</button>` : ''}</div></td><td>${m.pkg}</td><td>${m.totalQty} ${m.unit}</td><td>${m.totalUnits}</td><td>${stock}</td><td>${delivered}</td><td>${Math.max(0, remaining)}</td><td><span class="chip ${statusCls}">${statusText}</span></td></tr>`;
+    return `<tr><td><div class="flex items-center gap-8"><button class="catalog-edit-btn" onclick="openEditProjectMaterials(${editIdx})" title="Edit this material"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button><strong>${m.name}</strong>${m.fromOffer ? `<button class="remove-btn" title="Delete material" onclick="deleteOfferMaterial('${encodeURIComponent(sKey).replace(/'/g, '%27')}')">✕</button>` : ''}</div></td><td>${m.pkg}</td><td>${m.totalQty} ${m.unit}</td><td>${m.totalUnits}</td><td>${stock}</td><td>${reserved || '—'}</td><td><strong>${avail}</strong></td><td>${delivered}</td><td>${Math.max(0, remaining)}</td><td><span class="chip ${statusCls}">${statusText}</span></td></tr>`;
   }).join('');
   $('tab-materials').innerHTML = `
     <div class="flex justify-between items-center mb-16"><h3>Material Requirements</h3>
-      <button class="btn btn-secondary btn-sm" onclick="navigate('orders');openPlanner()">Open Reorder Planner</button></div>
-    <div class="overflow-x"><table><thead><tr><th>Material</th><th>Pkg</th><th>Total Qty</th><th>Packs Needed</th><th>In Stock</th><th>Delivered</th><th>Remaining</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      <div class="flex gap-8">${sampleAI && (p.systems || []).some(s => Array.isArray(s.surfaces)) ? `<button class="btn btn-secondary btn-sm" onclick="document.getElementById('ocFile').click()">Check offer / invoice…</button><input type="file" id="ocFile" accept=".pdf,image/jpeg,image/png,image/webp" hidden onchange="checkOfferFile(this)">` : ''}<button class="btn btn-secondary btn-sm" onclick="navigate('orders');openPlanner()">Open Reorder Planner</button></div></div>
+    <div class="overflow-x"><table><thead><tr><th>Material</th><th>Pkg</th><th>Total Qty</th><th>Packs Needed</th><th>In Stock</th><th title="Reserved by other active projects">Reserved (others)</th><th title="In stock minus reserved by other active projects">Available</th><th>Delivered</th><th>Remaining</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 
@@ -2239,6 +2253,7 @@ async function doSaveDelivery(items) {
     stockData[sKey].quantity = Math.max(0, (stockData[sKey].quantity || 0) - item.quantity);
   });
   if (db) db.doc('stock/materials').set(stockData);
+  clearLoading(currentProject);
   logActivity(`recorded delivery ${del.ref} for "${projects[currentProject]?.name}" (${items.length} items)`);
   closeModal();
   toast('Delivery recorded and stock updated');
@@ -2408,12 +2423,7 @@ function renderStock() {
   }
   // Calculate total demand across active projects
   const demand = {};
-  Object.values(projects).filter(p => p.status === 'active').forEach(p => {
-    getAllMaterials(p.systems || []).forEach(m => {
-      const key = m.name + '|' + m.pkg;
-      demand[key] = (demand[key] || 0) + m.totalUnits;
-    });
-  });
+  Object.values(projects).filter(p => p.status === 'active').forEach(p => Object.entries(remainingDemandOf(p)).forEach(([k, v]) => { demand[k] = (demand[k] || 0) + v; }));
 
   if (entries.length === 0) { $('stockTable').innerHTML = '<div class="empty-state" style="padding:32px"><p>No material matches your search.</p></div>'; return; }
   let rows = entries.map(([key, val]) => {
@@ -2422,7 +2432,7 @@ function renderStock() {
     const cls = val.quantity <= 0 ? 'out' : val.quantity <= (val.minStock || 0) ? 'low' : 'ok';
     return `<tr><td><span class="stock-indicator ${cls}"></span></td><td><strong>${name}</strong></td><td>${pkg}</td><td>${val.quantity}</td><td>${val.minStock || 0}</td><td>${dem}</td><td>${val.quantity - dem}</td></tr>`;
   }).join('');
-  $('stockTable').innerHTML = `<table><thead><tr><th></th><th>Material</th><th>Pkg</th><th>In Stock</th><th>Min Stock</th><th>Total Demand</th><th>Surplus/Deficit</th></tr></thead><tbody>${rows}</tbody></table>`;
+  $('stockTable').innerHTML = `<table><thead><tr><th></th><th>Material</th><th>Pkg</th><th>In Stock</th><th>Min Stock</th><th title="Still to deliver for active projects">Reserved</th><th>Surplus/Deficit</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function openStockEdit() {
@@ -3526,11 +3536,62 @@ function dbSet(path, obj) {
 const poIsOpen = o => o.status === 'issued' || o.status === 'in_production';
 const poOverdue = o => poIsOpen(o) && o.dueDate && o.dueDate < today();
 const poPacks = o => (o.items || []).reduce((s, i) => s + (Number(i.ordered) || 0), 0);
+// a production order has two kinds of lines: items to PRODUCE and picks from the WAREHOUSE (already in stock)
+const poPicks = o => o.picks || [];
+const poAllLines = o => (o.items || []).map(i => ({ material: i.material, ordered: Number(i.ordered) || 0, produced: Number(i.produced) || 0 }))
+  .concat(poPicks(o).map(k => ({ material: k.material, ordered: Number(k.qty) || 0, produced: (k.done || o.status === 'completed') ? (Number(k.qty) || 0) : 0 })));
+
+// ---- stock reservation: active projects reserve what they still need (not yet delivered) ----
+function projectDeliveredMap(pid) {
+  const d = {};
+  Object.values(deliveries).filter(x => x.projectId === pid).forEach(x => (x.items || []).forEach(i => { d[i.material] = (d[i.material] || 0) + (Number(i.quantity) || 0); }));
+  return d;
+}
+function remainingDemandOf(p) {
+  const del = projectDeliveredMap(p.id), out = {};
+  getAllMaterials(p.systems || []).forEach(m => { const k = m.name + '|' + m.pkg, r = Math.max(0, m.totalUnits - (del[k] || 0)); if (r) out[k] = (out[k] || 0) + r; });
+  return out;
+}
+function reservedForOthers(excludePid) {
+  const out = {};
+  Object.values(projects).filter(x => x.status === 'active' && x.id !== excludePid).forEach(x => Object.entries(remainingDemandOf(x)).forEach(([k, v]) => { out[k] = (out[k] || 0) + v; }));
+  return out;
+}
+// returns key -> packs this project can still take from the warehouse (stock minus what other active projects reserved)
+function availableFor(pid) {
+  const res = reservedForOthers(pid);
+  return key => Math.max(0, ((stockData[key] || {}).quantity || 0) - (res[key] || 0));
+}
+
+// ---- ready for loading ----
+function markReadyForLoading(o) {
+  const p = projects[o.projectId];
+  if (!p) return;
+  if (Object.values(productionOrders).some(x => x.projectId === p.id && x.id !== o.id && poIsOpen(x))) return;
+  p.loading = { ready: true, at: new Date().toISOString(), by: currentUser, ref: o.ref };
+  p.updatedAt = new Date().toISOString();
+  saveProjectDoc(p);
+  logActivity(`"${p.name}" is ready for loading (${o.ref} completed)`);
+}
+function clearLoading(pid) {
+  const p = projects[pid];
+  if (!p || !p.loading) return;
+  delete p.loading;
+  p.updatedAt = new Date().toISOString();
+  saveProjectDoc(p);
+}
+function markLoaded(pid) {
+  clearLoading(pid);
+  const p = projects[pid];
+  if (p) logActivity(`"${p.name}" was loaded`);
+  toast('Marked as loaded');
+  renderProjectDetail();
+}
 
 function poIssuedQty(projectId, key, excludeId, phaseId) {
   return Object.values(productionOrders)
     .filter(o => o.projectId === projectId && o.status !== 'cancelled' && o.id !== excludeId && (phaseId === undefined || (o.phaseId || '') === phaseId))
-    .reduce((s, o) => s + (o.items || []).filter(i => i.material === key).reduce((x, i) => x + (Number(i.ordered) || 0), 0), 0);
+    .reduce((s, o) => s + poAllLines(o).filter(i => i.material === key).reduce((x, i) => x + i.ordered, 0), 0);
 }
 
 function poLog(o, text) {
@@ -3557,7 +3618,8 @@ function poCardHtml(o, showProject) {
         ${poOverdue(o) ? '<span class="chip chip-red">Overdue</span>' : ''}</div>
       <div class="text-sm text-muted">${o.dueDate ? 'Due ' + fmtDate(o.dueDate) : 'No due date'}</div>
     </div>
-    <div class="text-sm mt-8">${items || '—'}</div>
+    <div class="text-sm mt-8">${items ? '<strong>Produce:</strong> ' + items : (poPicks(o).length ? '' : '—')}</div>
+    ${poPicks(o).length ? `<div class="text-sm mt-8"><strong>Pick from warehouse:</strong> ${poPicks(o).map(k => `${escAttr(k.name)} (${escAttr(k.pkg)}) × ${k.qty}${k.done || o.status === 'completed' ? ' ✓' : ''}`).join(' · ')}</div>` : ''}
     ${live}
     ${o.notes ? `<div class="text-sm text-muted mt-8">Instructions: ${escAttr(o.notes)}</div>` : ''}
     <div class="flex justify-between items-center mt-8" style="flex-wrap:wrap;gap:8px">
@@ -3710,7 +3772,8 @@ function renderFloor() {
       <div class="floor-label">Current stage</div>
       <div class="floor-stages">${PO_STAGES.map(([c, l]) => `<button class="floor-btn stage ${stage === c ? 'on' : ''}" onclick="floorStage('${c}')">${l}</button>`).join('')}</div>` : ''}
     <div class="floor-label">${running ? 'Produced so far' : 'To produce'}</div>
-    ${items}
+    ${items || '<div class="text-sm text-muted" style="padding:8px 0">Nothing to produce on this order — only warehouse picks.</div>'}
+    ${poPicks(o).length ? `<div class="floor-label">Taken from the warehouse (not produced)</div><div class="floor-log">${poPicks(o).map(k => `<div class="floor-log-row"><strong>${k.qty} ×</strong> ${escAttr(k.name)} <span class="text-muted">${escAttr(k.pkg)}</span>${k.done ? ' ✓ picked' : ''}</div>`).join('')}</div>` : ''}
     ${running ? `<div class="floor-label">Note for the team</div>
       <textarea id="floorNote" class="floor-input" rows="2" placeholder="e.g., colour batch changed, waiting for bags…" oninput="floorNoteDraft=this.value">${escAttr(floorNoteDraft)}</textarea>
       <button class="floor-btn alt" style="margin-top:8px" onclick="floorAddNote()">Add note</button>` : ''}
@@ -3788,25 +3851,31 @@ function floorFinish() {
 }
 
 // ---- issue / edit ----
-function poRowsHtml(p, excludeId, phaseId, existing) {
+function poRowsHtml(p, excludeId, phaseId, existing, existingPick) {
   const mats = getAllMaterials(p.systems || []);
   const ph = phaseId ? (p.phases || []).find(x => x.id === phaseId) : null;
   const phQty = ph ? phaseQtyMap(p, ph) : null;
+  const avail = availableFor(p.id);
   return mats.map(m => {
     const key = m.name + '|' + m.pkg;
-    const issuedAll = poIssuedQty(p.id, key, excludeId);
-    let q = existing && existing[key] != null ? existing[key] : '';
-    if (existing == null && phQty) q = Math.max(0, (phQty[key] || 0) - poIssuedQty(p.id, key, excludeId, phaseId)) || '';
-    return `<tr><td><strong>${escAttr(m.name)}</strong></td><td>${escAttr(m.pkg)}</td><td>${m.totalUnits}</td>${phQty ? `<td>${phQty[key] || 0}</td>` : ''}<td>${issuedAll}</td>
-      <td><input type="number" class="po-qty" data-key="${escAttr(key)}" data-total="${m.totalUnits}" data-issued="${issuedAll}" min="0" step="1" value="${q}" placeholder="0" style="width:80px;font-weight:600" oninput="poQtyChange()"></td></tr>`;
+    const issuedAll = poIssuedQty(p.id, key, excludeId), a = avail(key);
+    let q = '', pk = '';
+    if (existing == null) {
+      // new order: take what is still needed and split it automatically — pick what the warehouse has, produce the rest
+      const need = phQty ? Math.max(0, (phQty[key] || 0) - poIssuedQty(p.id, key, excludeId, phaseId)) : Math.max(0, m.totalUnits - issuedAll);
+      pk = Math.min(need, a) || ''; q = need - (pk || 0) || '';
+    } else { q = existing[key] != null ? existing[key] : ''; pk = existingPick && existingPick[key] != null ? existingPick[key] : ''; }
+    return `<tr><td><strong>${escAttr(m.name)}</strong></td><td>${escAttr(m.pkg)}</td><td>${m.totalUnits}</td>${phQty ? `<td>${phQty[key] || 0}</td>` : ''}<td>${issuedAll}</td><td>${a}</td>
+      <td><input type="number" class="po-pick" data-key="${escAttr(key)}" data-avail="${a}" min="0" step="1" value="${pk}" placeholder="0" style="width:72px;font-weight:600" oninput="poQtyChange()"></td>
+      <td><input type="number" class="po-qty" data-key="${escAttr(key)}" data-total="${m.totalUnits}" data-issued="${issuedAll}" min="0" step="1" value="${q}" placeholder="0" style="width:72px;font-weight:600" oninput="poQtyChange()"></td></tr>`;
   }).join('');
 }
 
-function poItemsTable(p, excludeId, phaseId, existing) {
+function poItemsTable(p, excludeId, phaseId, existing, existingPick) {
   const ph = phaseId ? (p.phases || []).find(x => x.id === phaseId) : null;
-  const rows = poRowsHtml(p, excludeId, phaseId, existing);
+  const rows = poRowsHtml(p, excludeId, phaseId, existing, existingPick);
   if (!rows) return '<div class="empty-state"><p>This project has no materials yet. Add product systems first.</p></div>';
-  return `<div class="overflow-x"><table><thead><tr><th>Material</th><th>Pack</th><th>Project total</th>${ph ? '<th>This phase</th>' : ''}<th>Already issued</th><th>Produce now (packs)</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `<div class="overflow-x"><table><thead><tr><th>Material</th><th>Pack</th><th>Project total</th>${ph ? '<th>This phase</th>' : ''}<th>Already issued</th><th title="In stock minus what other active projects reserved">Available</th><th title="Packs taken from the warehouse — not produced">Pick from warehouse</th><th title="Packs the production unit has to make">Produce</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 function openProdOrder(projectId, phaseId, editId) {
@@ -3818,6 +3887,7 @@ function openProdOrder(projectId, phaseId, editId) {
   const startPid = pid || projArr[0].id;
   const p = projects[startPid];
   const existing = o ? Object.fromEntries((o.items || []).map(i => [i.material, i.ordered])) : null;
+  const existingPick = o ? Object.fromEntries(poPicks(o).map(k => [k.material, k.qty])) : null;
   const phId = o ? (o.phaseId || '') : (phaseId || '');
   openModal(o ? 'Edit Production Order ' + o.ref : 'New Production Order', `
     <div class="form-grid">
@@ -3825,13 +3895,14 @@ function openProdOrder(projectId, phaseId, editId) {
       <div class="form-row"><label>Phase (optional)</label><select id="poPhase" onchange="poPhaseChange()"><option value="">Whole project / no phase</option>${(p.phases || []).map(ph => `<option value="${ph.id}" ${ph.id === phId ? 'selected' : ''}>${escAttr(ph.name)}${ph.targetDate ? ' — ' + fmtDate(ph.targetDate) : ''}</option>`).join('')}</select></div>
     </div>
     <div class="form-grid">
-      <div class="form-row"><label>Due date</label><input type="date" id="poDue" value="${o ? o.dueDate || '' : ((p.phases || []).find(x => x.id === phId)?.targetDate || '')}"></div>
+      <div class="form-row"><label>Due date</label><input type="date" id="poDue" value="${o ? o.dueDate || '' : ((p.phases || []).find(x => x.id === phId)?.targetDate || p.deadline || '')}"></div>
       <div class="form-row"><label>Priority</label><select id="poPriority"><option value="normal" ${o && o.priority === 'normal' || !o ? 'selected' : ''}>Normal</option><option value="urgent" ${o && o.priority === 'urgent' ? 'selected' : ''}>Urgent</option></select></div>
     </div>
     <div class="form-row"><label>Instructions for the production unit</label><textarea id="poNotes" rows="2" placeholder="e.g., colour code, batch size, packaging">${escAttr(o ? o.notes : '')}</textarea></div>
     <hr style="border:none;border-top:1px solid var(--border-light);margin:12px 0">
-    <div class="flex justify-between items-center mb-8"><h3>What to produce</h3><button type="button" class="btn btn-secondary btn-sm" onclick="poFillRemaining()">Fill with all remaining</button></div>
-    <div id="poItems">${poItemsTable(p, editId, phId, existing)}</div>`,
+    <div class="flex justify-between items-center mb-8"><h3>What to hand over</h3><button type="button" class="btn btn-secondary btn-sm" onclick="poFillRemaining()">Fill with all remaining</button></div>
+    <div class="form-help mb-8">Packs already in the warehouse are <strong>picked</strong>, only the missing ones are <strong>produced</strong> — the split is calculated for you and can be changed.</div>
+    <div id="poItems">${poItemsTable(p, editId, phId, existing, existingPick)}</div>`,
     `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePO('${editId || ''}')">${o ? 'Save' : 'Issue to production'}</button>`);
 }
 
@@ -3841,7 +3912,8 @@ function poProjectChange() {
   const p = projects[$('poProject').value];
   $('poPhase').innerHTML = `<option value="">Whole project / no phase</option>` + (p.phases || []).map(ph => `<option value="${ph.id}">${escAttr(ph.name)}${ph.targetDate ? ' — ' + fmtDate(ph.targetDate) : ''}</option>`).join('');
   $('poDue').value = '';
-  $('poItems').innerHTML = poItemsTable(p, poEditId, '', null);
+  $('poDue').value = p.deadline || '';
+  $('poItems').innerHTML = poItemsTable(p, poEditId, '', null, null);
 }
 
 function poPhaseChange() {
@@ -3849,42 +3921,66 @@ function poPhaseChange() {
   const phId = $('poPhase').value;
   const ph = (p.phases || []).find(x => x.id === phId);
   if (ph && ph.targetDate) $('poDue').value = ph.targetDate;
-  $('poItems').innerHTML = poItemsTable(p, poEditId, phId, null);
+  $('poItems').innerHTML = poItemsTable(p, poEditId, phId, null, null);
 }
 
 function poQtyChange() {
+  const sum = key => [...document.querySelectorAll('.po-qty,.po-pick')].filter(i => i.dataset.key === key).reduce((t, i) => t + (parseInt(i.value) || 0), 0);
   document.querySelectorAll('.po-qty').forEach(inp => {
-    const over = (parseInt(inp.value) || 0) + (+inp.dataset.issued || 0) > (+inp.dataset.total || 0);
+    const over = sum(inp.dataset.key) + (+inp.dataset.issued || 0) > (+inp.dataset.total || 0);
     inp.style.borderColor = over ? 'var(--red)' : '';
   });
+  document.querySelectorAll('.po-pick').forEach(inp => { inp.style.borderColor = (parseInt(inp.value) || 0) > (+inp.dataset.avail || 0) ? 'var(--red)' : ''; });
 }
 
 function poFillRemaining() {
-  document.querySelectorAll('.po-qty').forEach(inp => { inp.value = Math.max(0, (+inp.dataset.total || 0) - (+inp.dataset.issued || 0)) || ''; });
+  document.querySelectorAll('.po-qty').forEach(inp => {
+    const need = Math.max(0, (+inp.dataset.total || 0) - (+inp.dataset.issued || 0));
+    const pk = [...document.querySelectorAll('.po-pick')].find(i => i.dataset.key === inp.dataset.key);
+    const take = pk ? Math.min(need, +pk.dataset.avail || 0) : 0;
+    if (pk) pk.value = take || '';
+    inp.value = need - take || '';
+  });
   poQtyChange();
 }
 
 function savePO(editId) {
   const p = projects[$('poProject').value];
   if (!p) return;
-  const items = [], warnings = [];
+  const items = [], picks = [], warnings = [], sums = {}, totals = {};
+  const prevPicks = editId && productionOrders[editId] ? poPicks(productionOrders[editId]) : [];
   document.querySelectorAll('.po-qty').forEach(inp => {
     const q = parseInt(inp.value) || 0;
+    totals[inp.dataset.key] = { total: +inp.dataset.total || 0, issued: +inp.dataset.issued || 0 };
     if (q <= 0) return;
     const [name, pkg] = inp.dataset.key.split('|');
     items.push({ material: inp.dataset.key, name, pkg, ordered: q, produced: 0 });
-    if (q + (+inp.dataset.issued || 0) > (+inp.dataset.total || 0)) warnings.push(`${escAttr(name)}: ${q + (+inp.dataset.issued || 0)} packs issued in total, project needs ${inp.dataset.total}`);
+    sums[inp.dataset.key] = (sums[inp.dataset.key] || 0) + q;
   });
-  if (!items.length) { toast('Enter a quantity for at least one material', 'warn'); return; }
-  const go = () => doSavePO(editId, p, items);
-  if (warnings.length) showWarning('More Than The Project Needs', warnings.join('<br>') + '<br><br>Issue anyway?', go);
+  document.querySelectorAll('.po-pick').forEach(inp => {
+    const q = parseInt(inp.value) || 0;
+    if (q <= 0) return;
+    const [name, pkg] = inp.dataset.key.split('|');
+    const prev = prevPicks.find(k => k.material === inp.dataset.key);
+    picks.push({ material: inp.dataset.key, name, pkg, qty: q, done: !!(prev && prev.done) });
+    sums[inp.dataset.key] = (sums[inp.dataset.key] || 0) + q;
+    if (q > (+inp.dataset.avail || 0)) warnings.push(`${escAttr(name)} ${escAttr(pkg)}: picking ${q} but only ${inp.dataset.avail} available (stock minus other projects' reservations)`);
+  });
+  if (!items.length && !picks.length) { toast('Enter a quantity for at least one material', 'warn'); return; }
+  Object.entries(sums).forEach(([k, v]) => { const t = totals[k]; if (t && v + t.issued > t.total) warnings.push(`${escAttr(k.split('|')[0])}: ${v + t.issued} packs issued in total, project needs ${t.total}`); });
+  if (!editId) {
+    const first = ((p.payment || {}).installments || [])[0];
+    if (first && !first.paid && ((Number(first.amount) || 0) > 0 || (Number(first.percent) || 0) > 0)) warnings.unshift(`Advance not paid: "${escAttr(first.label)}" (${first.percent ? first.percent + '% · ' : ''}€${first.amount || 0}) is not marked as paid yet.`);
+  }
+  const go = () => doSavePO(editId, p, items, picks);
+  if (warnings.length) showWarning('Check Before Issuing', warnings.join('<br>') + '<br><br>Issue anyway?', go);
   else go();
 }
 
-function doSavePO(editId, p, items) {
+function doSavePO(editId, p, items, picks) {
   const phId = $('poPhase').value;
   const ph = (p.phases || []).find(x => x.id === phId);
-  const base = { projectId: p.id, projectName: p.name, phaseId: phId, phaseName: ph ? ph.name : '', dueDate: $('poDue').value || '', priority: $('poPriority').value, notes: $('poNotes').value.trim(), items };
+  const base = { projectId: p.id, projectName: p.name, phaseId: phId, phaseName: ph ? ph.name : '', dueDate: $('poDue').value || '', priority: $('poPriority').value, notes: $('poNotes').value.trim(), items, picks };
   let o;
   if (editId) {
     o = productionOrders[editId];
@@ -3897,7 +3993,7 @@ function doSavePO(editId, p, items) {
     productionOrders[id] = o;
   }
   dbSet('production/' + o.id, o);
-  logActivity(`${editId ? 'edited' : 'issued'} production order ${o.ref} (${items.length} materials) for "${p.name}"`);
+  logActivity(`${editId ? 'edited' : 'issued'} production order ${o.ref} (${items.length} to produce, ${picks.length} to pick) for "${p.name}"`);
   closeModal();
   toast(editId ? 'Production order updated' : `Production order ${o.ref} issued`);
   refreshProductionViews();
@@ -3938,6 +4034,7 @@ function poComplete(id) {
   openModal('Complete ' + o.ref, `
     <div class="form-help mb-8">Check what was actually produced. It is pre-filled with the quantities tracked so far (or the ordered quantity if none were tracked).</div>
     <div class="overflow-x"><table><thead><tr><th>Material</th><th>Pack</th><th>Ordered</th><th>Produced</th></tr></thead><tbody>${(o.items || []).map((i, k) => `<tr><td>${escAttr(i.name)}</td><td>${escAttr(i.pkg)}</td><td>${i.ordered}</td><td><input type="number" class="po-done" data-i="${k}" min="0" step="1" value="${o.items.some(x => x.produced > 0) ? (i.produced || 0) : i.ordered}" style="width:80px;font-weight:600"></td></tr>`).join('')}</tbody></table></div>
+    ${poPicks(o).length ? `<div class="mt-16"><label>Taken from the warehouse</label>${poPicks(o).map((k, n) => `<label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.85rem;margin:4px 0"><input type="checkbox" class="list-check po-pick-done" data-i="${n}" ${k.done ? 'checked' : 'checked'}> ${k.qty} × ${escAttr(k.name)} <span class="text-muted">${escAttr(k.pkg)} — picked and ready</span></label>`).join('')}</div>` : ''}
     <div class="form-row mt-16"><label>Production notes (optional)</label><textarea id="poDoneNotes" rows="2">${escAttr(o.productionNotes || '')}</textarea></div>
     <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.85rem"><input type="checkbox" id="poAddStock" class="list-check" checked> Add the produced quantities to warehouse stock</label>`,
     `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="doPoComplete('${id}')">Mark completed</button>`);
@@ -3947,6 +4044,7 @@ function doPoComplete(id) {
   const o = productionOrders[id];
   if (!o) return;
   document.querySelectorAll('.po-done').forEach(inp => { o.items[+inp.dataset.i].produced = Math.max(0, parseInt(inp.value) || 0); });
+  document.querySelectorAll('.po-pick-done').forEach(inp => { if (o.picks && o.picks[+inp.dataset.i]) o.picks[+inp.dataset.i].done = inp.checked; });
   o.productionNotes = $('poDoneNotes').value.trim();
   flushPO(id);
   o.completedAt = new Date().toISOString(); o.completedBy = currentUser;
@@ -3966,6 +4064,8 @@ function doPoComplete(id) {
   if (floorId === id) closeFloor();
   toast(`${o.ref} completed${addStock ? ' — stock updated' : ''}`);
   poSetStatus(o, 'completed', 'Production completed' + (addStock ? ', quantities added to stock' : ''));
+  markReadyForLoading(o);
+  if (projects[o.projectId] && projects[o.projectId].loading) toast(`"${projects[o.projectId].name}" is ready for loading`);
 }
 
 function poCancel(id) {
@@ -3996,6 +4096,7 @@ function poView(id) {
     <div class="form-grid mb-16"><div><label>Project</label><p>${escAttr(o.projectName)}</p></div><div><label>Phase</label><p>${escAttr(o.phaseName || '—')}</p></div></div>
     <div class="form-grid mb-16"><div><label>Status</label><p><span class="chip ${cls}">${label}</span> ${o.priority === 'urgent' ? '<span class="chip chip-red">Urgent</span>' : ''}</p></div><div><label>Due</label><p>${o.dueDate ? fmtDate(o.dueDate) : '—'}</p></div></div>
     <table><thead><tr><th>Material</th><th>Pack</th><th>Ordered</th><th>Produced</th></tr></thead><tbody>${(o.items || []).map(i => `<tr><td>${escAttr(i.name)}</td><td>${escAttr(i.pkg)}</td><td>${i.ordered}</td><td>${['in_production', 'completed'].includes(o.status) ? `<strong>${Number(i.produced) || 0}</strong>${Number(i.produced) >= Number(i.ordered) ? ' ✓' : ''}` : '—'}</td></tr>`).join('')}</tbody></table>
+    ${poPicks(o).length ? `<div class="mt-16"><label>Pick from warehouse</label><table><thead><tr><th>Material</th><th>Pack</th><th>Qty</th><th>Picked</th></tr></thead><tbody>${poPicks(o).map((k, n) => `<tr><td>${escAttr(k.name)}</td><td>${escAttr(k.pkg)}</td><td><strong>${k.qty}</strong></td><td>${o.status === 'cancelled' ? '—' : `<input type="checkbox" class="list-check" ${k.done || o.status === 'completed' ? 'checked' : ''} ${o.status === 'completed' ? 'disabled' : ''} onchange="poTogglePick('${o.id}', ${n}, this.checked)">`}</td></tr>`).join('')}</tbody></table></div>` : ''}
     ${o.notes ? `<div class="mt-16"><label>Instructions</label><p>${escAttr(o.notes)}</p></div>` : ''}
     ${o.productionNotes ? `<div class="mt-16"><label>Production notes</label><p>${escAttr(o.productionNotes)}</p></div>` : ''}
     ${o.status === 'in_production' ? `<div class="mt-16"><label>Stage</label><p>${poStageLabel(o.stage)} — ${poProducedTotal(o)} / ${poPacks(o)} packs so far</p></div>` : ''}
@@ -4004,11 +4105,22 @@ function poView(id) {
     `<button class="btn btn-secondary" onclick="closeModal()">Close</button><button class="btn btn-primary" onclick="poDownload('${id}')">Download</button>`);
 }
 
+function poTogglePick(id, n, checked) {
+  const o = productionOrders[id];
+  if (!o || !o.picks || !o.picks[n]) return;
+  o.picks[n].done = !!checked;
+  poStamp(o);
+  poAddLog(o, { type: 'note', at: o.updatedAt, by: currentUser, text: (checked ? '✓ picked ' : '↩ un-picked ') + o.picks[n].qty + ' × ' + o.picks[n].name + ' (' + o.picks[n].pkg + ')' });
+  poPersist(o, true);
+  refreshProductionViews();
+}
+
 async function poDownload(id) {
   const o = productionOrders[id];
   if (!o) return;
   const rows = [['CEMENT PLUS - PRODUCTION ORDER'], ['Reference', o.ref], ['Project', o.projectName], ['Phase', o.phaseName || ''], ['Due date', o.dueDate || ''], ['Priority', o.priority], ['Status', PO_STATUS[o.status][1]], ['Instructions', o.notes || ''], [], ['Material', 'Pack', 'Ordered (packs)', 'Produced (packs)']]
-    .concat((o.items || []).map(i => [i.name, i.pkg, i.ordered, ['in_production', 'completed'].includes(o.status) ? (Number(i.produced) || 0) : '']));
+    .concat((o.items || []).map(i => [i.name, i.pkg, i.ordered, ['in_production', 'completed'].includes(o.status) ? (Number(i.produced) || 0) : '']))
+    .concat(poPicks(o).length ? [[], ['PICK FROM WAREHOUSE', 'Pack', 'Qty', 'Picked']].concat(poPicks(o).map(k => [k.name, k.pkg, k.qty, (k.done || o.status === 'completed') ? 'yes' : ''])) : []);
   await saveCsv(`${o.ref}.csv`, rows);
 }
 
@@ -4223,17 +4335,12 @@ async function extractPdfText(file) {
 // ========== NEW PROJECT OFFER/INVOICE SCAN ==========
 let npAttachedDocs = [];
 
-async function scanNewProjectFile() {
-  const file = $('npAttachFile')?.files?.[0];
-  if (!file) return;
-  if (!sampleAI) { toast('AI scanning not available', 'error'); return; }
-  $('npAttachZone').hidden = true;
-  $('npScanProgress').hidden = false;
-  $('npScanText').textContent = 'Preparing document...';
+// reads an offer / invoice (PDF or photo) with the AI and returns the extracted JSON, or null after showing the reason
+async function readDocumentAI(file, setText) {
   try {
     let images = [];
     if (file.type === 'application/pdf') {
-      $('npScanText').textContent = 'Rendering PDF pages...';
+      setText('Rendering PDF pages...');
       images = await renderPdfToImages(file);
     } else {
       images = [file];
@@ -4273,29 +4380,42 @@ Return ONLY one JSON object:
 }
 Rules for materials: colours are essential — copy the colour of every line (CREME, CLAY, SNOW, COPPER, BETON …) into the name; only the product RASOCOL 600 is written D-BASE 60 now. Only physical products (no labour, transport, discounts, VAT). "quantity" is the number of packs as ordered. If the quantity column is in kg/lt/m² (e.g. 60 kg of a 20kg product) convert it to number of packs (3). Keep EVERY product line; group lines under one system if the document does, otherwise use a single system. Installments: derive from the payment terms (e.g. "100% advance" -> one installment 100%; "50% advance, 50% on delivery" -> two); percent and amount may be 0 if unknown.`;
 
-    $('npScanText').textContent = 'Reading document carefully with AI...';
+    setText('Reading document carefully with AI...');
     const opts = { modelTier: 'complex', cache: false };
     let result;
     if (canSendImages && images.length > 0) {
       result = await sampleAI.json(prompt, { ...opts, images: images.slice(0, limits.images.maxCount || 5) });
     } else if (file.type === 'application/pdf') {
-      $('npScanText').textContent = 'Extracting text...';
+      setText('Extracting text...');
       const text = await extractPdfText(file);
-      if (!text) { toast('Cannot read this PDF', 'error'); resetNpScan(); return; }
+      if (!text) { toast('Cannot read this PDF', 'error'); return null; }
       result = await sampleAI.json(prompt + '\n\nDocument text:\n' + text.slice(0, 30000), opts);
     } else {
-      toast('Image support not available — try a PDF instead', 'error'); resetNpScan(); return;
+      toast('Image support not available — try a PDF instead', 'error'); return null;
     }
-    if (!result || typeof result !== 'object' || Array.isArray(result)) { toast('Could not extract data from document', 'warn'); resetNpScan(); return; }
-    applyScannedData(result, file);
+    if (!result || typeof result !== 'object' || Array.isArray(result)) { toast('Could not extract data from document', 'warn'); return null; }
+    return result;
   } catch (e) {
     const msg = e.code === 'not_granted' ? 'AI scanning permission denied' :
                 e.code === 'rate_limited' ? 'Rate limited — try again in a moment' :
                 e.code === 'image_rejected' ? 'Image could not be processed — try a different file' :
                 e.code === 'invalid_json' ? 'Could not parse document — try a clearer scan' :
                 'Scan failed: ' + (e.message || 'unknown error');
-    toast(msg, 'error'); resetNpScan();
+    toast(msg, 'error');
+    return null;
   }
+}
+
+async function scanNewProjectFile() {
+  const file = $('npAttachFile')?.files?.[0];
+  if (!file) return;
+  if (!sampleAI) { toast('AI scanning not available', 'error'); return; }
+  $('npAttachZone').hidden = true;
+  $('npScanProgress').hidden = false;
+  $('npScanText').textContent = 'Preparing document...';
+  const result = await readDocumentAI(file, t => { if ($('npScanText')) $('npScanText').textContent = t; });
+  if (!result) { resetNpScan(); return; }
+  try { applyScannedData(result, file); } catch (e) { toast('Could not use the scanned data: ' + (e.message || 'error'), 'error'); resetNpScan(); }
 }
 
 function resetNpScan() {
@@ -4332,6 +4452,15 @@ function applyScannedData(data, file) {
   const docId = uid();
   let matCount = 0;
   const unknownLines = [];
+  const hasBomCards = !!document.querySelector('#systemsList .system-card[data-bom="1"]');
+  if (hasBomCards) {
+    // the project is calculated from surfaces: the document is checked against that calculation after saving
+    const lines = offerLinesFromData(data);
+    npAttachedDocs.push({ id: docId, fileName: file.name, file, docType, matCount: lines.length, payFound, checkLines: lines, docNumber: data.documentNumber || '' });
+    renderAttachedFiles(); resetNpScan();
+    toast(`Document read — ${lines.length} lines will be checked against the calculation when you save${payFound ? '; payment terms filled in' : ''}`);
+    return;
+  }
   (Array.isArray(data.systems) ? data.systems : []).forEach((sys, n) => {
     const key = systemNames().find(k => k.toLowerCase() === String(sys.systemName || '').trim().toLowerCase());
     const materials = (Array.isArray(sys.materials) ? sys.materials : []).map(m => {
@@ -4360,7 +4489,7 @@ function renderAttachedFiles() {
       <div class="af-icon">${/\.pdf$/i.test(d.fileName) ? 'PDF' : 'IMG'}</div>
       <div class="af-info">
         <div class="af-name">${escAttr(d.fileName)}</div>
-        <div class="af-status">${d.docType === 'invoice' ? 'Invoice' : 'Offer'} — ${d.matCount} materials${d.payFound ? ' • payment terms' : ''}</div>
+        <div class="af-status">${d.docType === 'invoice' ? 'Invoice' : 'Offer'} — ${d.matCount} materials${d.payFound ? ' • payment terms' : ''}${d.checkLines ? ' • will be checked against the calculation' : ''}</div>
       </div>
       <button type="button" class="btn btn-secondary btn-sm" onclick="previewAttachedDoc('${d.id}')">Preview</button>
       <button type="button" class="btn btn-secondary btn-sm" onclick="editAttachedDoc('${d.id}')">Edit</button>
@@ -4375,7 +4504,7 @@ function previewAttachedDoc(docId) {
 
 function editAttachedDoc(docId) {
   const card = document.querySelector(`#systemsList .system-card[data-doc="${docId}"]`);
-  if (!card) { toast('Nothing to edit — the document produced no systems', 'warn'); return; }
+  if (!card) { toast(npAttachedDocs.find(x => x.id === docId)?.checkLines ? 'This document is compared with the surface calculation when you save — nothing to edit here' : 'Nothing to edit — the document produced no systems', 'warn'); return; }
   card.scrollIntoView({ behavior: 'smooth', block: 'center' });
   card.classList.add('flash');
   setTimeout(() => card.classList.remove('flash'), 1600);
@@ -4387,6 +4516,152 @@ function deleteAttachedDoc(docId) {
   cards.forEach(c => c.remove());
   renderAttachedFiles();
   toast('Document and its materials removed');
+}
+
+// ========== OFFER / INVOICE CHECK: the ERP document is compared with the app's BOM calculation ==========
+let ocState = null;
+const ocUnitSize = pkg => /(kg|lt|m²)$/.test(pkg || '') ? pkgSize(pkg) : 1;
+const ocText = (packs, unit) => packs.map(x => `${x.units} × ${x.pkg || 'unit'}`).join(' + ') + (packs.some(x => /(kg|lt|m²)$/.test(x.pkg || '')) ? ` (${Math.round(packs.reduce((t, x) => t + x.units * ocUnitSize(x.pkg), 0) * 100) / 100} ${unit || ''})` : '');
+
+function offerLinesFromData(data) {
+  const out = {};
+  (Array.isArray(data.systems) ? data.systems : []).forEach(sys => (Array.isArray(sys.materials) ? sys.materials : []).forEach(m => {
+    const c = canonOfferLine(m.name, m.pkg), q = parseFloat(m.quantity) || 0;
+    if (!c.name || q <= 0) return;
+    const k = c.name + '|' + c.pkg;
+    out[k] = out[k] || { name: c.name, pkg: c.pkg, quantity: 0, unit: String(m.unit || 'kg') };
+    out[k].quantity += q;
+  }));
+  return Object.values(out);
+}
+
+// products that can stand in for a BOM product (the ERP sells a variant under another name)
+const OFFER_SUBSTITUTES = { 'COLORFRESH': ['COLORFRESH INTENSIV'], 'COLORTEC': ['COLORTEC MAX'] };
+
+function compareOfferWithCalc(p, lines) {
+  const bom = (p.systems || []).filter(s => Array.isArray(s.surfaces));
+  if (!bom.length) return null;
+  const needs = {};
+  bom.forEach(s => Object.entries(bomNeeds(s)).forEach(([k, v]) => { needs[k] = (needs[k] || 0) + v; }));
+  const app = {};
+  getAllMaterials(bom).forEach(m => { const a = app[m.name] || (app[m.name] = { name: m.name, packs: [], qty: 0, need: needs[m.name], unit: m.unit }); a.packs.push({ pkg: m.pkg, units: m.totalUnits }); a.qty += m.totalQty; });
+  const off = {};
+  lines.forEach(l => { const o = off[l.name] || (off[l.name] = { name: l.name, packs: [], qty: 0, unit: (productDef(l.name) || {}).unit || l.unit }); o.packs.push({ pkg: l.pkg, units: l.quantity }); o.qty += l.quantity * ocUnitSize(l.pkg); });
+  const findings = [], used = new Set();
+  let matched = 0;
+  Object.values(app).forEach(a => {
+    const o = off[a.name];
+    if (o) {
+      used.add(a.name);
+      const need = a.need !== undefined ? a.need : a.qty, tol = Math.min(...a.packs.map(x => ocUnitSize(x.pkg)));
+      if (o.qty < need - 1e-6) findings.push({ kind: 'short', name: a.name, app: a, offer: o, note: `offer ${Math.round((need - o.qty) * 100) / 100} ${a.unit} below the BOM need (${Math.round(need * 100) / 100} ${a.unit})` });
+      else if (o.qty > a.qty + tol + 1e-6) findings.push({ kind: 'over', name: a.name, app: a, offer: o, note: `offer ${Math.round((o.qty - a.qty) * 100) / 100} ${a.unit} above the calculated packs` });
+      else matched++;
+    } else {
+      const cand = Object.values(off).find(o2 => !used.has(o2.name) && !app[o2.name] && productBase(o2.name) === productBase(a.name));
+      const sub = Object.values(off).find(o2 => !used.has(o2.name) && !app[o2.name] && (OFFER_SUBSTITUTES[productBase(a.name)] || []).includes(o2.name));
+      if (cand) { used.add(cand.name); findings.push({ kind: 'colour', name: a.name, app: a, offer: cand, note: `colour differs: app ${a.name}, offer ${cand.name}` }); }
+      else if (sub) { used.add(sub.name); findings.push({ kind: 'variant', name: a.name, app: a, offer: sub, note: `the offer uses ${sub.name} instead of ${a.name}` }); }
+      else findings.push({ kind: 'missing', name: a.name, app: a, offer: null, note: 'calculated by the BOM but not on the offer' });
+    }
+  });
+  Object.values(off).forEach(o => {
+    if (used.has(o.name) || app[o.name]) return;
+    const known = !!productDef(o.name) || o.packs.some(x => (o.name + '|' + x.pkg) in stockData);
+    findings.push({ kind: known ? 'extra' : 'unknown', name: o.name, app: null, offer: o, note: known ? 'on the offer but not part of the BOM calculation' : 'not found in the catalogue or stock list — check the spelling' });
+  });
+  return { findings, matched, total: Object.keys(app).length };
+}
+
+const OC_KINDS = {
+  short: ['Offer too low', 'chip-red', [['keep', 'Keep the app calculation'], ['offer', 'Use the offer quantity']]],
+  over: ['Offer higher', 'chip-amber', [['keep', 'Keep the app calculation'], ['offer', 'Use the offer quantity']]],
+  colour: ['Colour differs', 'chip-red', [['keep', 'Keep the app colour'], ['offer', 'Use the offer colour']]],
+  missing: ['Not on offer', 'chip-amber', [['keep', 'Keep in project'], ['remove', 'Remove from project']]],
+  variant: ['Other variant', 'chip-amber', [['keep', 'Keep the BOM product'], ['offer', 'Use the offer product instead']]],
+  extra: ['Only on offer', 'chip-blue', [['skip', 'Ignore'], ['add', 'Add to project as extra material']]],
+  unknown: ['Unknown product', 'chip-red', [['skip', 'Ignore'], ['add', 'Add to project as extra material']]]
+};
+
+async function checkOfferFile(inp) {
+  const file = inp.files && inp.files[0];
+  inp.value = '';
+  const p = projects[currentProject];
+  if (!file || !p) return;
+  if (!sampleAI) { toast('AI reading is not available', 'error'); return; }
+  toast('Reading the document… this takes a few seconds');
+  const data = await readDocumentAI(file, () => {});
+  if (!data) return;
+  runOfferCheck(p.id, offerLinesFromData(data), file, String(data.documentType || '').toLowerCase() === 'invoice' ? 'invoice' : 'offer', data.documentNumber);
+}
+
+function runOfferCheck(projectId, lines, file, docType, docNumber) {
+  const p = projects[projectId];
+  if (!p) return;
+  const cmp = compareOfferWithCalc(p, lines);
+  if (!cmp) { toast('This project has no BOM calculation to compare with — add a system with surfaces first', 'warn'); return; }
+  ocState = { projectId, file, docType, docNumber: docNumber || '', findings: cmp.findings, matched: cmp.matched };
+  if (!cmp.findings.length) { finishOfferCheck([]); toast(`${docType === 'invoice' ? 'Invoice' : 'Offer'} matches the calculation — all ${cmp.matched} products agree ✓`); return; }
+  const rows = cmp.findings.map((f, i) => {
+    const [label, cls, acts] = OC_KINDS[f.kind];
+    return `<tr><td><strong>${escAttr(f.name)}</strong>${f.offer && f.offer.name !== f.name ? `<div class="text-sm text-muted">offer: ${escAttr(f.offer.name)}</div>` : ''}</td>
+      <td>${f.app ? escAttr(ocText(f.app.packs, f.app.unit)) : '—'}</td><td>${f.offer ? escAttr(ocText(f.offer.packs, f.offer.unit)) : '—'}</td>
+      <td><span class="chip ${cls}">${label}</span><div class="text-sm text-muted">${escAttr(f.note)}</div></td>
+      <td><select class="oc-act" data-i="${i}">${acts.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select></td></tr>`;
+  }).join('');
+  openModal('Check offer against the calculation', `
+    <div class="form-help mb-8"><strong>${cmp.matched}</strong> of ${cmp.total} calculated products agree with the ${docType === 'invoice' ? 'invoice' : 'offer'}${docNumber ? ' ' + escAttr(docNumber) : ''}. <strong>${cmp.findings.length}</strong> need your decision. Nothing changes until you press Apply.</div>
+    <div class="overflow-x"><table><thead><tr><th>Product</th><th>App calculation</th><th>${docType === 'invoice' ? 'Invoice' : 'Offer'}</th><th>Difference</th><th>What to do</th></tr></thead><tbody>${rows}</tbody></table></div>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="applyOfferCheck()">Apply</button>`);
+}
+
+function applyOfferCheck() {
+  const st = ocState;
+  if (!st) return;
+  const p = projects[st.projectId];
+  if (!p) return;
+  const decisions = [];
+  document.querySelectorAll('.oc-act').forEach(sel => {
+    const f = st.findings[+sel.dataset.i], act = sel.value;
+    decisions.push({ product: f.name, issue: f.kind, action: act });
+    const bom = (p.systems || []).filter(s => Array.isArray(s.surfaces));
+    const uses = name => bom.filter(s => (bomNeeds(s)[name] || 0) > 0);
+    if (act === 'offer' && (f.kind === 'short' || f.kind === 'over')) {
+      const sys = uses(f.name).sort((a, b) => bomNeeds(b)[f.name] - bomNeeds(a)[f.name])[0];
+      if (sys) { sys.packFixed = { ...(sys.packFixed || {}), [f.name]: f.offer.packs.map(x => ({ pkg: x.pkg, units: Math.round(x.units) })) }; }
+    } else if (act === 'remove') {
+      uses(f.name).forEach(s => { s.rateOverrides = { ...(s.rateOverrides || {}), [productBase(f.name)]: 0 }; });
+    } else if (act === 'offer' && f.kind === 'colour') {
+      const base = productBase(f.name), newColour = f.offer.name.slice(colourShort(base).length).trim(), oldColour = f.name.slice(colourShort(base).length).trim();
+      bom.filter(s => (SYSTEMS[s.systemName] || {}).colour === base).forEach(s => s.surfaces.forEach(x => { if (String(x.colour || '').toUpperCase() === oldColour.toUpperCase()) x.colour = newColour; }));
+      bom.forEach(s => { s.application = bomSummary(s); });
+    } else if (act === 'offer' && f.kind === 'variant') {
+      uses(f.name).forEach(s => { s.rateOverrides = { ...(s.rateOverrides || {}), [productBase(f.name)]: 0 }; });
+      let ex = (p.systems || []).find(s => s.systemName === 'Offer extras' && Array.isArray(s.offerItems));
+      if (!ex) { ex = { id: uid(), systemName: 'Offer extras', application: 'Imported materials', area: 1, areaKnown: false, notes: 'Added from the offer check', offerItems: [] }; (p.systems = p.systems || []).push(ex); }
+      f.offer.packs.forEach(x => ex.offerItems.push({ name: f.offer.name, pkg: x.pkg, quantity: Math.round(x.units), unit: /(kg|lt|m²)$/.test(x.pkg) ? pkgUnitOf(x.pkg) : 'pcs' }));
+    } else if (act === 'add') {
+      let ex = (p.systems || []).find(s => s.systemName === 'Offer extras' && Array.isArray(s.offerItems));
+      if (!ex) { ex = { id: uid(), systemName: 'Offer extras', application: 'Imported materials', area: 1, areaKnown: false, notes: 'Added from the offer check', offerItems: [] }; (p.systems = p.systems || []).push(ex); }
+      f.offer.packs.forEach(x => ex.offerItems.push({ name: f.offer.name, pkg: x.pkg, quantity: Math.round(x.units), unit: /(kg|lt|m²)$/.test(x.pkg) ? pkgUnitOf(x.pkg) : 'pcs' }));
+    }
+  });
+  finishOfferCheck(decisions);
+  closeModal();
+  toast('Offer check applied');
+}
+
+function finishOfferCheck(decisions) {
+  const st = ocState;
+  if (!st) return;
+  const p = projects[st.projectId];
+  p.offerChecks = (p.offerChecks || []).concat([{ at: new Date().toISOString(), by: currentUser, doc: st.file ? st.file.name : '', type: st.docType, number: st.docNumber, differences: st.findings.length, decisions }]);
+  p.updatedAt = new Date().toISOString();
+  saveProjectDoc(p);
+  logActivity(`checked ${st.docType} ${st.docNumber || (st.file ? st.file.name : '')} against the calculation for "${p.name}" (${st.findings.length} differences)`);
+  if (st.file && assets && !(p.files || []).some(f => f.name === st.file.name)) uploadOfferDocs(p.id, [{ file: st.file, fileName: st.file.name, docType: st.docType }]);
+  ocState = null;
+  if (currentProject === p.id) renderProjectDetail();
 }
 
 // ========== DOCUMENT PREVIEW ==========
@@ -5070,7 +5345,7 @@ Projects list: New Project, table with checkboxes; selecting rows shows a bar wi
 New Project: "Attach Offer or Invoice" lets AI read a PDF/photo and fill client, location, deadline, notes, payment terms and the exact material quantities; each attached file has Preview, Edit and delete. Product systems can also be added manually: pick a system, then list its surfaces (surface type, interior/exterior, substrate, m2); the app picks the layers from the Cement Plus BOM for each surface (e.g. no mesh or D-Base 60 on a smooth substrate), adds up the materials and combines packs with the least leftover (shown live as a preview).
 Project tabs: Overview (systems, progress), Phases (a delivery/production stage: choose pack quantities per material for the phase, optional m2 helper, start and target dates, status; "Issue to production" creates a production order), Materials (required packs, in stock, delivered, remaining), Payment Terms (total, terms, installments with Paid/Pending/Overdue, mark paid), Deliveries (record a delivery: deducts stock, delivery note CSV, photos), Files (upload, preview), Production (the project's production orders), Notes.
 Production (left menu, also a tab per project): the procedure for giving work to the production unit. The office issues a production order (project, optional phase, materials and packs to produce, due date, priority, instructions); the production unit starts it (Issued > In production) and opens the big floor view (made for gloves) where they tap the packs produced in real time, set the current stage (Preparing, Mixing, Packing, Quality check, Ready) and add notes; everyone sees the live progress on the Production page and the dashboard. They finish it by confirming produced quantities (optionally added to warehouse stock). Phases are different: they split a project's delivery in stages.
-Stock: quantities and minimum levels per material (Update Stock). Reconcile with ERP (Stock page): upload ERP stock file(s), see differences vs app stock, apply ERP values per material or in bulk. Orders: supplier orders pending > ordered > received (receiving adds to stock); Reorder Planner (Orders page): per material suggested order = remaining demand of active projects + minimum stock - stock - already ordered, with needed-by date (earliest phase target date or project deadline), lead time and order-by date, plus one-click order creation; older AUTO-... orders were created by a removed auto-reorder, now the dashboard shows an alert pointing to the planner. Reminders: assign to team members with date/time. Emails are switched off for now. Data is shared by the whole team in one database.
+Production orders split every line into PRODUCE (packs the production unit must make) and PICK from the warehouse (packs already in stock); only produced packs are added to stock on completion and the delivery deducts everything. Issuing an order warns when the first instalment (advance) is not paid. When a project's last open production order is completed, the project gets a Ready for loading status (chip, dashboard alert) until a delivery is recorded or Mark loaded is pressed. Active projects reserve stock: the Materials tab shows In stock, Reserved (other active projects) and Available. Packs for a quantity are chosen as the cheapest mix by the BOM list prices (e.g. 23 kg Nanostucco = 20kg + 5kg). Materials tab > Check offer / invoice compares an ERP document with the BOM calculation and asks the user how to resolve each difference. Stock: quantities and minimum levels per material (Update Stock). Reconcile with ERP (Stock page): upload ERP stock file(s), see differences vs app stock, apply ERP values per material or in bulk. Orders: supplier orders pending > ordered > received (receiving adds to stock); Reorder Planner (Orders page): per material suggested order = remaining demand of active projects + minimum stock - stock - already ordered, with needed-by date (earliest phase target date or project deadline), lead time and order-by date, plus one-click order creation; older AUTO-... orders were created by a removed auto-reorder, now the dashboard shows an alert pointing to the planner. Reminders: assign to team members with date/time. Emails are switched off for now. Data is shared by the whole team in one database.
 Catalog: ${systemNames().length} product systems built from the Cement Plus BOM (consumption per m2 depends on surface type x interior/exterior x substrate: friable, friable+damp, existing tiles, rough, smooth) and ${Object.keys(PRODUCTS).length} products with their pack sizes. Systems: ${sysNames}. Rasocol 600 was renamed D-BASE 60.
 Not in the app today (candidates when asked what is missing): unit prices, costs and margins per material or project; supplier database and supplier prices; a customer database (client is free text); issuing offers/invoices from the app; user roles and permissions; calendar sync; returns and credit notes; stock by batch number or warehouse location; multi-currency (EUR only); reports/export to accounting.
 
