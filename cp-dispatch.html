@@ -988,8 +988,44 @@ function bomNeeds(sys) {
   return out;
 }
 
+// ---- offer / ERP lines -> the names and pack labels used by the catalogue and the stock ("NANOSTUCCO 500 CREME 20KG" -> NANOSTUCCO 500 CREME | 20kg) ----
+function canonPkg(p) {
+  const raw = String(p || '').trim();
+  if (!raw) return '';
+  const m = raw.replace(/\s+/g, '').toUpperCase().replace(/Μ/g, 'M').match(/^([\d.,+]*\d(?:KG)?(?:\+[\d.,]+)?)(?:KG|LT|L|ML|M2|M²)$/);
+  const um = raw.replace(/\s+/g, '').toUpperCase().match(/(KG|LT|ML|M2|M²|L)$/);
+  if (!m || !um) return raw;
+  let unit = um[1], parts = m[1].replace(/KG/g, '').replace(/,/g, '.').split('+').map(x => parseFloat(x));
+  if (parts.some(x => !isFinite(x))) return raw;
+  if (unit === 'ML') { parts = parts.map(x => x / 1000); unit = 'lt'; }
+  else unit = unit === 'KG' ? 'kg' : (unit === 'L' || unit === 'LT') ? 'lt' : 'm²';
+  return parts.map(x => String(Math.round(x * 1000) / 1000)).join('+') + unit;
+}
+const OFFER_PACK_RE = /\s*(\d+(?:[.,]\d+)?(?:\s*KG)?(?:\s*\+\s*\d+(?:[.,]\d+)?)?)\s*(KG|LT|L|ML|M2|M²)\s*$/;
+const OFFER_ALIASES = [
+  [/^(?:ISOLMIX )?RASOCOL 600\b.*$/, 'D-BASE 60'], [/^D[ -]?BASE 60\b.*$/, 'D-BASE 60'], [/^D[ -]?BASE UNO\b.*$/, 'D-BASE UNO'],
+  [/^GLASSTEX (?:GR )?(?:160|150)(?:GR)?\b.*$/, 'GLASSTEX 160'], [/^GLASSTEX (?:GR )?74(?:GR)?\b.*$/, 'GLASSTEX 74'],
+  [/^UW (?:PLUS )?MEMBRANE(?: PLUS)?\b.*$/, 'UW MEMBRANE PLUS'],
+  [/^PAVITECT RESIN EPOXY UV\b.*$/, 'PAVITECT EPOXY UV'], [/^PAVITECT RESIN PU (?:2K )?UV\b.*$/, 'PAVITECT RESIN PU 2K UV'],
+  [/^NATURA PAINT (.+)$/, 'PAINT NATURA $1'], [/^NATURA CREATIVO (.+)$/, 'CREATIVO NATURA $1'],
+  [/^ELEMENT ?10 (.+)$/, 'ELEMENT:10 $1'], [/^ELEMENT ?20 (.+)$/, 'ELEMENT:20 $1'],
+  [/^(NANOSTUCCO 500|NANOFIN 50 VELVET|NATURA 50 VELVET|NANOFIN METAL|ELEMENT:10|ELEMENT:20|TX RASO|PAINT NATURA|CREATIVO NATURA) \(POWDER\) (.+)$/, '$1 $2'],
+  [/^INTOTECT (?!RESIN)(.+)$/, 'INTOTECT RESIN $1']
+];
+function canonOfferLine(name, pkg) {
+  let n = String(name || '').toUpperCase().replace(/Μ/g, 'M').replace(/\s+/g, ' ').trim(), pk = canonPkg(pkg);
+  const m = n.match(OFFER_PACK_RE);
+  if (m) {
+    const fromName = canonPkg(m[1].replace(/\s+/g, '') + m[2]);
+    if (!pk) pk = fromName;
+    if (fromName === pk) n = n.slice(0, m.index).trim();
+  }
+  for (const [re, to] of OFFER_ALIASES) if (re.test(n)) { n = n.replace(re, to); break; }
+  return { name: n, pkg: pk };
+}
+
 function getEffectiveProducts(sys) {
-  if (Array.isArray(sys.offerItems)) return sys.offerItems.map(it => ({ name: it.name, pkg: it.pkg || '', unit: it.unit || 'kg', consumption: 0, fixedUnits: parseFloat(it.quantity) || 0 }));
+  if (Array.isArray(sys.offerItems)) return sys.offerItems.map(it => { const c = canonOfferLine(it.name, it.pkg); return { name: c.name, pkg: c.pkg, unit: /(kg|lt|m²)$/.test(c.pkg) ? pkgUnitOf(c.pkg) : (it.unit || 'kg'), consumption: 0, fixedUnits: parseFloat(it.quantity) || 0 }; });
   return [];
 }
 
@@ -1978,7 +2014,7 @@ function phaseAreaRemaining(sysId) {
   const p = projects[currentProject];
   const sys = (p.systems || []).find(x => x.id === sysId);
   if (!sys) return;
-  const usedBy = (s, name) => Array.isArray(s.surfaces) ? (bomNeeds(s)[name] || 0) > 0 : (s.offerItems || []).some(it => it.name === name);
+  const usedBy = (s, name) => Array.isArray(s.surfaces) ? (bomNeeds(s)[name] || 0) > 0 : (s.offerItems || []).some(it => canonOfferLine(it.name, it.pkg).name === name);
   document.querySelectorAll('.phq-left').forEach(c => {
     const st = phqState(c.dataset.group), name = st.name;
     if (!usedBy(sys, name) || (p.systems || []).some(o => o.id !== sysId && usedBy(o, name))) return;
@@ -3958,7 +3994,7 @@ function poView(id) {
   openModal('Production Order ' + o.ref, `
     <div class="form-grid mb-16"><div><label>Project</label><p>${escAttr(o.projectName)}</p></div><div><label>Phase</label><p>${escAttr(o.phaseName || '—')}</p></div></div>
     <div class="form-grid mb-16"><div><label>Status</label><p><span class="chip ${cls}">${label}</span> ${o.priority === 'urgent' ? '<span class="chip chip-red">Urgent</span>' : ''}</p></div><div><label>Due</label><p>${o.dueDate ? fmtDate(o.dueDate) : '—'}</p></div></div>
-    <table><thead><tr><th>Material</th><th>Pack</th><th>Ordered</th><th>Produced</th></tr></thead><tbody>${(o.items || []).map(i => `<tr><td>${escAttr(i.name)}</td><td>${escAttr(i.pkg)}</td><td>${i.ordered}</td><td>${o.status === 'completed' ? i.produced : '—'}</td></tr>`).join('')}</tbody></table>
+    <table><thead><tr><th>Material</th><th>Pack</th><th>Ordered</th><th>Produced</th></tr></thead><tbody>${(o.items || []).map(i => `<tr><td>${escAttr(i.name)}</td><td>${escAttr(i.pkg)}</td><td>${i.ordered}</td><td>${['in_production', 'completed'].includes(o.status) ? `<strong>${Number(i.produced) || 0}</strong>${Number(i.produced) >= Number(i.ordered) ? ' ✓' : ''}` : '—'}</td></tr>`).join('')}</tbody></table>
     ${o.notes ? `<div class="mt-16"><label>Instructions</label><p>${escAttr(o.notes)}</p></div>` : ''}
     ${o.productionNotes ? `<div class="mt-16"><label>Production notes</label><p>${escAttr(o.productionNotes)}</p></div>` : ''}
     ${o.status === 'in_production' ? `<div class="mt-16"><label>Stage</label><p>${poStageLabel(o.stage)} — ${poProducedTotal(o)} / ${poPacks(o)} packs so far</p></div>` : ''}
@@ -3971,7 +4007,7 @@ async function poDownload(id) {
   const o = productionOrders[id];
   if (!o) return;
   const rows = [['CEMENT PLUS - PRODUCTION ORDER'], ['Reference', o.ref], ['Project', o.projectName], ['Phase', o.phaseName || ''], ['Due date', o.dueDate || ''], ['Priority', o.priority], ['Status', PO_STATUS[o.status][1]], ['Instructions', o.notes || ''], [], ['Material', 'Pack', 'Ordered (packs)', 'Produced (packs)']]
-    .concat((o.items || []).map(i => [i.name, i.pkg, i.ordered, o.status === 'completed' ? i.produced : '']));
+    .concat((o.items || []).map(i => [i.name, i.pkg, i.ordered, ['in_production', 'completed'].includes(o.status) ? (Number(i.produced) || 0) : '']));
   await saveCsv(`${o.ref}.csv`, rows);
 }
 
@@ -4209,7 +4245,7 @@ Read it VERY carefully, line by line: header, customer block, line-item table, t
 
 Known product systems: ${systemNames().join(', ')}
 Note: the product formerly called RASOCOL 600 is now named D-BASE 60 — always use D-BASE 60.
-Known products: ${knownProducts.join(', ')}
+Known products (spelling guide only — the document wins; ALWAYS keep colours and variants): ${knownProducts.join(', ')}
 
 Return ONLY one JSON object:
 {
@@ -4230,11 +4266,11 @@ Return ONLY one JSON object:
       "systemName": "matching name from the known product systems, else a short descriptive name",
       "application": "matching application or empty",
       "area": area in m² as a number if printed, else 0,
-      "materials": [{"name":"product name (use the known product name when it matches)","pkg":"pack size, e.g. 20kg, 10lt, 5+1lt, 50m²","quantity":number of packs/units on that line,"unit":"kg | lt | m² | pcs"}]
+      "materials": [{"name":"the FULL product description exactly as printed on the line INCLUDING its colour / shade / variant, e.g. NANOSTUCCO 500 CREME, NANOFIN METAL COPPER, COLORFRESH INTENSIV, NANOFIN 50 VELVET SNOW — never shorten it to a generic product name and never add words that are not printed; leave the pack size out of the name","pkg":"pack size, e.g. 20kg, 10lt, 5+1lt, 50m²","quantity":number of packs/units on that line,"unit":"kg | lt | m² | pcs"}]
     }
   ]
 }
-Rules for materials: only physical products (no labour, transport, discounts, VAT). "quantity" is the number of packs as ordered. If the quantity column is in kg/lt/m² (e.g. 60 kg of a 20kg product) convert it to number of packs (3). Keep EVERY product line; group lines under one system if the document does, otherwise use a single system. Installments: derive from the payment terms (e.g. "100% advance" -> one installment 100%; "50% advance, 50% on delivery" -> two); percent and amount may be 0 if unknown.`;
+Rules for materials: colours are essential — copy the colour of every line (CREME, CLAY, SNOW, COPPER, BETON …) into the name; only the product RASOCOL 600 is written D-BASE 60 now. Only physical products (no labour, transport, discounts, VAT). "quantity" is the number of packs as ordered. If the quantity column is in kg/lt/m² (e.g. 60 kg of a 20kg product) convert it to number of packs (3). Keep EVERY product line; group lines under one system if the document does, otherwise use a single system. Installments: derive from the payment terms (e.g. "100% advance" -> one installment 100%; "50% advance, 50% on delivery" -> two); percent and amount may be 0 if unknown.`;
 
     $('npScanText').textContent = 'Reading document carefully with AI...';
     const opts = { modelTier: 'complex', cache: false };
@@ -4294,16 +4330,17 @@ function applyScannedData(data, file) {
 
   const docId = uid();
   let matCount = 0;
+  const unknownLines = [];
   (Array.isArray(data.systems) ? data.systems : []).forEach((sys, n) => {
     const key = systemNames().find(k => k.toLowerCase() === String(sys.systemName || '').trim().toLowerCase());
-    const materials = (Array.isArray(sys.materials) ? sys.materials : []).map(m => ({
-      name: String(m.name || '').trim(), pkg: String(m.pkg || '').trim(),
-      quantity: parseFloat(m.quantity) || 0, unit: String(m.unit || 'kg').trim()
-    })).filter(m => m.name);
+    const materials = (Array.isArray(sys.materials) ? sys.materials : []).map(m => {
+      const c = canonOfferLine(m.name, m.pkg);
+      return { name: c.name, pkg: c.pkg, quantity: parseFloat(m.quantity) || 0, unit: String(m.unit || 'kg').trim() };
+    }).filter(m => m.name);
     if (!key && materials.length === 0) return;
     const app = 'Imported materials';
     const card = { systemName: key || String(sys.systemName || '').trim() || `${label} ${data.documentNumber || ''} items ${n + 1}`.trim(), application: app, area: parseFloat(sys.area) || 0, notes: '', offerDoc: file.name };
-    if (materials.length) { card.offerItems = materials; matCount += materials.length; }
+    if (materials.length) { card.offerItems = materials; matCount += materials.length; materials.forEach(m => { if (!(m.name + '|' + m.pkg in stockData) && !((productDef(m.name) || { packs: [] }).packs.includes(m.pkg))) unknownLines.push(m.name + (m.pkg ? ' ' + m.pkg : '')); }); }
     $('systemsList').insertAdjacentHTML('beforeend', systemCardHtml(card, docId));
   });
 
@@ -4311,7 +4348,7 @@ function applyScannedData(data, file) {
   renderAttachedFiles();
   resetNpScan();
   if (matCount === 0) toast('Document read, but no material lines were found — add them manually', 'warn');
-  else toast(`Document read — ${matCount} materials${payFound ? ' and payment terms' : ''} filled in`);
+  else toast(`Document read — ${matCount} materials${payFound ? ' and payment terms' : ''} filled in${unknownLines.length ? `. Not in stock list or catalogue: ${unknownLines.slice(0, 4).join(', ')}${unknownLines.length > 4 ? '…' : ''}` : ''}`, unknownLines.length ? 'warn' : undefined);
 }
 
 function renderAttachedFiles() {
@@ -4579,7 +4616,7 @@ function deleteOfferMaterial(encKey) {
   showWarning('Delete Material', 'Remove this material from the project?', () => {
     const p = projects[currentProject];
     p.systems.forEach(s => {
-      if (Array.isArray(s.offerItems)) s.offerItems = s.offerItems.filter(it => (it.name + '|' + (it.pkg || '')) !== key);
+      if (Array.isArray(s.offerItems)) s.offerItems = s.offerItems.filter(it => { const c = canonOfferLine(it.name, it.pkg); return (c.name + '|' + c.pkg) !== key; });
     });
     p.updatedAt = new Date().toISOString();
     saveProjectDoc(p);
