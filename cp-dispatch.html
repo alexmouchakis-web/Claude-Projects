@@ -265,6 +265,16 @@ tr:hover td{background:var(--surface-alt)}
 .po-time.late{background:var(--red-light)}
 .pt-main{font-weight:700}
 .po-est{padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-alt)}
+.pd-bar{height:56px!important}
+.pd-seg{flex-direction:column;align-items:flex-start!important;justify-content:center;text-align:left;padding:0 8px;line-height:1.15}
+.pd-l1{font-size:.68rem;font-weight:500;opacity:.9;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.pd-l2{font-size:.86rem;font-weight:700;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.pd-new{background:repeating-linear-gradient(45deg,var(--ink),var(--ink) 8px,#5a3a3d 8px,#5a3a3d 16px)}
+.fs-verdict{padding:14px 16px;border-radius:var(--radius);border:2px solid}
+.fs-verdict.ok{border-color:var(--green);background:var(--green-light)}
+.fs-verdict.no{border-color:var(--red);background:var(--red-light)}
+.fs-big{font-size:1.4rem;font-weight:800;margin-bottom:4px}
+.fs-warn{padding:10px 12px;border-radius:var(--radius);background:var(--amber-light)}
 .pd-row{display:grid;grid-template-columns:150px 1fr;gap:4px 12px;align-items:center;margin:8px 0}
 .pd-day{display:flex;flex-direction:column}
 .pd-bar{position:relative;height:26px;border-radius:6px;background:var(--surface-alt);border:1px solid var(--border-light);overflow:hidden}
@@ -540,6 +550,7 @@ body.chat-open #chatPanel{transform:none;visibility:visible}
       </div>
       <div class="flex gap-8">
         <button class="btn btn-secondary btn-sm" onclick="editCurrentProject()">Edit</button>
+        <button class="btn btn-secondary btn-sm" onclick="openFeasibility(currentProject)">Production slot?</button>
         <button class="btn btn-secondary btn-sm" onclick="duplicateProject()">Duplicate</button>
         <button class="btn btn-danger btn-sm" onclick="deleteProject()">Delete</button>
       </div>
@@ -567,7 +578,7 @@ body.chat-open #chatPanel{transform:none;visibility:visible}
 
   <!-- PRODUCTION -->
   <div class="page" id="page-production">
-    <div class="page-header"><h1>Production</h1><div class="flex gap-8"><button class="btn btn-secondary" onclick="openProdTimes()">Production times</button><button class="btn btn-primary" onclick="openProdOrder()">New Production Order</button></div></div>
+    <div class="page-header"><h1>Production</h1><div class="flex gap-8"><button class="btn btn-secondary" onclick="openFeasibility()">Check a new job</button><button class="btn btn-secondary" onclick="openProdTimes()">Production times</button><button class="btn btn-primary" onclick="openProdOrder()">New Production Order</button></div></div>
     <div id="prodList"></div>
   </div>
 
@@ -680,7 +691,6 @@ const PRODUCTS = {
   "DECO TOP": { unit: "kg", packs: ["3.35+0.65kg","12.6+2.4kg"], kind: "sealer" },
   "DECO TOP ECO MATE": { unit: "kg", packs: ["11.7+3.3kg"], kind: "sealer" },
   "DECO TOP EVO W MAT": { unit: "kg", packs: ["2.7+0.3kg","8.1+0.9kg"], kind: "sealer" },
-  "COLORFRESH INTENSIV": { unit: "lt", packs: ["1lt","10lt"], kind: "sealer" },
   "COLORTEC MAX": { unit: "lt", packs: ["1lt","10lt"], kind: "sealer" },
   "NANOFIN WAX": { unit: "lt", packs: ["1lt"], kind: "sealer" },
   "NANOFIN METAL SEALER": { unit: "lt", packs: ["0.5lt","1lt"], kind: "sealer" },
@@ -1032,7 +1042,8 @@ const OFFER_ALIASES = [
   [/^NATURA PAINT (.+)$/, 'PAINT NATURA $1'], [/^NATURA CREATIVO (.+)$/, 'CREATIVO NATURA $1'],
   [/^ELEMENT ?10 (.+)$/, 'ELEMENT:10 $1'], [/^ELEMENT ?20 (.+)$/, 'ELEMENT:20 $1'],
   [/^(NANOSTUCCO 500|NANOFIN 50 VELVET|NATURA 50 VELVET|NANOFIN METAL|ELEMENT:10|ELEMENT:20|TX RASO|PAINT NATURA|CREATIVO NATURA) \(POWDER\) (.+)$/, '$1 $2'],
-  [/^INTOTECT (?!RESIN)(.+)$/, 'INTOTECT RESIN $1']
+  [/^INTOTECT (?!RESIN)(.+)$/, 'INTOTECT RESIN $1'],
+  [/^COLORFRESH INTENSIV\b.*$/, 'COLORFRESH']
 ];
 function canonOfferLine(name, pkg) {
   let n = String(name || '').toUpperCase().replace(/(\d)\s*Μ/g, '$1M').replace(/\s+/g, ' ').trim(), pk = canonPkg(pkg);
@@ -1203,7 +1214,7 @@ function renderDashboard() {
   const lowStock = Object.entries(stockData).filter(([k, v]) => v.quantity <= (v.minStock || 0)).length;
 
   $('dashKpis').innerHTML = `
-    <div class="kpi kpi-blue clickable tile-link" role="button" tabindex="0" onclick="navigate('projects')"><div class="kpi-label">Active Projects</div><div class="kpi-value">${active.length}</div><div class="kpi-sub">${pArr.length} total</div></div>
+    <div class="kpi kpi-blue clickable tile-link" role="button" tabindex="0" onclick="navigate('projects')"><div class="kpi-label">Active Projects</div><div class="kpi-value">${active.length}</div><div class="kpi-sub">${pArr.filter(p => p.status === 'planning').length ? pArr.filter(p => p.status === 'planning').length + ' planning · ' : ''}${pArr.length} total</div></div>
     <div class="kpi ${pendingOrders > 0 ? 'kpi-amber' : 'kpi-green'} clickable tile-link" role="button" tabindex="0" onclick="navigate('orders')"><div class="kpi-label">Pending Orders</div><div class="kpi-value">${pendingOrders}</div><div class="kpi-sub">awaiting delivery</div></div>
     <div class="kpi ${lowStock > 0 ? 'kpi-red' : 'kpi-green'} clickable tile-link" role="button" tabindex="0" onclick="navigate('stock')"><div class="kpi-label">Stock Alerts</div><div class="kpi-value">${lowStock}</div><div class="kpi-sub">below minimum</div></div>
     <div class="kpi ${alerts.length > 0 ? 'kpi-amber' : 'kpi-green'} clickable tile-link" role="button" tabindex="0" onclick="showAllAlerts()"><div class="kpi-label">Active Alerts</div><div class="kpi-value">${alerts.length}</div><div class="kpi-sub">need attention</div></div>`;
@@ -1278,6 +1289,7 @@ function generateAlerts() {
     if (days < 0) alerts.push({ level: 'red', message: `Order "${o.ref || o.id}" is ${Math.abs(days)} days overdue`, go: "navigate('orders')" });
   });
   Object.values(projects).filter(p => p.loading && p.loading.ready && p.status !== 'archived').forEach(p => alerts.push({ level: 'blue', message: `📦 Ready for loading: "${p.name}" (${p.loading.ref || 'production completed'})`, go: proj(p.id) }));
+  Object.values(projects).filter(p => p.status === 'planning' && Object.values(productionOrders).some(o => o.projectId === p.id && poIsOpen(o))).forEach(p => alerts.push({ level: 'amber', message: `"${p.name}" has production orders but is still in Planning — set it to Active`, go: proj(p.id) }));
   try { const sch = prodSchedule(); Object.values(productionOrders).filter(poIsOpen).forEach(o => { const e = sch[o.id]; if (e && e.late && !poOverdue(o)) alerts.push({ level: 'amber', message: `Production order ${o.ref} (${o.projectName}) is expected to finish ${slotText(e.end, e.end).replace(/^(\S+ ).*$/, '$1')}${hm(e.end)} — after its due date`, go: "navigate('production')" }); }); } catch (e) { console.error(e); }
   Object.values(productionOrders).filter(poIsOpen).forEach(o => {
     if (poOverdue(o)) alerts.push({ level: 'red', message: `Production order ${o.ref} (${o.projectName}) is overdue`, go: "navigate('production')" });
@@ -2532,7 +2544,7 @@ function erpChunks(text, max = 14000) {
 function erpPrompt(known) {
   return `You are reading an inventory / stock export from the ERP of Cement Plus (microcement, Greece). It is Excel/CSV/PDF content, usually Greek. Extract the CURRENT ON-HAND STOCK quantity per product.
 
-Alias: the product RASOCOL 600 (any spelling) is now called D-BASE 60 — use the D-BASE 60 key.
+Alias: the product RASOCOL 600 (any spelling) is now called D-BASE 60 — use the D-BASE 60 key. COLORFRESH INTENSIV is the same product as COLORFRESH — use the COLORFRESH key.
 Known stock keys ("PRODUCT NAME|PACK SIZE"):
 ${known.join('\n')}
 
@@ -3990,34 +4002,45 @@ function poTimeHtml(o, sched) {
 }
 
 // ---- dashboard on the Production page: queue + slots per day ----
+// ---- day plan: one bar per working day, orders drawn on the bars with their project name ----
+const PD_COLORS = ['#C2410C', '#1D6FA5', '#2E7D4F', '#8A5A00', '#7A3E9D', '#B4233B', '#0F766E', '#6B7280'];
+function prodDayBars(open, sch, days) {
+  const now = prodNow(), cap = prodDayWork();
+  const ordersSorted = open.slice().sort((a, b) => sch[a.id].start - sch[b.id].start);
+  const colorOf = o => o.id === '__new' ? 'var(--ink)' : PD_COLORS[ordersSorted.filter(x => x.id !== '__new').indexOf(o) % PD_COLORS.length];
+  const dayList = [];
+  let d = workStartOnOrAfter(now);
+  for (let i = 0; i < 21 && dayList.length < (days || 5); i++) {
+    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i);
+    if (prodIsWorkDay(day)) dayList.push(day);
+  }
+  const rows = dayList.map(day => {
+    const ds = prodDayStart(day), de = prodDayEnd(day);
+    let used = 0;
+    const segs = ordersSorted.map(o => {
+      const e = sch[o.id], a = new Date(Math.max(e.start, ds)), b = new Date(Math.min(e.end, de));
+      if (b <= a) return '';
+      used += (b - a) / 60000;
+      const left = (a - ds) / (de - ds) * 100, w = (b - a) / (de - ds) * 100;
+      const nm = escAttr(o.projectName || ''), ref = escAttr(String(o.ref || '').replace('PO-', ''));
+      return `<div class="pd-seg ${o.id === '__new' ? 'pd-new' : ''}" style="left:${left}%;width:${w}%;${o.id === '__new' ? '' : 'background:' + colorOf(o)}" title="${escAttr(o.ref + ' · ' + (o.projectName || '') + ' · ' + hm(a) + '–' + hm(b))}"><span class="pd-l1">${ref} · ${hm(a)}–${hm(b)}</span><span class="pd-l2">${nm}</span></div>`;
+    }).join('');
+    const elapsed = dayWord(day) === 'Today' && now > ds ? Math.max(0, Math.min(cap, (now - ds) / 60000)) : 0;
+    const free = Math.max(0, cap - used - elapsed);
+    return `<div class="pd-row"><div class="pd-day"><strong>${dayWord(day)}</strong><span class="text-sm text-muted">${used ? fmtDur(used) + ' booked' : 'free'}${free && used ? ' · ' + fmtDur(free) + ' free' : ''}</span></div>
+      <div class="pd-bar">${segs}</div><div class="pd-scale text-sm text-muted">${hm(ds)}<span>${hm(de)}</span></div></div>`;
+  }).join('');
+  const legend = ordersSorted.map(o => `<span class="pd-key"><i style="background:${colorOf(o)}"></i><strong>${escAttr(o.id === '__new' ? 'NEW JOB' : o.ref)}</strong> ${escAttr(o.projectName || '')} <span class="text-muted">${fmtDur(sch[o.id].minutes)}${o.status === 'in_production' ? ' left' : ''}</span></span>`).join('');
+  return `<div class="pd-rows">${rows}</div><div class="pd-legend">${legend}</div>`;
+}
+
 function prodDashboardHtml() {
   const open = Object.values(productionOrders).filter(poIsOpen);
   if (!open.length) return '';
   const sch = curSched = prodSchedule();
   const now = prodNow(), cap = prodDayWork();
-  const colors = ['#C2410C', '#1D6FA5', '#2E7D4F', '#8A5A00', '#7A3E9D', '#B4233B', '#0F766E', '#6B7280'];
-  const ordersSorted = open.slice().sort((a, b) => sch[a.id].start - sch[b.id].start);
-  const days = [];
-  let d = workStartOnOrAfter(now);
-  for (let i = 0; i < 14 && days.length < 5; i++) {
-    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i);
-    if (prodIsWorkDay(day)) days.push(day);
-  }
-  const rows = days.map(day => {
-    const ds = prodDayStart(day), de = prodDayEnd(day);
-    const segs = ordersSorted.map((o, k) => {
-      const e = sch[o.id], a = new Date(Math.max(e.start, ds)), b = new Date(Math.min(e.end, de));
-      if (b <= a) return '';
-      const left = (a - ds) / (de - ds) * 100, w = (b - a) / (de - ds) * 100;
-      return `<div class="pd-seg" style="left:${left}%;width:${w}%;background:${colors[k % colors.length]}" title="${escAttr(o.ref + ' · ' + (o.projectName || '') + ' · ' + hm(a) + '–' + hm(b))}">${w > 9 ? escAttr(o.ref.replace('PO-', '')) : ''}</div>`;
-    }).join('');
-    const used = ordersSorted.reduce((t, o) => { const e = sch[o.id], a = Math.max(e.start, ds), b = Math.min(e.end, de); return t + Math.max(0, (b - a) / 60000); }, 0);
-    const free = Math.max(0, cap - used - (dayWord(day) === 'Today' && now > ds ? Math.max(0, Math.min(cap, (now - ds) / 60000)) : 0));
-    return `<div class="pd-row"><div class="pd-day"><strong>${dayWord(day)}</strong><span class="text-sm text-muted">${used ? fmtDur(used) + ' booked' : 'free'}${free && used ? ' · ' + fmtDur(free) + ' free' : ''}</span></div>
-      <div class="pd-bar">${segs}</div><div class="pd-scale text-sm text-muted">${hm(ds)}<span>${hm(de)}</span></div></div>`;
-  }).join('');
   const late = open.filter(o => sch[o.id].late);
-  const todayUsed = ordersSorted.reduce((t, o) => { const e = sch[o.id], ds = prodDayStart(now), de = prodDayEnd(now), a = Math.max(e.start, ds), b = Math.min(e.end, de); return t + Math.max(0, (b - a) / 60000); }, 0);
+  const todayUsed = open.reduce((t, o) => { const e = sch[o.id], ds = prodDayStart(now), de = prodDayEnd(now), a = Math.max(e.start, ds), b = Math.min(e.end, de); return t + Math.max(0, (b - a) / 60000); }, 0);
   const tile = (val, label, color) => `<div class="pay-kpi"><div class="pk-val" style="color:${color}">${val}</div><div class="pk-label">${label}</div></div>`;
   return `<div class="card mb-16"><div class="card-body">
     <div class="flex justify-between items-center mb-8" style="flex-wrap:wrap;gap:8px"><h3>Production plan</h3><span class="text-sm text-muted">${prodSettings.confirmed ? '' : '<span class="chip chip-amber">default times</span> '}${prodSettings.machines} machine${prodSettings.machines > 1 ? 's' : ''} · ${prodSettings.start}–${prodSettings.end}</span></div>
@@ -4027,9 +4050,56 @@ function prodDashboardHtml() {
       ${tile(Math.round(Math.min(100, todayUsed / cap * 100)) + '%', 'Today booked (' + fmtDur(todayUsed) + ' of ' + fmtDur(cap) + ')', 'var(--amber)')}
       ${tile(late.length, 'May miss due date', late.length ? 'var(--red)' : 'var(--green)')}
     </div>
-    <div class="pd-rows">${rows}</div>
-    <div class="pd-legend">${ordersSorted.map((o, k) => `<span class="pd-key"><i style="background:${colors[k % colors.length]}"></i>${escAttr(o.ref)} · ${escAttr(o.projectName || '')} <span class="text-muted">${fmtDur(sch[o.id].minutes)}${o.status === 'in_production' ? ' left' : ''}</span></span>`).join('')}</div>
+    ${prodDayBars(open, sch, 5)}
   </div></div>`;
+}
+
+// ---- "Can we take this job?": a planning project is dropped into the real queue ----
+function openFeasibility(projectId) {
+  const cand = Object.values(projects).filter(p => p.status !== 'completed' && p.status !== 'archived').sort((a, b) => ((b.status === 'planning') - (a.status === 'planning')) || a.name.localeCompare(b.name));
+  if (!cand.length) { toast('Create a project (status Planning) first', 'warn'); return; }
+  const start = projects[projectId] && cand.includes(projects[projectId]) ? projects[projectId] : cand[0];
+  openModal('Can we take this job?', `
+    <div class="form-help mb-8">Pick a project (use status <strong>Planning</strong> for an offer that is not confirmed yet). The app puts its materials into the real production queue — current stock, reservations, orders already running — and tells you when it can be ready.</div>
+    <div class="form-grid">
+      <div class="form-row"><label>Project</label><select id="fsProject" onchange="document.getElementById('fsDate').value=(projects[this.value]||{}).deadline||'';feasibilityRun()">${cand.map(p => `<option value="${p.id}" ${p.id === start.id ? 'selected' : ''}>${escAttr(p.name)} — ${p.status}</option>`).join('')}</select></div>
+      <div class="form-row"><label>Customer needs it ready by</label><input type="date" id="fsDate" value="${start.deadline || ''}" onchange="feasibilityRun()"></div>
+    </div>
+    <div class="form-grid"><div class="form-row"><label>Priority in the queue</label><select id="fsPrio" onchange="feasibilityRun()"><option value="normal">Normal — after the orders already waiting</option><option value="urgent">Urgent — jumps the queue</option></select></div><div class="form-help" style="align-self:end;padding-bottom:10px">Edit the project to change its surfaces and m².</div></div>
+    <div id="fsOut" class="mt-16"></div>`, `<button class="btn btn-secondary" onclick="closeModal()">Close</button><button class="btn btn-primary" id="fsOpen" onclick="closeModal();navigate('project-detail',document.getElementById('fsProject')?.value)">Open project</button>`);
+  feasibilityRun();
+}
+
+function feasibilityRun() {
+  const out = $('fsOut'), p = projects[$('fsProject').value];
+  if (!out || !p) return;
+  const del = projectDeliveredMap(p.id), date = $('fsDate').value, prio = $('fsPrio').value;
+  const items = getAllMaterials(p.systems || []).map(m => { const key = m.name + '|' + m.pkg; return { material: key, name: m.name, pkg: m.pkg, ordered: Math.max(0, m.totalUnits - poIssuedQty(p.id, key) - (del[key] || 0)), produced: 0 }; }).filter(i => i.ordered > 0);
+  if (!items.length) { out.innerHTML = '<div class="empty-state"><p>This project has no materials yet (or everything is already issued). Add a product system with its surfaces first.</p></div>'; return; }
+  const mk = pr => ({ id: '__new', ref: 'NEW JOB', projectId: p.id, projectName: p.name, status: 'issued', priority: pr, dueDate: date, issuedAt: '9999', items });
+  const base = prodSchedule(), withNew = prodSchedule(mk(prio)), e = withNew.__new;
+  const dueEnd = date ? new Date(date + 'T' + (prodSettings.end || '16:00') + ':00') : null;
+  const fits = !dueEnd || e.end <= dueEnd, spare = dueEnd ? (dueEnd - e.end) / 60000 : 0;
+  const moved = Object.values(productionOrders).filter(poIsOpen).map(o => ({ o, delta: (withNew[o.id].end - base[o.id].end) / 60000 })).filter(x => x.delta > 1);
+  const alt = !fits && prio === 'normal' ? prodSchedule(mk('urgent')).__new : null;
+  const altMoved = alt ? Object.values(productionOrders).filter(poIsOpen).map(o => ({ o, delta: (prodSchedule(mk('urgent'))[o.id].end - base[o.id].end) / 60000 })).filter(x => x.delta > 1) : [];
+  const lead = plannerSettings && plannerSettings.lead != null ? plannerSettings.lead : 14;
+  const buyBy = new Date(prodNow().getTime() + lead * 86400000);
+  const needsBuy = e.short.length > 0;
+  const fitsAll = fits && (!needsBuy || !dueEnd || buyBy <= dueEnd);
+  const verdictCls = fitsAll ? 'ok' : 'no';
+  const dayDiff = Math.round(Math.abs(spare) / (prodDayWork() || 480) * 10) / 10;
+  const movedTxt = list => list.length ? list.map(x => `<div class="text-sm">• <strong>${escAttr(x.o.ref)}</strong> ${escAttr(x.o.projectName || '')} would finish ${fmtDur(x.delta)} later</div>`).join('') : '<div class="text-sm text-muted">No other order is delayed.</div>';
+  const day = prodDayBars(Object.values(productionOrders).filter(poIsOpen).concat([mk(prio)]), withNew, 4);
+  out.innerHTML = `<div class="fs-verdict ${verdictCls}">
+      <div class="fs-big">${fitsAll ? '✓ Yes, it fits' : '✗ Not in time'}</div>
+      <div>Ready <strong>${slotText(e.end, e.end).replace(/ \d.*$/, '')} ${hm(e.end)}</strong> — ${fmtDur(e.minutes)} of work (production ${fmtDur(e.prodMin)} + picking ${fmtDur(e.pickMin)} for ${e.pieces} packs)${e.waitMin > 1 ? ', starting in ' + fmtDur(e.waitMin) : ''}.</div>
+      ${dueEnd ? `<div>${fits ? `${dayDiff} working day${dayDiff === 1 ? '' : 's'} to spare before ${fmtDate(date)}.` : `Misses ${fmtDate(date)} by about ${dayDiff} working day${dayDiff === 1 ? '' : 's'}.`}</div>` : '<div class="text-muted">No required date entered.</div>'}
+    </div>
+    ${needsBuy ? `<div class="fs-warn mt-8"><strong>Needs purchasing:</strong> ${e.short.map(x => x.qty + ' × ' + escAttr(x.name) + ' ' + escAttr(x.pkg)).join(', ')} — not in stock and not made by us. With the planner lead time of ${lead} days they arrive about ${fmtDate(buyBy.toISOString().slice(0, 10))}${dueEnd && buyBy > dueEnd ? ' <strong style="color:var(--red)">— after the required date</strong>' : ''}.</div>` : ''}
+    ${moved.length ? `<div class="mt-8"><strong>Effect on the queue</strong>${movedTxt(moved)}</div>` : ''}
+    ${alt ? `<div class="fs-warn mt-8"><strong>If it is made urgent:</strong> ready ${slotText(alt.end, alt.end).replace(/ \\S+$/, '')} ${hm(alt.end)} ${alt.end <= dueEnd ? '<span style="color:var(--green)">✓ fits</span>' : '<span style="color:var(--red)">✗ still too late</span>'}${movedTxt(altMoved)}</div>` : ''}
+    <div class="mt-16">${day}</div>`;
 }
 
 // ---- estimate preview while issuing an order ----
@@ -4223,6 +4293,7 @@ function savePO(editId) {
     const first = ((p.payment || {}).installments || [])[0];
     if (first && !first.paid && ((Number(first.amount) || 0) > 0 || (Number(first.percent) || 0) > 0)) warnings.unshift(`Advance not paid: "${escAttr(first.label)}" (${first.percent ? first.percent + '% · ' : ''}€${first.amount || 0}) is not marked as paid yet.`);
   }
+  if (!editId && p.status === 'planning') warnings.push(`"${escAttr(p.name)}" is still in Planning — issuing this order will make the project Active.`);
   const go = () => doSavePO(editId, p, items, []);
   if (warnings.length) showWarning('Check Before Issuing', warnings.join('<br>') + '<br><br>Issue anyway?', go);
   else go();
@@ -4242,6 +4313,7 @@ function doSavePO(editId, p, items, picks) {
     o = { id, ref: nextOrderRef('PO', productionOrders), status: 'issued', issuedAt: new Date().toISOString(), issuedBy: currentUser, ...base };
     poLog(o, 'Issued to production');
     productionOrders[id] = o;
+    if (p.status === 'planning') { p.status = 'active'; p.updatedAt = new Date().toISOString(); saveProjectDoc(p); logActivity(`project "${p.name}" is now Active (production order ${o.ref} issued)`); }
   }
   dbSet('production/' + o.id, o);
   logActivity(`${editId ? 'edited' : 'issued'} production order ${o.ref} (${items.length} materials) for "${p.name}"`);
@@ -4619,7 +4691,7 @@ async function readDocumentAI(file, setText) {
 Read it VERY carefully, line by line: header, customer block, line-item table, totals, payment terms and small print. Copy values exactly as printed (keep Greek text, never translate or invent). If something is not in the document use "" (or 0 / []).
 
 Known product systems: ${systemNames().join(', ')}
-Note: the product formerly called RASOCOL 600 is now named D-BASE 60 — always use D-BASE 60.
+Note: the product formerly called RASOCOL 600 is now named D-BASE 60 — always use D-BASE 60. COLORFRESH INTENSIV is simply COLORFRESH.
 Known products (spelling guide only — the document wins; ALWAYS keep colours and variants): ${knownProducts.join(', ')}
 
 Return ONLY one JSON object:
@@ -4803,7 +4875,24 @@ function offerLinesFromData(data) {
 }
 
 // products that can stand in for a BOM product (the ERP sells a variant under another name)
-const OFFER_SUBSTITUTES = { 'COLORFRESH': ['COLORFRESH INTENSIV'], 'COLORTEC': ['COLORTEC MAX'] };
+const OFFER_SUBSTITUTES = { 'COLORTEC': ['COLORTEC MAX'] };
+
+// cost of a pack list at BOM list prices (null when a price is missing)
+function ocCost(name, packs) {
+  const def = productDef(name);
+  if (!def || !def.price) return null;
+  let t = 0;
+  for (const x of packs) { const pr = def.price[x.pkg]; if (pr === undefined) return null; t += x.units * ocUnitSize(x.pkg) * pr; }
+  return t;
+}
+const ocEuro = n => n == null ? '' : '€' + (Math.round(n * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// the default decision: when the offer covers the need but with other packs, take the cheaper option for the customer
+// (an offer below the BOM need is never preselected — it would leave the project short)
+function ocDefaultAct(f) {
+  if (f.kind !== 'over') return null;
+  if (f.appCost == null || f.offerCost == null) return null;
+  return f.offerCost < f.appCost - 0.005 ? 'offer' : 'keep';
+}
 
 function compareOfferWithCalc(p, lines) {
   const bom = (p.systems || []).filter(s => Array.isArray(s.surfaces));
@@ -4837,6 +4926,7 @@ function compareOfferWithCalc(p, lines) {
     const known = !!productDef(o.name) || o.packs.some(x => (o.name + '|' + x.pkg) in stockData);
     findings.push({ kind: known ? 'extra' : 'unknown', name: o.name, app: null, offer: o, note: known ? 'on the offer but not part of the BOM calculation' : 'not found in the catalogue or stock list — check the spelling' });
   });
+  findings.forEach(f => { f.appCost = f.app ? ocCost(f.app.name, f.app.packs) : null; f.offerCost = f.offer ? ocCost(f.offer.name, f.offer.packs) : null; });
   return { findings, matched, total: Object.keys(app).length };
 }
 
@@ -4872,12 +4962,12 @@ function runOfferCheck(projectId, lines, file, docType, docNumber) {
   const rows = cmp.findings.map((f, i) => {
     const [label, cls, acts] = OC_KINDS[f.kind];
     return `<tr><td><strong>${escAttr(f.name)}</strong>${f.offer && f.offer.name !== f.name ? `<div class="text-sm text-muted">offer: ${escAttr(f.offer.name)}</div>` : ''}</td>
-      <td>${f.app ? escAttr(ocText(f.app.packs, f.app.unit)) : '—'}</td><td>${f.offer ? escAttr(ocText(f.offer.packs, f.offer.unit)) : '—'}</td>
-      <td><span class="chip ${cls}">${label}</span><div class="text-sm text-muted">${escAttr(f.note)}</div></td>
-      <td><select class="oc-act" data-i="${i}">${acts.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select></td></tr>`;
+      <td>${f.app ? escAttr(ocText(f.app.packs, f.app.unit)) : '—'}${f.appCost != null ? `<div class="text-sm text-muted">${ocEuro(f.appCost)}</div>` : ''}</td><td>${f.offer ? escAttr(ocText(f.offer.packs, f.offer.unit)) : '—'}${f.offerCost != null ? `<div class="text-sm text-muted">${ocEuro(f.offerCost)}</div>` : ''}</td>
+      <td><span class="chip ${cls}">${label}</span><div class="text-sm text-muted">${escAttr(f.note)}</div>${ocDefaultAct(f) ? `<div class="text-sm" style="color:var(--green)">Preselected: cheaper for the customer (${ocEuro(Math.abs(f.appCost - f.offerCost))} less)</div>` : ''}</td>
+      <td><select class="oc-act" data-i="${i}">${acts.map(([v, t]) => `<option value="${v}"${ocDefaultAct(f) === v ? ' selected' : ''}>${t}</option>`).join('')}</select></td></tr>`;
   }).join('');
   openModal('Check offer against the calculation', `
-    <div class="form-help mb-8"><strong>${cmp.matched}</strong> of ${cmp.total} calculated products agree with the ${docType === 'invoice' ? 'invoice' : 'offer'}${docNumber ? ' ' + escAttr(docNumber) : ''}. <strong>${cmp.findings.length}</strong> need your decision. Nothing changes until you press Apply.</div>
+    <div class="form-help mb-8"><strong>${cmp.matched}</strong> of ${cmp.total} calculated products agree with the ${docType === 'invoice' ? 'invoice' : 'offer'}${docNumber ? ' ' + escAttr(docNumber) : ''}. <strong>${cmp.findings.length}</strong> need your decision. Where the offer covers the need with other packs, the cheaper option for the customer (BOM list prices) is preselected. Nothing changes until you press Apply.</div>
     <div class="overflow-x"><table><thead><tr><th>Product</th><th>App calculation</th><th>${docType === 'invoice' ? 'Invoice' : 'Offer'}</th><th>Difference</th><th>What to do</th></tr></thead><tbody>${rows}</tbody></table></div>`,
     `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="applyOfferCheck()">Apply</button>`);
 }
