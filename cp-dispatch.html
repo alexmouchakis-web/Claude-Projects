@@ -4065,7 +4065,7 @@ function openFeasibility(projectId) {
       <div class="form-row"><label>Project</label><select id="fsProject" onchange="document.getElementById('fsDate').value=(projects[this.value]||{}).deadline||'';feasibilityRun()">${cand.map(p => `<option value="${p.id}" ${p.id === start.id ? 'selected' : ''}>${escAttr(p.name)} — ${p.status}</option>`).join('')}</select></div>
       <div class="form-row"><label>Customer needs it ready by</label><input type="date" id="fsDate" value="${start.deadline || ''}" onchange="feasibilityRun()"></div>
     </div>
-    <div class="form-grid"><div class="form-row"><label>Priority in the queue</label><select id="fsPrio" onchange="feasibilityRun()"><option value="normal">Normal — after the orders already waiting</option><option value="urgent">Urgent — jumps the queue</option></select></div><div class="form-help" style="align-self:end;padding-bottom:10px">Edit the project to change its surfaces and m².</div></div>
+    <div class="form-grid"><div class="form-row"><label>Priority in the queue</label><select id="fsPrio" onchange="feasibilityRun()"><option value="normal">Normal — after the orders already waiting</option><option value="urgent">Urgent — jumps the queue</option></select></div><div class="form-row" style="align-self:end"><label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:.85rem"><input type="checkbox" id="fsFull" class="list-check" onchange="feasibilityRun()"> Count the whole job again (ignore orders already issued or delivered)</label><div class="form-help">Edit the project to change its surfaces and m².</div></div></div>
     <div id="fsOut" class="mt-16"></div>`, `<button class="btn btn-secondary" onclick="closeModal()">Close</button><button class="btn btn-primary" id="fsOpen" onclick="closeModal();navigate('project-detail',document.getElementById('fsProject')?.value)">Open project</button>`);
   feasibilityRun();
 }
@@ -4073,9 +4073,18 @@ function openFeasibility(projectId) {
 function feasibilityRun() {
   const out = $('fsOut'), p = projects[$('fsProject').value];
   if (!out || !p) return;
-  const del = projectDeliveredMap(p.id), date = $('fsDate').value, prio = $('fsPrio').value;
-  const items = getAllMaterials(p.systems || []).map(m => { const key = m.name + '|' + m.pkg; return { material: key, name: m.name, pkg: m.pkg, ordered: Math.max(0, m.totalUnits - poIssuedQty(p.id, key) - (del[key] || 0)), produced: 0 }; }).filter(i => i.ordered > 0);
-  if (!items.length) { out.innerHTML = '<div class="empty-state"><p>This project has no materials yet (or everything is already issued). Add a product system with its surfaces first.</p></div>'; return; }
+  const del = projectDeliveredMap(p.id), date = $('fsDate').value, prio = $('fsPrio').value, whole = $('fsFull').checked;
+  const all = getAllMaterials(p.systems || []);
+  const items = all.map(m => { const key = m.name + '|' + m.pkg; return { material: key, name: m.name, pkg: m.pkg, ordered: whole ? m.totalUnits : Math.max(0, m.totalUnits - poIssuedQty(p.id, key) - (del[key] || 0)), produced: 0 }; }).filter(i => i.ordered > 0);
+  if (!all.length) { out.innerHTML = '<div class="empty-state"><p>This project has no materials yet. Add a product system with its surfaces first (Edit project).</p></div>'; return; }
+  if (!items.length) {
+    const sch = prodSchedule(), mine = Object.values(productionOrders).filter(o => o.projectId === p.id && poIsOpen(o));
+    const rows = mine.map(o => { const e = sch[o.id]; return `<div class="text-sm">• <strong>${escAttr(o.ref)}</strong> — ${o.status === 'in_production' ? 'in production' : 'waiting to start'}${e ? `, expected to finish <strong>${slotText(e.end, e.end).replace(/ \d.*$/, '')} ${hm(e.end)}</strong>${e.late ? ' <span style="color:var(--red)">— after its due date</span>' : ''}` : ''}</div>`; }).join('');
+    out.innerHTML = `<div class="fs-verdict ok"><div class="fs-big">This job is already planned</div>
+      <div>All materials of <strong>${escAttr(p.name)}</strong> are already in production orders${mine.length ? '' : ' or delivered'} — there is nothing left to schedule.</div>${rows}</div>
+      <div class="form-help mt-8">To test the whole job as if it were new, tick <strong>Count the whole job again</strong> above.</div>`;
+    return;
+  }
   const mk = pr => ({ id: '__new', ref: 'NEW JOB', projectId: p.id, projectName: p.name, status: 'issued', priority: pr, dueDate: date, issuedAt: '9999', items });
   const base = prodSchedule(), withNew = prodSchedule(mk(prio)), e = withNew.__new;
   const dueEnd = date ? new Date(date + 'T' + (prodSettings.end || '16:00') + ':00') : null;
@@ -4098,7 +4107,7 @@ function feasibilityRun() {
     </div>
     ${needsBuy ? `<div class="fs-warn mt-8"><strong>Needs purchasing:</strong> ${e.short.map(x => x.qty + ' × ' + escAttr(x.name) + ' ' + escAttr(x.pkg)).join(', ')} — not in stock and not made by us. With the planner lead time of ${lead} days they arrive about ${fmtDate(buyBy.toISOString().slice(0, 10))}${dueEnd && buyBy > dueEnd ? ' <strong style="color:var(--red)">— after the required date</strong>' : ''}.</div>` : ''}
     ${moved.length ? `<div class="mt-8"><strong>Effect on the queue</strong>${movedTxt(moved)}</div>` : ''}
-    ${alt ? `<div class="fs-warn mt-8"><strong>If it is made urgent:</strong> ready ${slotText(alt.end, alt.end).replace(/ \\S+$/, '')} ${hm(alt.end)} ${alt.end <= dueEnd ? '<span style="color:var(--green)">✓ fits</span>' : '<span style="color:var(--red)">✗ still too late</span>'}${movedTxt(altMoved)}</div>` : ''}
+    ${alt ? `<div class="fs-warn mt-8"><strong>If it is made urgent:</strong> ready ${slotText(alt.end, alt.end).replace(/ \d.*$/, '')} ${hm(alt.end)} ${alt.end <= dueEnd ? '<span style="color:var(--green)">✓ fits</span>' : '<span style="color:var(--red)">✗ still too late</span>'}${movedTxt(altMoved)}</div>` : ''}
     <div class="mt-16">${day}</div>`;
 }
 
