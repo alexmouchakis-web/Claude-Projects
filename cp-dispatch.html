@@ -279,11 +279,19 @@ tr:hover td{background:var(--surface-alt)}
 .pd-day{display:flex;flex-direction:column}
 .pd-bar{position:relative;height:26px;border-radius:6px;background:var(--surface-alt);border:1px solid var(--border-light);overflow:hidden}
 .pd-seg{position:absolute;top:0;bottom:0;color:#fff;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;border-right:1px solid rgba(255,255,255,.5);overflow:hidden;white-space:nowrap}
-.pd-scale{grid-column:2;display:flex;justify-content:space-between;margin-top:-2px}
+.pd-scale{grid-column:2;position:relative;height:16px;margin-top:-2px}
+.pd-tl{position:absolute;top:0;font-size:.7rem;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pd-th{transform:translateX(-50%)}
+.pd-tick{position:absolute;top:0;bottom:0;width:1px;background:rgba(0,0,0,.12);pointer-events:none}
+.pd-drag{cursor:grab;touch-action:none;user-select:none;z-index:2;box-shadow:0 0 0 2px var(--orange,#E8541A)}
+.pd-ghost{z-index:3000;pointer-events:none;box-shadow:0 8px 22px rgba(0,0,0,.4);cursor:grabbing;color:#fff;font-size:.7rem;font-weight:700;display:flex;flex-direction:column;justify-content:center;padding:0 8px;overflow:hidden;border-radius:4px}
+.pd-tip{position:fixed;z-index:3000;background:var(--ink);color:#fff;font-size:.8rem;font-weight:600;padding:5px 9px;border-radius:6px;pointer-events:none;white-space:nowrap}
+.fs-pin{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:end;margin-top:10px}
+.fs-pin .form-row{margin:0}
 .pd-legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:.8rem}
 .pd-key i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
 .floor-time .po-time{font-size:1.05rem}
-@media(max-width:700px){.pd-row{grid-template-columns:1fr}.pd-scale{grid-column:1}}
+@media(max-width:700px){.pd-row{grid-template-columns:1fr}.pd-scale{grid-column:1}.pd-th:nth-of-type(even){display:none}}
 .tbl-compact th{padding:8px 8px;font-size:.7rem;letter-spacing:.03em}
 .tbl-compact td{padding:8px 8px;font-size:.84rem}
 .tbl-compact .chip{white-space:nowrap}
@@ -3935,6 +3943,16 @@ function addWorkMinutes(t, mins) {
   }
   return t;
 }
+// working minutes between two moments (nights, weekends and days off do not count)
+function workMinutesBetween(a, b) {
+  if (b <= a) return 0;
+  let t = new Date(a.getFullYear(), a.getMonth(), a.getDate()), tot = 0;
+  for (let i = 0; i < 800 && t <= b; i++) {
+    if (prodIsWorkDay(t)) { const s = Math.max(+prodDayStart(t), +a), e = Math.min(+prodDayEnd(t), +b); if (e > s) tot += (e - s) / 60000; }
+    t = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1);
+  }
+  return tot;
+}
 const prodDayWork = () => Math.max(1, (prodDayEnd(new Date()) - prodDayStart(new Date())) / 60000);
 
 // ---- labels ----
@@ -3972,17 +3990,47 @@ function poEstimate(o) {
   return { minutes: prodMin + pickMin, prodMin, pickMin, pieces, runs, makePacks: lines.reduce((t, l) => t + l.make, 0), short, lines };
 }
 
-// queue of open orders -> start / end slots; `extra` is an order that is only being typed (not saved yet)
+// working minutes laid out from t, skipping the fixed blocks [[from, to], …]; returns the pieces [[from, to], …]
+function placeWork(t, mins, blocks) {
+  const parts = [];
+  let left = Math.max(0, mins);
+  t = workStartOnOrAfter(t);
+  for (let i = 0; i < 4000 && left > 1e-6; i++) {
+    const blk = blocks.find(x => t >= x[0] && t < x[1]);
+    if (blk) { t = workStartOnOrAfter(blk[1]); continue; }
+    let lim = prodDayEnd(t);
+    const nb = blocks.filter(x => x[0] > t && x[0] < lim).sort((x, y) => x[0] - y[0])[0];
+    if (nb) lim = nb[0];
+    const take = Math.min(left, (lim - t) / 60000);
+    if (take > 1e-6) { parts.push([t, new Date(t.getTime() + take * 60000)]); left -= take; }
+    t = new Date(t.getTime() + take * 60000);
+    if (left > 1e-6 && t >= prodDayEnd(t)) t = workStartOnOrAfter(new Date(t.getTime() + 1000));
+  }
+  return parts.length ? parts : [[t, t]];
+}
+
+// queue of open orders -> start / end slots; `extra` is an order that is only being typed (not saved yet).
+// An extra order with `pinStart` is placed at that time by hand; the other orders flow around it.
 function prodSchedule(extra) {
   const now = prodNow();
-  const list = Object.values(productionOrders).filter(poIsOpen).concat(extra ? [extra] : []);
+  const pinned = extra && extra.pinStart ? extra : null;
+  const list = Object.values(productionOrders).filter(poIsOpen).concat(extra && !pinned ? [extra] : []);
   list.sort((a, b) => ((b.status === 'in_production') - (a.status === 'in_production')) || ((b.priority === 'urgent') - (a.priority === 'urgent')) || (a.dueDate || '9').localeCompare(b.dueDate || '9') || (a.issuedAt || '').localeCompare(b.issuedAt || ''));
-  let cursor = workStartOnOrAfter(now), res = {}, queueMin = 0;
-  list.forEach(o => {
-    const est = poEstimate(o), start = cursor, end = addWorkMinutes(start, est.minutes);
+  let cursor = workStartOnOrAfter(now), res = {}, queueMin = 0, blocks = [];
+  const put = (o, est, parts) => {
+    const start = parts[0][0], end = parts[parts.length - 1][1];
     const due = o.dueDate ? new Date(o.dueDate + 'T' + (prodSettings.end || '16:00') + ':00') : null;
-    res[o.id || '__new'] = { ...est, start, end, waitMin: Math.max(0, (start - now) / 60000), late: !!(due && end > due), due };
-    cursor = end; queueMin += est.minutes;
+    res[o.id || '__new'] = { ...est, parts, start, end, waitMin: Math.max(0, (start - now) / 60000), late: !!(due && end > due), due };
+    queueMin += est.minutes;
+    return end;
+  };
+  if (pinned) {
+    const est = poEstimate(pinned), parts = placeWork(new Date(Math.max(+pinned.pinStart, +now)), est.minutes, []);
+    put(pinned, est, parts); blocks = parts;
+  }
+  list.forEach(o => {
+    const est = poEstimate(o), parts = blocks.length ? placeWork(cursor, est.minutes, blocks) : [[cursor, addWorkMinutes(cursor, est.minutes)]];
+    cursor = put(o, est, parts);
   });
   res.__queueMin = queueMin; res.__clears = cursor;
   return res;
@@ -4004,31 +4052,46 @@ function poTimeHtml(o, sched) {
 // ---- dashboard on the Production page: queue + slots per day ----
 // ---- day plan: one bar per working day, orders drawn on the bars with their project name ----
 const PD_COLORS = ['#C2410C', '#1D6FA5', '#2E7D4F', '#8A5A00', '#7A3E9D', '#B4233B', '#0F766E', '#6B7280'];
-function prodDayBars(open, sch, days) {
+function prodDayBars(open, sch, days, opts) {
+  opts = opts || {};
   const now = prodNow(), cap = prodDayWork();
   const ordersSorted = open.slice().sort((a, b) => sch[a.id].start - sch[b.id].start);
   const colorOf = o => o.id === '__new' ? 'var(--ink)' : PD_COLORS[ordersSorted.filter(x => x.id !== '__new').indexOf(o) % PD_COLORS.length];
   const dayList = [];
   let d = workStartOnOrAfter(now);
-  for (let i = 0; i < 21 && dayList.length < (days || 5); i++) {
+  for (let i = 0; i < 60 && dayList.length < (days || 5); i++) {
     const day = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i);
     if (prodIsWorkDay(day)) dayList.push(day);
   }
   const rows = dayList.map(day => {
-    const ds = prodDayStart(day), de = prodDayEnd(day);
+    const ds = prodDayStart(day), de = prodDayEnd(day), span = de - ds;
     let used = 0;
     const segs = ordersSorted.map(o => {
-      const e = sch[o.id], a = new Date(Math.max(e.start, ds)), b = new Date(Math.min(e.end, de));
-      if (b <= a) return '';
-      used += (b - a) / 60000;
-      const left = (a - ds) / (de - ds) * 100, w = (b - a) / (de - ds) * 100;
-      const nm = escAttr(o.projectName || ''), ref = escAttr(String(o.ref || '').replace('PO-', ''));
-      return `<div class="pd-seg ${o.id === '__new' ? 'pd-new' : ''}" style="left:${left}%;width:${w}%;${o.id === '__new' ? '' : 'background:' + colorOf(o)}" title="${escAttr(o.ref + ' · ' + (o.projectName || '') + ' · ' + hm(a) + '–' + hm(b))}"><span class="pd-l1">${ref} · ${hm(a)}–${hm(b)}</span><span class="pd-l2">${nm}</span></div>`;
+      const e = sch[o.id], isNew = o.id === '__new';
+      return (e.parts || [[e.start, e.end]]).map((pt, pi) => {
+        const a = new Date(Math.max(pt[0], ds)), b = new Date(Math.min(pt[1], de));
+        if (b <= a) return '';
+        used += (b - a) / 60000;
+        const left = (a - ds) / span * 100, w = (b - a) / span * 100;
+        const nm = escAttr(o.projectName || ''), ref = escAttr(String(o.ref || '').replace('PO-', ''));
+        const drag = isNew && opts.drag ? ` data-start="${+pt[0]}"` : '';
+        return `<div class="pd-seg ${isNew ? 'pd-new' : ''}${isNew && opts.drag ? ' pd-drag' : ''}" style="left:${left}%;width:${w}%;${isNew ? '' : 'background:' + colorOf(o)}"${drag} title="${escAttr(o.ref + ' · ' + (o.projectName || '') + ' · ' + hm(a) + '–' + hm(b))}"><span class="pd-l1">${ref} · ${hm(a)}–${hm(b)}</span><span class="pd-l2">${nm}</span></div>`;
+      }).join('');
     }).join('');
+    // hour marks inside the bar and hour labels under it
+    const ticks = [], labels = [`<span class="pd-tl" style="left:0">${hm(ds)}</span>`];
+    for (let t = new Date(ds); ; ) {
+      t = new Date(t.getFullYear(), t.getMonth(), t.getDate(), t.getHours() + 1, 0, 0);
+      if (t >= de) break;
+      const x = (t - ds) / span * 100;
+      ticks.push(`<i class="pd-tick" style="left:${x}%"></i>`);
+      labels.push(`<span class="pd-tl pd-th" style="left:${x}%">${hm(t)}</span>`);
+    }
+    labels.push(`<span class="pd-tl" style="left:100%;transform:translateX(-100%)">${hm(de)}</span>`);
     const elapsed = dayWord(day) === 'Today' && now > ds ? Math.max(0, Math.min(cap, (now - ds) / 60000)) : 0;
     const free = Math.max(0, cap - used - elapsed);
     return `<div class="pd-row"><div class="pd-day"><strong>${dayWord(day)}</strong><span class="text-sm text-muted">${used ? fmtDur(used) + ' booked' : 'free'}${free && used ? ' · ' + fmtDur(free) + ' free' : ''}</span></div>
-      <div class="pd-bar">${segs}</div><div class="pd-scale text-sm text-muted">${hm(ds)}<span>${hm(de)}</span></div></div>`;
+      <div class="pd-bar" data-ds="${+ds}" data-de="${+de}">${ticks.join('')}${segs}</div><div class="pd-scale text-sm text-muted">${labels.join('')}</div></div>`;
   }).join('');
   const legend = ordersSorted.map(o => `<span class="pd-key"><i style="background:${colorOf(o)}"></i><strong>${escAttr(o.id === '__new' ? 'NEW JOB' : o.ref)}</strong> ${escAttr(o.projectName || '')} <span class="text-muted">${fmtDur(sch[o.id].minutes)}${o.status === 'in_production' ? ' left' : ''}</span></span>`).join('');
   return `<div class="pd-rows">${rows}</div><div class="pd-legend">${legend}</div>`;
@@ -4055,14 +4118,16 @@ function prodDashboardHtml() {
 }
 
 // ---- "Can we take this job?": a planning project is dropped into the real queue ----
+let fsPin = null; // start chosen by dragging the new job (Date) — null = first free slot
 function openFeasibility(projectId) {
+  fsPin = null;
   const cand = Object.values(projects).filter(p => p.status !== 'completed' && p.status !== 'archived').sort((a, b) => ((b.status === 'planning') - (a.status === 'planning')) || a.name.localeCompare(b.name));
   if (!cand.length) { toast('Create a project (status Planning) first', 'warn'); return; }
   const start = projects[projectId] && cand.includes(projects[projectId]) ? projects[projectId] : cand[0];
   openModal('Can we take this job?', `
     <div class="form-help mb-8">Pick a project (use status <strong>Planning</strong> for an offer that is not confirmed yet). The app puts its materials into the real production queue — current stock, reservations, orders already running — and tells you when it can be ready.</div>
     <div class="form-grid">
-      <div class="form-row"><label>Project</label><select id="fsProject" onchange="document.getElementById('fsDate').value=(projects[this.value]||{}).deadline||'';feasibilityRun()">${cand.map(p => `<option value="${p.id}" ${p.id === start.id ? 'selected' : ''}>${escAttr(p.name)} — ${p.status}</option>`).join('')}</select></div>
+      <div class="form-row"><label>Project</label><select id="fsProject" onchange="fsPin=null;document.getElementById('fsDate').value=(projects[this.value]||{}).deadline||'';feasibilityRun()">${cand.map(p => `<option value="${p.id}" ${p.id === start.id ? 'selected' : ''}>${escAttr(p.name)} — ${p.status}</option>`).join('')}</select></div>
       <div class="form-row"><label>Customer needs it ready by</label><input type="date" id="fsDate" value="${start.deadline || ''}" onchange="feasibilityRun()"></div>
     </div>
     <div class="form-grid"><div class="form-row"><label>Priority in the queue</label><select id="fsPrio" onchange="feasibilityRun()"><option value="normal">Normal — after the orders already waiting</option><option value="urgent">Urgent — jumps the queue</option></select></div><div class="form-row" style="align-self:end"><label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:.85rem"><input type="checkbox" id="fsFull" class="list-check" onchange="feasibilityRun()"> Count the whole job again (ignore orders already issued or delivered)</label><div class="form-help">Edit the project to change its surfaces and m².</div></div></div>
@@ -4085,12 +4150,12 @@ function feasibilityRun() {
       <div class="form-help mt-8">To test the whole job as if it were new, tick <strong>Count the whole job again</strong> above.</div>`;
     return;
   }
-  const mk = pr => ({ id: '__new', ref: 'NEW JOB', projectId: p.id, projectName: p.name, status: 'issued', priority: pr, dueDate: date, issuedAt: '9999', items });
+  const mk = pr => ({ id: '__new', ref: 'NEW JOB', projectId: p.id, projectName: p.name, status: 'issued', priority: pr, dueDate: date, issuedAt: '9999', items, pinStart: fsPin || undefined });
   const base = prodSchedule(), withNew = prodSchedule(mk(prio)), e = withNew.__new;
   const dueEnd = date ? new Date(date + 'T' + (prodSettings.end || '16:00') + ':00') : null;
-  const fits = !dueEnd || e.end <= dueEnd, spare = dueEnd ? (dueEnd - e.end) / 60000 : 0;
+  const fits0 = !dueEnd || e.end <= dueEnd, fits = fits0, spare = dueEnd ? (fits0 ? workMinutesBetween(e.end, dueEnd) : workMinutesBetween(dueEnd, e.end)) : 0;
   const moved = Object.values(productionOrders).filter(poIsOpen).map(o => ({ o, delta: (withNew[o.id].end - base[o.id].end) / 60000 })).filter(x => x.delta > 1);
-  const alt = !fits && prio === 'normal' ? prodSchedule(mk('urgent')).__new : null;
+  const alt = !fits && prio === 'normal' && !fsPin ? prodSchedule(mk('urgent')).__new : null;
   const altMoved = alt ? Object.values(productionOrders).filter(poIsOpen).map(o => ({ o, delta: (prodSchedule(mk('urgent'))[o.id].end - base[o.id].end) / 60000 })).filter(x => x.delta > 1) : [];
   const lead = plannerSettings && plannerSettings.lead != null ? plannerSettings.lead : 14;
   const buyBy = new Date(prodNow().getTime() + lead * 86400000);
@@ -4099,7 +4164,14 @@ function feasibilityRun() {
   const verdictCls = fitsAll ? 'ok' : 'no';
   const dayDiff = Math.round(Math.abs(spare) / (prodDayWork() || 480) * 10) / 10;
   const movedTxt = list => list.length ? list.map(x => `<div class="text-sm">• <strong>${escAttr(x.o.ref)}</strong> ${escAttr(x.o.projectName || '')} would finish ${fmtDur(x.delta)} later</div>`).join('') : '<div class="text-sm text-muted">No other order is delayed.</div>';
-  const day = prodDayBars(Object.values(productionOrders).filter(poIsOpen).concat([mk(prio)]), withNew, 4);
+  const lastT = Math.max(+e.end, dueEnd ? +dueEnd : 0), startDay = new Date(prodNow().getFullYear(), prodNow().getMonth(), prodNow().getDate());
+  let wd = 0; for (let t = new Date(startDay); t <= new Date(lastT) && wd < 14; t = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1)) if (prodIsWorkDay(t)) wd++;
+  const day = prodDayBars(Object.values(productionOrders).filter(poIsOpen).concat([mk(prio)]), withNew, Math.max(5, Math.min(10, wd + 1)), { drag: true });
+  const pad = n => String(n).padStart(2, '0'), ymd = t => `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
+  const pinRow = `<div class="fs-pin"><div class="form-row"><label>Start the job on</label><input type="date" id="fsPinD" value="${ymd(e.start)}" onchange="fsSetPin()"></div>
+    <div class="form-row"><label>At</label><input type="time" id="fsPinT" step="300" value="${hm(e.start)}" onchange="fsSetPin()"></div>
+    ${fsPin ? '<button type="button" class="btn btn-secondary btn-sm" onclick="fsPin=null;feasibilityRun()">Back to first free slot</button>' : ''}</div>
+    <div class="form-help">Drag the striped bar to another day or time (it snaps to 5 min), or type it here. Other orders move around it.</div>`;
   out.innerHTML = `<div class="fs-verdict ${verdictCls}">
       <div class="fs-big">${fitsAll ? '✓ Yes, it fits' : '✗ Not in time'}</div>
       <div>Ready <strong>${slotText(e.end, e.end).replace(/ \d.*$/, '')} ${hm(e.end)}</strong> — ${fmtDur(e.minutes)} of work (production ${fmtDur(e.prodMin)} + picking ${fmtDur(e.pickMin)} for ${e.pieces} packs)${e.waitMin > 1 ? ', starting in ' + fmtDur(e.waitMin) : ''}.</div>
@@ -4108,8 +4180,69 @@ function feasibilityRun() {
     ${needsBuy ? `<div class="fs-warn mt-8"><strong>Needs purchasing:</strong> ${e.short.map(x => x.qty + ' × ' + escAttr(x.name) + ' ' + escAttr(x.pkg)).join(', ')} — not in stock and not made by us. With the planner lead time of ${lead} days they arrive about ${fmtDate(buyBy.toISOString().slice(0, 10))}${dueEnd && buyBy > dueEnd ? ' <strong style="color:var(--red)">— after the required date</strong>' : ''}.</div>` : ''}
     ${moved.length ? `<div class="mt-8"><strong>Effect on the queue</strong>${movedTxt(moved)}</div>` : ''}
     ${alt ? `<div class="fs-warn mt-8"><strong>If it is made urgent:</strong> ready ${slotText(alt.end, alt.end).replace(/ \d.*$/, '')} ${hm(alt.end)} ${alt.end <= dueEnd ? '<span style="color:var(--green)">✓ fits</span>' : '<span style="color:var(--red)">✗ still too late</span>'}${movedTxt(altMoved)}</div>` : ''}
-    <div class="mt-16">${day}</div>`;
+    ${pinRow}
+    <div class="mt-8" id="fsBars">${day}</div>`;
 }
+
+function fsSetPin() {
+  const d = $('fsPinD').value, t = $('fsPinT').value;
+  if (!d || !t) return;
+  const [h, m] = t.split(':').map(Number), [y, mo, da] = d.split('-').map(Number);
+  fsPin = new Date(y, mo - 1, da, h, m, 0);
+  feasibilityRun();
+}
+
+// drag the new job on the day bars
+let fsDrag = null;
+const fsSnap = ms => Math.round(ms / 300000) * 300000;
+function fsTarget(e) {
+  const bar = document.elementsFromPoint(e.clientX, e.clientY).find(x => x.classList && x.classList.contains('pd-bar') && x.dataset.ds);
+  if (!bar) return null;
+  const r = bar.getBoundingClientRect(), ds = +bar.dataset.ds, de = +bar.dataset.de;
+  const at = ds + Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * (de - ds);
+  return { bar, at, ds, de };
+}
+function fsDragTip(e) {
+  const tg = fsTarget(e), tip = $('fsTip');
+  if (!tip) return null;
+  if (!tg) { tip.hidden = true; return null; }
+  const start = new Date(Math.max(tg.ds, Math.min(tg.de - 300000, fsSnap(tg.at - fsDrag.off))));
+  tip.hidden = false; tip.textContent = `Start ${dayWord(start)} ${hm(start)}`;
+  tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY - 34) + 'px';
+  return start;
+}
+document.addEventListener('pointerdown', e => {
+  const seg = e.target.closest && e.target.closest('.pd-seg.pd-drag');
+  const bar = seg && seg.closest('.pd-bar');
+  if (!bar) return;
+  e.preventDefault();
+  const r = bar.getBoundingClientRect(), ds = +bar.dataset.ds, de = +bar.dataset.de;
+  const grab = ds + (e.clientX - r.left) / r.width * (de - ds);
+  const sr = seg.getBoundingClientRect(), ghost = seg.cloneNode(true);
+  ghost.className = 'pd-seg pd-new pd-ghost'; ghost.removeAttribute('style');
+  ghost.style.cssText = `position:fixed;left:${sr.left}px;top:${sr.top}px;width:${sr.width}px;height:${sr.height}px`;
+  document.body.appendChild(ghost);
+  fsDrag = { seg, ghost, x0: e.clientX, y0: e.clientY, off: grab - (+seg.dataset.start) };
+  seg.style.opacity = '.3';
+  if (!$('fsTip')) { const t = document.createElement('div'); t.id = 'fsTip'; t.className = 'pd-tip'; t.hidden = true; document.body.appendChild(t); }
+});
+document.addEventListener('pointermove', e => {
+  if (!fsDrag) return;
+  fsDrag.ghost.style.transform = `translate(${e.clientX - fsDrag.x0}px,${e.clientY - fsDrag.y0}px)`;
+  fsDragTip(e);
+});
+const fsGhostOff = seg => { seg.style.opacity = ''; };
+function fsDragEnd(e, cancel) {
+  if (!fsDrag) return;
+  const start = cancel ? null : fsDragTip(e), seg = fsDrag.seg, ghost = fsDrag.ghost;
+  fsDrag = null;
+  ghost.remove();
+  const tip = $('fsTip'); if (tip) tip.remove();
+  fsGhostOff(seg);
+  if (start) { fsPin = start; feasibilityRun(); }
+}
+document.addEventListener('pointerup', e => fsDragEnd(e, false));
+document.addEventListener('pointercancel', e => fsDragEnd(e, true));
 
 // ---- estimate preview while issuing an order ----
 function poEstimatePreview() {
